@@ -165,6 +165,53 @@ router.post('/generate-from-project', authMiddleware, async (req, res) => {
         const { projectId, targetDuration } = req.body;
         console.log('[GENERATE-PROJECT] ProjectId:', projectId, 'Duration:', targetDuration);
 
+        // === MOCK MODE (Bypass total : DB + Fichier + IA) ===
+        if (process.env.USE_MOCK_DB === 'true') {
+            console.log('⚠️ [GENERATE-PROJECT] Mock mode enabled - Bypass DB & File');
+            const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+            await delay(2000); // Simuler délai
+
+            const mockDialogue = {
+                title: "Podcast Mock : " + (projectId ? "Projet " + projectId : "Démo"),
+                dialogues: [
+                    { character: "anabelle", text: "Ceci est un podcast produit à partir des cours originaux de l'EISF.", section: "jingle" },
+                    { character: "anabelle", text: "Bonjour ! Nous sommes en mode démonstration car la base de données est simulée.", section: "intro" },
+                    { character: "bryan", text: "Ah d'accord ! Donc le texte n'a rien à voir avec mon fichier ?", section: "intro" },
+                    { character: "anabelle", text: "Exactement. C'est pour tester l'interface sans appeler l'IA ni lire de fichiers.", section: "content" },
+                    { character: "bryan", text: "C'est très clair. On peut donc vérifier que tout s'affiche bien.", section: "content" },
+                    { character: "anabelle", text: "Tout à fait. À bientôt pour une vraie génération !", section: "conclusion" }
+                ]
+            };
+
+            // Sauvegarder ce mock en BDD Mock pour qu'il soit listé
+            // Note: En mode Mock, on insère quand même pour avoir un ID
+            const normalized = mockDialogue.dialogues.map(d => ({ ...d, text_studio: d.text, text_reading: d.text }));
+            const actualWordCount = normalized.reduce((sum, d) => sum + d.text_studio.split(/\s+/).length, 0);
+
+            // On utilise 'pool' qui est le mock_pool ici
+            const podcastResult = await pool.query(
+                'INSERT INTO podcasts (project_id, title, word_count, duration_seconds) VALUES ($1, $2, $3, $4) RETURNING id',
+                [projectId || 1, mockDialogue.title, actualWordCount, (targetDuration || 5) * 60]
+            );
+            const podcastId = podcastResult.rows[0].id;
+
+            for (let i = 0; i < normalized.length; i++) {
+                const d = normalized[i];
+                await pool.query(
+                    'INSERT INTO dialogues (podcast_id, order_index, character, text_studio, text_reading, duration_seconds, section) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+                    [podcastId, i, d.character, d.text_studio, d.text_reading, 10, d.section]
+                );
+            }
+
+            return res.json({
+                podcastId,
+                title: mockDialogue.title,
+                wordCount: actualWordCount,
+                dialogueCount: normalized.length,
+            });
+        }
+
+        // === RÉEL MODE ===
         // Récupérer le chemin du fichier source
         const projectResult = await pool.query(
             'SELECT source_file_path FROM projects WHERE id = $1 AND user_id = $2',
@@ -198,9 +245,6 @@ router.post('/generate-from-project', authMiddleware, async (req, res) => {
 
         const content = educationalContent.join('\n');
         const duration = targetDuration || 5;
-
-        // === DÉBUT GÉNÉRATION (copié de /generate) ===
-
         const targetWords = duration * 150;
 
         const prompt = `
@@ -240,41 +284,20 @@ VÉRIFIE AVANT D'ENVOYER :
 `;
 
 
-        let generatedText;
+        console.log('[GENERATE-PROJECT] Appel Gemini...');
+        console.log('[GENERATE-PROJECT] Prompt length:', prompt.length);
 
-        // MOCK MODE
-        if (process.env.USE_MOCK_DB === 'true') {
-            console.log('⚠️ [GENERATE-PROJECT] Mock mode enabled');
-            await new Promise(resolve => setTimeout(resolve, 2000)); // Simuler délai
+        const { GoogleGenerativeAI } = require("@google/generative-ai");
+        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+        const model = genAI.getGenerativeModel({
+            model: "gemini-1.5-flash",
+            generationConfig: { responseMimeType: "application/json" }
+        });
 
-            const mockDialogue = {
-                title: "Podcast Mock : " + (projectId ? "Projet " + projectId : "Sans titre"),
-                dialogues: [
-                    { character: "anabelle", text: "Ceci est un podcast produit à partir des cours originaux de l'EISF.", section: "jingle" },
-                    { character: "anabelle", text: "Bonjour à tous ! Aujourd'hui nous analysons le document que vous avez fourni.", section: "intro" },
-                    { character: "bryan", text: "C'est super intéressant ! De quoi ça parle exactement ?", section: "intro" },
-                    { character: "anabelle", text: "Nous allons voir les points clés, notamment la structure et le contenu pédagogique.", section: "content" },
-                    { character: "bryan", text: "D'accord, je comprends mieux l'importance de ce sujet maintenant.", section: "content" },
-                    { character: "anabelle", text: "Voilà pour l'essentiel. À bientôt pour un prochain épisode !", section: "conclusion" }
-                ]
-            };
-            generatedText = JSON.stringify(mockDialogue);
-        } else {
-            console.log('[GENERATE-PROJECT] Appel Gemini...');
-            console.log('[GENERATE-PROJECT] Prompt length:', prompt.length);
-
-            const { GoogleGenerativeAI } = require("@google/generative-ai");
-            const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-            const model = genAI.getGenerativeModel({
-                model: "gemini-1.5-flash",
-                generationConfig: { responseMimeType: "application/json" }
-            });
-
-            const aiResult = await model.generateContent(prompt);
-            console.log('[GENERATE-PROJECT] Réponse Gemini reçue');
-            generatedText = aiResult.response.text();
-            console.log('[GENERATE-PROJECT] Response length:', generatedText.length);
-        }
+        const aiResult = await model.generateContent(prompt);
+        console.log('[GENERATE-PROJECT] Réponse Gemini reçue');
+        const generatedText = aiResult.response.text();
+        console.log('[GENERATE-PROJECT] Response length:', generatedText.length);
 
         // Parser JSON
         const jsonMatch = generatedText.match(/```json\n([\s\S]*?)\n```/);
