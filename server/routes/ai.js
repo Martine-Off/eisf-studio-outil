@@ -9,7 +9,10 @@ const router = express.Router();
 // Générer dialogue Anabelle/Bryan
 router.post('/generate', authMiddleware, async (req, res) => {
     try {
+        console.log('[GENERATE] Début de la route /generate');
+        console.log('[GENERATE] req.body:', JSON.stringify(req.body).substring(0, 200));
         const { projectId, content, targetDuration } = req.body;
+        console.log('[GENERATE] projectId:', projectId, 'targetDuration:', targetDuration, 'content length:', content?.length);
 
         if (!content || !targetDuration) {
             return res.status(400).json({ error: 'Contenu et durée cible requis' });
@@ -86,6 +89,9 @@ VÉRIFIE AVANT D'ENVOYER :
             const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
             console.log('🤖 [AI] calling OpenAI...');
+            console.log('[AI] Prompt length:', prompt.length);
+            console.log('[AI] Target duration:', targetDuration, 'minutes');
+
             const completion = await openai.chat.completions.create({
                 messages: [
                     { role: "system", content: "Tu es un assistant pédagogique expert qui génère des dialogues JSON." },
@@ -95,6 +101,8 @@ VÉRIFIE AVANT D'ENVOYER :
                 response_format: { type: "json_object" },
             });
 
+            console.log('[AI] OpenAI response received');
+            console.log('[AI] Response length:', completion.choices[0].message.content.length);
             generatedText = completion.choices[0].message.content;
         }
 
@@ -153,7 +161,9 @@ VÉRIFIE AVANT D'ENVOYER :
 // Régénérer à partir du fichier Word du projet
 router.post('/generate-from-project', authMiddleware, async (req, res) => {
     try {
+        console.log('[GENERATE-PROJECT] Début génération depuis projet');
         const { projectId, targetDuration } = req.body;
+        console.log('[GENERATE-PROJECT] ProjectId:', projectId, 'Duration:', targetDuration);
 
         // Récupérer le chemin du fichier source
         const projectResult = await pool.query(
@@ -162,14 +172,18 @@ router.post('/generate-from-project', authMiddleware, async (req, res) => {
         );
 
         if (projectResult.rows.length === 0) {
+            console.log('[GENERATE-PROJECT] Projet non trouvé');
             return res.status(404).json({ error: 'Projet non trouvé' });
         }
 
         const filePath = projectResult.rows[0].source_file_path;
+        console.log('[GENERATE-PROJECT] Fichier source:', filePath);
 
         // Lire le fichier Word
+        console.log('[GENERATE-PROJECT] Lecture du fichier Word...');
         const result = await mammoth.extractRawText({ path: filePath });
         const text = result.value;
+        console.log('[GENERATE-PROJECT] Texte extrait, longueur:', text.length);
 
         // Filtrer le contenu pédagogique
         const lines = text.split('\n').filter(line => line.trim());
@@ -180,21 +194,146 @@ router.post('/generate-from-project', authMiddleware, async (req, res) => {
             return true;
         });
 
-        // Rediriger vers la route de génération
-        req.body.content = educationalContent.join('\n');
-        req.body.targetDuration = targetDuration || 5;
+        console.log('[GENERATE-PROJECT] Contenu filtré, lignes:', educationalContent.length);
 
-        // Appeler la logique de génération directement
-        // (Réutiliser le handler /generate ci-dessus via un forwarding interne)
-        const genHandler = router.stack.find(r => r.route?.path === '/generate');
-        if (genHandler) {
-            return genHandler.route.stack[0].handle(req, res);
+        const content = educationalContent.join('\n');
+        const duration = targetDuration || 5;
+
+        // === DÉBUT GÉNÉRATION (copié de /generate) ===
+
+        const targetWords = duration * 150;
+
+        const prompt = `
+Tu es un générateur de podcasts pédagogiques EISF (École d'Ingénierie et de Sciences Fromagères).
+
+CONTRAINTES STRICTES :
+- Durée : ${duration} minutes (${targetWords} mots)
+- Personnages : Anabelle (70%) et Bryan (30%)
+- Anabelle = experte, ton posé, professionnel. Explique les concepts clairement.
+- Bryan = apprenant curieux, spontané. Pose des questions, reformule, fait des liens concrets.
+- Jingle obligatoire (première réplique d'Anabelle) : "Ceci est un podcast produit à partir des cours originaux de l'EISF."
+- Structure : Jingle (15s) + Intro (30s) + Contenu avec quiz intégré (3-5min) + Conclusion (30s)
+- Quiz : Intégré naturellement dans le dialogue, pas de section séparée
+- Ton conversationnel et naturel (pas "Chers auditeurs", pas "Bienvenue dans ce cours")
+
+CONTENU SOURCE :
+${content}
+
+GÉNÈRE LE DIALOGUE AU FORMAT JSON UNIQUEMENT (pas de texte avant/après) :
+{
+  "title": "Titre accrocheur du podcast (max 50 caractères)",
+  "dialogues": [
+    {"character": "anabelle", "text": "...", "section": "jingle"},
+    {"character": "bryan", "text": "...", "section": "jingle"},
+    {"character": "anabelle", "text": "...", "section": "intro"},
+    ...
+  ]
+}
+
+VÉRIFIE AVANT D'ENVOYER :
+✅ Jingle = texte EXACT fourni
+✅ Ratio Anabelle/Bryan ≈ 70/30
+✅ Durée totale = ${duration} min (±30 secondes OK)
+✅ Ton conversationnel
+✅ Quiz intégré dans dialogue
+✅ JSON valide
+`;
+
+
+        let generatedText;
+
+        // MOCK MODE
+        if (process.env.USE_MOCK_DB === 'true') {
+            console.log('⚠️ [GENERATE-PROJECT] Mock mode enabled');
+            await new Promise(resolve => setTimeout(resolve, 2000)); // Simuler délai
+
+            const mockDialogue = {
+                title: "Podcast Mock : " + (projectId ? "Projet " + projectId : "Sans titre"),
+                dialogues: [
+                    { character: "anabelle", text: "Ceci est un podcast produit à partir des cours originaux de l'EISF.", section: "jingle" },
+                    { character: "anabelle", text: "Bonjour à tous ! Aujourd'hui nous analysons le document que vous avez fourni.", section: "intro" },
+                    { character: "bryan", text: "C'est super intéressant ! De quoi ça parle exactement ?", section: "intro" },
+                    { character: "anabelle", text: "Nous allons voir les points clés, notamment la structure et le contenu pédagogique.", section: "content" },
+                    { character: "bryan", text: "D'accord, je comprends mieux l'importance de ce sujet maintenant.", section: "content" },
+                    { character: "anabelle", text: "Voilà pour l'essentiel. À bientôt pour un prochain épisode !", section: "conclusion" }
+                ]
+            };
+            generatedText = JSON.stringify(mockDialogue);
+        } else {
+            console.log('[GENERATE-PROJECT] Appel Gemini...');
+            console.log('[GENERATE-PROJECT] Prompt length:', prompt.length);
+
+            const { GoogleGenerativeAI } = require("@google/generative-ai");
+            const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+            const model = genAI.getGenerativeModel({
+                model: "gemini-1.5-flash",
+                generationConfig: { responseMimeType: "application/json" }
+            });
+
+            const aiResult = await model.generateContent(prompt);
+            console.log('[GENERATE-PROJECT] Réponse Gemini reçue');
+            generatedText = aiResult.response.text();
+            console.log('[GENERATE-PROJECT] Response length:', generatedText.length);
         }
 
-        res.status(500).json({ error: 'Route de génération non trouvée' });
+        // Parser JSON
+        const jsonMatch = generatedText.match(/```json\n([\s\S]*?)\n```/);
+        let dialogue;
+        try {
+            dialogue = JSON.parse(jsonMatch ? jsonMatch[1] : generatedText);
+        } catch (parseErr) {
+            const cleaned = generatedText.replace(/```json\n?|```/g, '').trim();
+            dialogue = JSON.parse(cleaned);
+        }
+
+        console.log('[GENERATE-PROJECT] JSON parsé, titre:', dialogue.title);
+
+        // Normaliser
+        const normalized = dialogue.dialogues.map(line => ({
+            ...line,
+            text_studio: normalizeText(line.text),
+            text_reading: line.text,
+        }));
+
+        // Calculer nombre de mots
+        const actualWordCount = normalized.reduce((sum, d) => sum + d.text_studio.split(/\s+/).length, 0);
+        console.log('[GENERATE-PROJECT] Mots générés:', actualWordCount);
+
+        // Créer podcast dans BDD
+        const podcastResult = await pool.query(
+            'INSERT INTO podcasts (project_id, title, word_count, duration_seconds) VALUES ($1, $2, $3, $4) RETURNING id',
+            [projectId, dialogue.title, actualWordCount, duration * 60]
+        );
+
+        const podcastId = podcastResult.rows[0].id;
+        console.log('[GENERATE-PROJECT] Podcast créé, ID:', podcastId);
+
+        // Insérer dialogues
+        for (let i = 0; i < normalized.length; i++) {
+            const d = normalized[i];
+            const wordCount = d.text_studio.split(/\s+/).length;
+            const estimatedDuration = Math.round((wordCount / 150) * 60);
+            await pool.query(
+                'INSERT INTO dialogues (podcast_id, order_index, character, text_studio, text_reading, duration_seconds, section) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+                [podcastId, i, d.character, d.text_studio, d.text_reading, estimatedDuration, d.section]
+            );
+        }
+
+        console.log('[GENERATE-PROJECT] Dialogues insérés:', normalized.length);
+        console.log('[GENERATE-PROJECT] ✅ Génération terminée avec succès');
+
+        res.json({
+            podcastId,
+            title: dialogue.title,
+            wordCount: actualWordCount,
+            dialogueCount: normalized.length,
+        });
+
     } catch (error) {
-        console.error('Erreur génération depuis projet:', error);
-        res.status(500).json({ error: 'Erreur serveur' });
+        console.error('[GENERATE-PROJECT] ERREUR:', error);
+        // Renvoyer l'erreur exacte de Google (ex: Rate limit, Quota exceeded)
+        const errorDetails = error.errorDetails || error.message;
+        res.status(500).json({ error: 'Erreur génération IA', details: errorDetails });
     }
 });
 
