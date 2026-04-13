@@ -225,6 +225,11 @@ export default function Editor() {
     
     const [selectedPodcastId, setSelectedPodcastId] = useState<number | null>(null);
     const [availablePodcasts, setAvailablePodcasts] = useState<{id: number, title: string}[]>([]);
+    
+    // États pour le découpage manuel/unitaire
+    const [editableChapters, setEditableChapters] = useState<Chapter[]>([]);
+    const [generatingChapters, setGeneratingChapters] = useState<Set<number>>(new Set());
+    const [generatedChapters, setGeneratedChapters] = useState<Set<number>>(new Set());
 
     const sensors = useSensors(
         useSensor(PointerSensor),
@@ -246,6 +251,13 @@ export default function Editor() {
             handlePreview();
         }
     }, [step]);
+
+    // Synchroniser les chapitres éditables quand les données de preview arrivent
+    useEffect(() => {
+        if (previewData?.chapters) {
+            setEditableChapters(previewData.chapters);
+        }
+    }, [previewData]);
 
     useEffect(() => {
         const timer = setInterval(() => {
@@ -417,13 +429,45 @@ export default function Editor() {
         try {
             await api.post('/ai/generate-from-project', {
                 projectId: Number(projectId),
-                segments: previewData?.chapters
+                segments: editableChapters // Utilise les chapitres potentiellement renommés
             });
             navigate(`/project/${projectId}/podcasts`);
         } catch (error) {
             console.error('Erreur génération:', error);
         } finally {
             setGenerating(false);
+        }
+    };
+
+    const updateChapterTitle = (index: number, newTitle: string) => {
+        setEditableChapters(prev => prev.map((ch, i) => i === index ? { ...ch, title: newTitle } : ch));
+    };
+
+    const handleGenerateSingle = async (index: number) => {
+        const chapter = editableChapters[index];
+        if (!chapter) return;
+
+        setGeneratingChapters(prev => new Set(prev).add(index));
+        try {
+            await api.post('/ai/generate-single-chapter', {
+                projectId: Number(projectId),
+                segment: chapter,
+                orderIndex: index
+            });
+            setGeneratedChapters(prev => new Set(prev).add(index));
+            
+            // Notification succès
+            setSaveStatus('saved');
+            setShowToast(true);
+            setTimeout(() => setShowToast(false), 3000);
+        } catch (error) {
+            console.error('Erreur génération unitaire:', error);
+        } finally {
+            setGeneratingChapters(prev => {
+                const next = new Set(prev);
+                next.delete(index);
+                return next;
+            });
         }
     };
 
@@ -665,22 +709,56 @@ export default function Editor() {
                         <div className="bg-card border border-border rounded-2xl p-6">
                             <h3 className="font-bold text-foreground mb-1">🗂️ Découpage proposé</h3>
                             <p className="text-sm text-muted-foreground mb-4">
-                                L'application a détecté {previewData.chapters.length} chapitre(s) dans votre cours.
-                                Choisissez la durée cible et lancez la génération.
+                                L'application a détecté {editableChapters.length} chapitre(s) dans votre cours.
+                                Vous pouvez modifier les titres et générer chaque épisode un par un.
                             </p>
 
                             <div className="space-y-3">
-                                {previewData.chapters.map((chapter, i) => (
-                                    <div key={i} className="flex items-center justify-between bg-secondary rounded-xl px-5 py-4">
-                                        <div>
-                                            <p className="font-bold text-foreground text-sm">📻 {chapter.title}</p>
-                                            <p className="text-xs text-muted-foreground mt-0.5">{chapter.wordCount} mots</p>
+                                {editableChapters.map((chapter, i) => {
+                                    const isGenerating = generatingChapters.has(i);
+                                    const isGenerated = generatedChapters.has(i);
+                                    
+                                    return (
+                                        <div key={i} className={`flex items-center gap-4 bg-secondary rounded-xl px-5 py-4 transition-all ${isGenerated ? 'opacity-60 grayscale-[0.5] border border-green-500/30' : ''}`}>
+                                            <div className="flex-shrink-0 w-10 h-10 bg-background rounded-lg flex items-center justify-center text-xl shadow-sm">
+                                                {isGenerated ? '✅' : '📻'}
+                                            </div>
+                                            
+                                            <div className="flex-1">
+                                                <input 
+                                                    type="text"
+                                                    value={chapter.title}
+                                                    onChange={(e) => updateChapterTitle(i, e.target.value)}
+                                                    className="w-full bg-transparent border-none p-0 font-bold text-foreground text-sm focus:ring-0 outline-none"
+                                                    placeholder="Titre du podcast..."
+                                                />
+                                                <div className="flex items-center gap-3 mt-1">
+                                                    <span className="text-[10px] bg-background px-2 py-0.5 rounded text-muted-foreground font-bold uppercase tracking-wider">
+                                                        {chapter.wordCount} mots
+                                                    </span>
+                                                    <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded font-bold uppercase tracking-wider">
+                                                        ~{chapter.estimatedMinutes} min
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            <div className="flex-shrink-0">
+                                                <button
+                                                    onClick={() => handleGenerateSingle(i)}
+                                                    disabled={isGenerating || isGenerated}
+                                                    className={`flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-xs transition-all ${
+                                                        isGenerated 
+                                                            ? 'bg-green-500/10 text-green-600 border border-green-500/20' 
+                                                            : 'bg-primary text-primary-foreground shadow-sm hover:opacity-90 active:scale-95 disabled:opacity-50'
+                                                    }`}
+                                                >
+                                                    {isGenerating ? <Loader2 size={14} className="animate-spin" /> : isGenerated ? <CheckCircle size={14} /> : null}
+                                                    {isGenerating ? 'En cours...' : isGenerated ? 'Généré' : 'Générer celui-ci'}
+                                                </button>
+                                            </div>
                                         </div>
-                                        <span className="bg-primary/10 text-primary text-xs font-bold px-3 py-1 rounded-full border border-primary/20">
-                                            ~{chapter.estimatedMinutes} min
-                                        </span>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         </div>
 
