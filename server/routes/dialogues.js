@@ -4,8 +4,41 @@ const authMiddleware = require('../middleware/auth');
 
 const router = express.Router();
 
-// Mettre à jour un dialogue
-router.put('/:dialogueId', authMiddleware, async (req, res) => {
+// Réordonner les dialogues (globalement), déclaré AVANT /:dialogueId
+router.patch('/reorder', authMiddleware, async (req, res) => {
+    try {
+        const { dialogues } = req.body; // [{ id, order_index }, ...]
+
+        if (!Array.isArray(dialogues)) {
+            return res.status(400).json({ error: 'Format invalide' });
+        }
+
+        const client = await pool.connect();
+        try {
+            await client.query('BEGIN');
+            for (const d of dialogues) {
+                await client.query(
+                    'UPDATE dialogues SET order_index = $1 WHERE id = $2',
+                    [d.order_index, d.id]
+                );
+            }
+            await client.query('COMMIT');
+        } catch (err) {
+            await client.query('ROLLBACK');
+            throw err;
+        } finally {
+            client.release();
+        }
+
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Erreur réorganisation globale:', error);
+        res.status(500).json({ error: 'Erreur serveur' });
+    }
+});
+
+const updateDialogueHandler = async (req, res) => {
+
     try {
         const { dialogueId } = req.params;
         const { text_studio, text_reading, character, section } = req.body;
@@ -46,7 +79,11 @@ router.put('/:dialogueId', authMiddleware, async (req, res) => {
         console.error('Erreur mise à jour dialogue:', error);
         res.status(500).json({ error: 'Erreur serveur' });
     }
-});
+};
+
+// Mettre à jour un dialogue
+router.put('/:dialogueId', authMiddleware, updateDialogueHandler);
+router.patch('/:dialogueId', authMiddleware, updateDialogueHandler);
 
 // Supprimer un dialogue
 router.delete('/:dialogueId', authMiddleware, async (req, res) => {

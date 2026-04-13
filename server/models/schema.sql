@@ -38,6 +38,18 @@ CREATE TABLE IF NOT EXISTS podcasts (
   created_at TIMESTAMP DEFAULT NOW()
 );
 
+-- Table chapters
+CREATE TABLE IF NOT EXISTS chapters (
+  id SERIAL PRIMARY KEY,
+  project_id INTEGER REFERENCES projects(id) ON DELETE CASCADE,
+  order_index INTEGER NOT NULL,
+  title VARCHAR(200) NOT NULL,
+  content TEXT NOT NULL,
+  word_count INTEGER,
+  podcast_id INTEGER REFERENCES podcasts(id) ON DELETE SET NULL,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
 -- Table dialogues
 CREATE TABLE IF NOT EXISTS dialogues (
   id SERIAL PRIMARY KEY,

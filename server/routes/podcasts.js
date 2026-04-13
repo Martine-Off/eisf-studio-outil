@@ -4,6 +4,26 @@ const authMiddleware = require('../middleware/auth');
 
 const router = express.Router();
 
+// Récupérer tous les podcasts d'un projet
+router.get('/', authMiddleware, async (req, res) => {
+    try {
+        const { projectId } = req.query;
+        if (!projectId) {
+            return res.status(400).json({ error: 'projectId est requis' });
+        }
+        
+        const result = await pool.query(
+            'SELECT id, title, word_count, duration_seconds, created_at FROM podcasts WHERE project_id = $1 ORDER BY id ASC',
+            [projectId]
+        );
+        
+        res.json(result.rows);
+    } catch (error) {
+        console.error('Erreur récupération podcasts par projet:', error);
+        res.status(500).json({ error: 'Erreur serveur' });
+    }
+});
+
 // Récupérer dialogues d'un podcast
 router.get('/:podcastId/dialogues', authMiddleware, async (req, res) => {
     try {
@@ -73,6 +93,18 @@ router.get('/:podcastId', authMiddleware, async (req, res) => {
         res.json(result.rows[0]);
     } catch (error) {
         console.error('Erreur récupération podcast:', error);
+        res.status(500).json({ error: 'Erreur serveur' });
+    }
+});
+
+// Export PDF d'un podcast (Placeholder pour l'instant)
+router.get('/:id/export/pdf', authMiddleware, async (req, res) => {
+    try {
+        const { id } = req.params;
+        // La logique PDFKit sera ici. En attendant on redirige ou erreur 501.
+        res.status(501).json({ error: 'Export PDF bientôt disponible' });
+    } catch (error) {
+        console.error('Erreur export PDF:', error);
         res.status(500).json({ error: 'Erreur serveur' });
     }
 });

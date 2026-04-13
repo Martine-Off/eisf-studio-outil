@@ -18,7 +18,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import {
-    FileDown, Loader2, CheckCircle, ArrowUp, ArrowDown, ChevronLeft, RefreshCw, ChevronRight, GripVertical, Wand2
+    FileDown, Loader2, CheckCircle, ArrowUp, ArrowDown, ChevronLeft, RefreshCw, ChevronRight, GripVertical
 } from 'lucide-react';
 import api from '../utils/api';
 import { useKeyboardNav } from '../hooks/useKeyboardNav';
@@ -216,6 +216,7 @@ export default function Editor() {
     const [step, setStep] = useState<Step>('editor');
     const [previewData, setPreviewData] = useState<PreviewData | null>(null);
     const [previewing, setPreviewing] = useState(false);
+    const [targetDuration, setTargetDuration] = useState(5);
     const [regeneratingId, setRegeneratingId] = useState<number | null>(null);
     const [verifying, setVerifying] = useState(false);
     const [verificationReport, setVerificationReport] = useState<VerificationReport | null>(null);
@@ -290,7 +291,7 @@ export default function Editor() {
             if (allDialogues.length > 0) {
                 const uniqueIds = Array.from(new Set(allDialogues.map((d: any) => d.podcast_id)));
                 const deducedPodcasts = uniqueIds.map(pid => {
-                    const firstMatch = allDialogues.find((d: any) => d.podcast_id === pid);
+                    const firstMatch: any = allDialogues.find((d: any) => d.podcast_id === pid);
                     return { id: pid as number, title: firstMatch?.podcast_title || `Chapitre ${firstMatch?.section || pid}` };
                 });
                 setAvailablePodcasts(deducedPodcasts);
@@ -418,8 +419,7 @@ export default function Editor() {
                 projectId: Number(projectId),
                 segments: previewData?.chapters
             });
-            await loadData();
-            saveAndGoTo('editor');
+            navigate(`/project/${projectId}/podcasts`);
         } catch (error) {
             console.error('Erreur génération:', error);
         } finally {
@@ -595,78 +595,129 @@ export default function Editor() {
                     </div>
                 </div>
 
+                {/* ============================================================ */}
+                {/* ÉTAPE 1 — PRÉVISUALISATION DU CONTENU EXTRAIT               */}
+                {/* ============================================================ */}
                 {step === 'preview' && (
                     <div className="space-y-6">
                         {previewing ? (
                             <div className="bg-card border border-dashed border-border rounded-3xl p-20 text-center">
                                 <Loader2 className="animate-spin text-primary mx-auto mb-4" size={32} />
+                                <p className="text-muted-foreground font-medium">Lecture du fichier Word en cours...</p>
                             </div>
                         ) : previewData ? (
                             <>
+                                {/* Stats du fichier */}
                                 <div className="grid grid-cols-3 gap-4">
                                     <div className="bg-card border border-border rounded-2xl p-5 text-center">
                                         <p className="text-3xl font-extrabold text-primary">{previewData.wordCount.toLocaleString()}</p>
-                                        <p className="text-sm text-muted-foreground mt-1">mots</p>
+                                        <p className="text-sm text-muted-foreground mt-1">mots extraits</p>
                                     </div>
                                     <div className="bg-card border border-border rounded-2xl p-5 text-center">
                                         <p className="text-3xl font-extrabold text-primary">{previewData.lineCount}</p>
-                                        <p className="text-sm text-muted-foreground mt-1">blocs</p>
+                                        <p className="text-sm text-muted-foreground mt-1">blocs pédagogiques</p>
                                     </div>
                                     <div className="bg-card border border-border rounded-2xl p-5 text-center">
                                         <p className="text-3xl font-extrabold text-primary">{previewData.chapters.length}</p>
-                                        <p className="text-sm text-muted-foreground mt-1">chapitres</p>
+                                        <p className="text-sm text-muted-foreground mt-1">chapitres détectés</p>
                                     </div>
                                 </div>
+
+                                {/* Aperçu du texte extrait */}
+                                <div className="bg-card border border-border rounded-2xl p-6">
+                                    <h3 className="font-bold text-foreground mb-3">📄 Aperçu du contenu extrait</h3>
+                                    <div className="bg-secondary rounded-xl p-4 max-h-64 overflow-y-auto">
+                                        {previewData.rawLinesPreview.map((line, i) => (
+                                            <p key={i} className="text-sm text-foreground/80 mb-1 leading-relaxed">{line}</p>
+                                        ))}
+                                        {previewData.lineCount > 30 && (
+                                            <p className="text-xs text-muted-foreground mt-2 italic">
+                                                ... et {previewData.lineCount - 30} blocs supplémentaires
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Bouton continuer */}
                                 <div className="flex justify-end">
-                                    <button onClick={() => saveAndGoTo('chapters')} className="eisf-gradient text-primary-foreground px-8 py-3 rounded-xl font-bold">Continuer →</button>
+                                    <button
+                                        onClick={() => saveAndGoTo('chapters')}
+                                        className="flex items-center gap-2 eisf-gradient text-primary-foreground px-8 py-3 rounded-xl font-bold shadow-eisf hover:opacity-90 transition-all"
+                                    >
+                                        Voir le découpage des chapitres →
+                                    </button>
                                 </div>
                             </>
                         ) : (
-                            <button onClick={handlePreview} className="text-primary underline">Lancer l'analyse</button>
+                            <div className="bg-card border border-dashed border-border rounded-3xl p-20 text-center">
+                                <p className="text-muted-foreground font-medium">Impossible de lire le fichier.</p>
+                                <button onClick={handlePreview} className="mt-4 text-primary underline text-sm">Réessayer</button>
+                            </div>
                         )}
                     </div>
                 )}
 
-                {step === 'chapters' && (
+                {/* ============================================================ */}
+                {/* ÉTAPE 2 — DÉCOUPAGE EN CHAPITRES                            */}
+                {/* ============================================================ */}
+                {step === 'chapters' && previewData && (
                     <div className="space-y-6">
-                        {previewData && previewData.chapters.length > 0 && (
+                        <div className="bg-card border border-border rounded-2xl p-6">
+                            <h3 className="font-bold text-foreground mb-1">🗂️ Découpage proposé</h3>
+                            <p className="text-sm text-muted-foreground mb-4">
+                                L'application a détecté {previewData.chapters.length} chapitre(s) dans votre cours.
+                                Choisissez la durée cible et lancez la génération.
+                            </p>
+
                             <div className="space-y-3">
-                                <h2 className="text-lg font-bold text-foreground">Chapitres détectés ({previewData.chapters.length})</h2>
-                                <div className="space-y-2">
-                                    {previewData.chapters.map((ch, i) => (
-                                        <div key={i} className="bg-card border border-border rounded-xl p-4 flex items-center justify-between">
-                                            <div className="flex items-center gap-3">
-                                                <span className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-sm font-bold">{i + 1}</span>
-                                                <span className="font-semibold text-foreground">{ch.title}</span>
-                                            </div>
-                                            <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                                                <span>{ch.wordCount.toLocaleString()} mots</span>
-                                                <span className="bg-secondary px-2 py-0.5 rounded-full text-xs font-bold">~{ch.estimatedMinutes} min</span>
-                                            </div>
+                                {previewData.chapters.map((chapter, i) => (
+                                    <div key={i} className="flex items-center justify-between bg-secondary rounded-xl px-5 py-4">
+                                        <div>
+                                            <p className="font-bold text-foreground text-sm">📻 {chapter.title}</p>
+                                            <p className="text-xs text-muted-foreground mt-0.5">{chapter.wordCount} mots</p>
                                         </div>
-                                    ))}
+                                        <span className="bg-primary/10 text-primary text-xs font-bold px-3 py-1 rounded-full border border-primary/20">
+                                            ~{chapter.estimatedMinutes} min
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Sélecteur durée + bouton générer */}
+                        <div className="bg-card border border-border rounded-2xl p-6">
+                            <h3 className="font-bold text-foreground mb-4">⚙️ Paramètres de génération</h3>
+                            <div className="flex items-center gap-4">
+                                <div>
+                                    <label className="text-sm text-muted-foreground font-medium block mb-2">Durée cible du podcast</label>
+                                    <select
+                                        value={targetDuration}
+                                        onChange={(e) => setTargetDuration(Number(e.target.value))}
+                                        className="px-4 py-2.5 rounded-xl border border-border bg-secondary text-foreground font-medium"
+                                    >
+                                        <option value={4}>4 minutes</option>
+                                        <option value={5}>5 minutes</option>
+                                        <option value={6}>6 minutes</option>
+                                        <option value={7}>7 minutes</option>
+                                    </select>
                                 </div>
                             </div>
-                        )}
-                        <div className="flex items-center justify-between pt-4">
+                        </div>
+
+                        <div className="flex items-center justify-between">
                             <button
                                 onClick={() => saveAndGoTo('preview')}
                                 className="text-muted-foreground hover:text-foreground text-sm font-medium transition-colors"
                             >
                                 ← Retour à l'aperçu
                             </button>
-                            <button onClick={handleGenerate} disabled={generating} className="eisf-gradient text-primary-foreground px-8 py-3 rounded-xl font-bold flex items-center gap-2 shadow-eisf hover:opacity-90 active:scale-95 transition-all">
-                                {generating ? (
-                                    <>
-                                        <Loader2 className="animate-spin" size={18} />
-                                        Génération en cours...
-                                    </>
-                                ) : (
-                                    <>
-                                        <Wand2 size={18} />
-                                        Générer le podcast
-                                    </>
-                                )}
+                            <button
+                                onClick={handleGenerate}
+                                disabled={generating}
+                                className="flex items-center gap-2 eisf-gradient text-primary-foreground px-8 py-3 rounded-xl font-bold shadow-eisf hover:opacity-90 active:scale-95 transition-all disabled:opacity-60"
+                            >
+                                {generating ? <Loader2 size={18} className="animate-spin" /> : '🎙️'}
+                                {generating ? 'Génération IA en cours...' : 'Générer le podcast'}
                             </button>
                         </div>
                     </div>

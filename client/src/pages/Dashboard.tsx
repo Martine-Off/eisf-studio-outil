@@ -120,7 +120,7 @@ export default function Dashboard() {
                             transition={{ delay: index * 0.05 }}
                         >
                             <Link
-                                to={`/editor/${project.id}`}
+                                to={`/project/${project.id}/podcasts`}
                                 className="group block bg-card border border-border rounded-2xl p-6 shadow-sm hover:shadow-eisf-hover transition-all duration-300 h-full flex flex-col relative overflow-hidden"
                             >
                                 <div className="flex justify-between items-start mb-4">

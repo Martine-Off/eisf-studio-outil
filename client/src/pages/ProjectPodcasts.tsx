@@ -1,0 +1,102 @@
+import { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { Loader2, ChevronLeft, Mic } from 'lucide-react';
+import api from '../utils/api';
+import AppLayout from '../components/AppLayout';
+
+interface Podcast {
+    id: number;
+    title: string;
+    word_count: number;
+    duration_seconds: number;
+}
+
+export default function ProjectPodcasts() {
+    const { projectId } = useParams();
+    const navigate = useNavigate();
+    const [podcasts, setPodcasts] = useState<Podcast[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchPodcasts = async () => {
+            try {
+                const res = await api.get(`/podcasts?projectId=${projectId}`);
+                setPodcasts(res.data);
+            } catch (error) {
+                console.error('Erreur récupération podcasts:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchPodcasts();
+    }, [projectId]);
+
+    return (
+        <AppLayout>
+            <div className="max-w-5xl mx-auto pb-20 mt-8">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 mt-4">
+                    <div className="flex items-center gap-4">
+                        <button
+                            onClick={() => navigate(`/editor/${projectId}`)}
+                            className="p-2.5 bg-card border border-border rounded-xl hover:bg-secondary text-muted-foreground hover:text-foreground transition-all shadow-sm"
+                        >
+                            <ChevronLeft size={20} />
+                        </button>
+                        <h1 className="text-3xl font-extrabold text-foreground tracking-tight font-display">
+                            Liste des Podcasts
+                        </h1>
+                    </div>
+                    <button
+                        onClick={() => navigate(`/editor/${projectId}`)}
+                        className="bg-primary text-primary-foreground px-6 py-2.5 rounded-xl font-bold hover:opacity-90 transition-all font-sans"
+                    >
+                        Nouveau Podcast (Éditeur de projet)
+                    </button>
+                </div>
+
+                {loading ? (
+                    <div className="flex items-center justify-center py-20">
+                        <Loader2 className="animate-spin text-primary" size={40} />
+                    </div>
+                ) : podcasts.length === 0 ? (
+                    <div className="bg-card border border-dashed border-border rounded-2xl p-12 text-center">
+                        <div className="w-16 h-16 bg-primary/10 text-primary rounded-2xl flex items-center justify-center mx-auto mb-4">
+                            <Mic size={24} />
+                        </div>
+                        <h2 className="text-xl font-bold mb-2">Aucun podcast</h2>
+                        <p className="text-muted-foreground">Vous n'avez pas encore généré de podcast pour ce projet.</p>
+                        <button
+                            onClick={() => navigate(`/editor/${projectId}`)}
+                            className="mt-6 text-primary font-bold underline cursor-pointer"
+                        >
+                            Aller à l'éditeur générer un podcast
+                        </button>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {podcasts.map((podcast) => (
+                            <div key={podcast.id} className="bg-card border border-border rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow flex flex-col items-start">
+                                <div className="w-12 h-12 bg-primary/10 text-primary rounded-xl flex items-center justify-center mb-4">
+                                    <Mic size={24} />
+                                </div>
+                                <h3 className="font-bold text-lg text-foreground mb-1 line-clamp-2">{podcast.title || `Podcast #${podcast.id}`}</h3>
+                                <div className="text-sm text-muted-foreground mb-6 flex gap-4 font-medium">
+                                    <span className="bg-secondary px-2.5 py-1 rounded-md">{podcast.word_count ? podcast.word_count.toLocaleString() : 0} mots</span>
+                                    <span className="bg-secondary px-2.5 py-1 rounded-md">~{Math.ceil((podcast.duration_seconds || 0) / 60)} min</span>
+                                </div>
+                                <div className="mt-auto w-full pt-4 border-t border-border">
+                                    <button
+                                        onClick={() => navigate(`/project/${projectId}/podcast/${podcast.id}/edit`)}
+                                        className="w-full text-center bg-accent/10 hover:bg-accent/20 text-accent font-bold py-3 rounded-xl transition-colors flex items-center justify-center gap-2"
+                                    >
+                                        Voir / Modifier le script
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+        </AppLayout>
+    );
+}

@@ -3,12 +3,7 @@ const cors = require('cors');
 const path = require('path');
 require('dotenv').config();
 
-const authRoutes = require('./routes/auth');
-const projectRoutes = require('./routes/projects');
-const aiRoutes = require('./routes/ai');
-const podcastRoutes = require('./routes/podcasts');
-const dialogueRoutes = require('./routes/dialogues');
-const exportRoutes = require('./routes/export');
+const apiRoutes = require('./routes');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -28,12 +23,7 @@ app.use((req, res, next) => {
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/projects', projectRoutes);
-app.use('/api/ai', aiRoutes);
-app.use('/api/podcasts', podcastRoutes);
-app.use('/api/dialogues', dialogueRoutes);
-app.use('/api/export', exportRoutes);
+app.use('/api', apiRoutes);
 
 // Health check
 const pool = require('./models/db');
