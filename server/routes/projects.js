@@ -155,6 +155,37 @@ router.get('/:projectId', authMiddleware, async (req, res) => {
     }
 });
 
+// Récupérer tous les dialogues d'un projet (via ses podcasts)
+router.get('/:projectId/dialogues', authMiddleware, async (req, res) => {
+    try {
+        const { projectId } = req.params;
+
+        // Vérifier que le projet appartient à l'utilisateur
+        const projCheck = await pool.query(
+            'SELECT id FROM projects WHERE id = $1 AND user_id = $2',
+            [projectId, req.userId]
+        );
+        if (projCheck.rows.length === 0) {
+            return res.status(404).json({ error: 'Projet non trouvé' });
+        }
+
+        // Récupérer tous les dialogues via les podcasts du projet
+        const result = await pool.query(
+            `SELECT d.*, p.title as podcast_title
+             FROM dialogues d
+             JOIN podcasts p ON d.podcast_id = p.id
+             WHERE p.project_id = $1
+             ORDER BY p.order_index ASC, d.order_index ASC`,
+            [projectId]
+        );
+
+        res.json(result.rows); // Retourne [] si aucun dialogue
+    } catch (error) {
+        console.error('Erreur récupération dialogues projet:', error);
+        res.status(500).json({ error: 'Erreur serveur' });
+    }
+});
+
 // Supprimer un projet
 router.delete('/:projectId', authMiddleware, async (req, res) => {
     try {

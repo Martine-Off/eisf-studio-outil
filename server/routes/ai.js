@@ -60,7 +60,7 @@ VÉRIFIE AVANT D'ENVOYER :
         let generatedText;
 
         // MOCK AI GENERATION
-        if (process.env.USE_MOCK_DB === 'true' && !process.env.OPENAI_API_KEY) {
+        if (!process.env.OPENAI_API_KEY || process.env.USE_MOCK_AI === 'true') {
             const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
             await delay(2000); // Simuler un délai de génération
 

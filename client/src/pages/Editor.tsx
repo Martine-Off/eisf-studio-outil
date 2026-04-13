@@ -18,7 +18,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import {
-    FileDown, Loader2, CheckCircle, ArrowUp, ArrowDown, ChevronLeft, RefreshCw, ChevronRight, GripVertical
+    FileDown, Loader2, CheckCircle, ArrowUp, ArrowDown, ChevronLeft, RefreshCw, ChevronRight, GripVertical, Wand2
 } from 'lucide-react';
 import api from '../utils/api';
 import { useKeyboardNav } from '../hooks/useKeyboardNav';
@@ -239,6 +239,13 @@ export default function Editor() {
         if (projectId) loadData();
     }, [projectId]);
 
+    // Auto-lancer le preview quand on arrive sur l'étape 'preview' sans données
+    useEffect(() => {
+        if (step === 'preview' && !previewData && !previewing && projectId) {
+            handlePreview();
+        }
+    }, [step]);
+
     useEffect(() => {
         const timer = setInterval(() => {
             if (saveStateRef.current.status === 'unsaved') {
@@ -266,30 +273,36 @@ export default function Editor() {
 
     const loadData = async () => {
         try {
-            const [projRes, dlgsRes] = await Promise.all([
-                api.get(`/projects/${projectId}`),
-                api.get(`/projects/${projectId}/dialogues`)
-            ]);
+            // Charger le projet d'abord
+            const projRes = await api.get(`/projects/${projectId}`);
+            setProject(projRes.data.project);
 
-            const allDialogues = dlgsRes.data || [];
-            
+            // Charger les dialogues séparément (peut retourner [] si aucun podcast)
+            let allDialogues: Dialogue[] = [];
+            try {
+                const dlgsRes = await api.get(`/projects/${projectId}/dialogues`);
+                allDialogues = dlgsRes.data || [];
+            } catch (dlgError) {
+                console.warn('Aucun dialogue trouvé, démarrage au preview:', dlgError);
+                allDialogues = [];
+            }
+
             if (allDialogues.length > 0) {
                 const uniqueIds = Array.from(new Set(allDialogues.map((d: any) => d.podcast_id)));
                 const deducedPodcasts = uniqueIds.map(pid => {
                     const firstMatch = allDialogues.find((d: any) => d.podcast_id === pid);
-                    return { id: pid as number, title: `Chapitre ${firstMatch?.section || pid}` };
+                    return { id: pid as number, title: firstMatch?.podcast_title || `Chapitre ${firstMatch?.section || pid}` };
                 });
                 setAvailablePodcasts(deducedPodcasts);
                 if (!selectedPodcastId && deducedPodcasts.length > 0) {
                     setSelectedPodcastId(deducedPodcasts[0].id);
                 }
             }
-            
-            setProject(projRes.data.project);
+
             setDialogues(allDialogues);
             setStep(allDialogues.length > 0 ? 'editor' : 'preview');
         } catch (error) {
-            console.error('Erreur chargement:', error);
+            console.error('Erreur chargement projet:', error);
         } finally {
             setLoading(false);
         }
@@ -616,9 +629,46 @@ export default function Editor() {
 
                 {step === 'chapters' && (
                     <div className="space-y-6">
-                        <button onClick={handleGenerate} disabled={generating} className="eisf-gradient text-primary-foreground px-8 py-3 rounded-xl font-bold">
-                            {generating ? 'Génération...' : 'Générer le podcast'}
-                        </button>
+                        {previewData && previewData.chapters.length > 0 && (
+                            <div className="space-y-3">
+                                <h2 className="text-lg font-bold text-foreground">Chapitres détectés ({previewData.chapters.length})</h2>
+                                <div className="space-y-2">
+                                    {previewData.chapters.map((ch, i) => (
+                                        <div key={i} className="bg-card border border-border rounded-xl p-4 flex items-center justify-between">
+                                            <div className="flex items-center gap-3">
+                                                <span className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-sm font-bold">{i + 1}</span>
+                                                <span className="font-semibold text-foreground">{ch.title}</span>
+                                            </div>
+                                            <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                                                <span>{ch.wordCount.toLocaleString()} mots</span>
+                                                <span className="bg-secondary px-2 py-0.5 rounded-full text-xs font-bold">~{ch.estimatedMinutes} min</span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                        <div className="flex items-center justify-between pt-4">
+                            <button
+                                onClick={() => saveAndGoTo('preview')}
+                                className="text-muted-foreground hover:text-foreground text-sm font-medium transition-colors"
+                            >
+                                ← Retour à l'aperçu
+                            </button>
+                            <button onClick={handleGenerate} disabled={generating} className="eisf-gradient text-primary-foreground px-8 py-3 rounded-xl font-bold flex items-center gap-2 shadow-eisf hover:opacity-90 active:scale-95 transition-all">
+                                {generating ? (
+                                    <>
+                                        <Loader2 className="animate-spin" size={18} />
+                                        Génération en cours...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Wand2 size={18} />
+                                        Générer le podcast
+                                    </>
+                                )}
+                            </button>
+                        </div>
                     </div>
                 )}
 

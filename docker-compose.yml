@@ -6,10 +6,10 @@ services:
     container_name: studio_eisf_db
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
+      POSTGRES_PASSWORD: martine
       POSTGRES_DB: studio_eisf
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
