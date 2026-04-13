@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS projects (
   title VARCHAR(255) NOT NULL,
   status VARCHAR(20) DEFAULT 'draft',
   source_file_path VARCHAR(500),
+  cleaned_text TEXT,
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW(),
   last_opened_at TIMESTAMP

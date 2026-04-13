@@ -111,8 +111,25 @@ class MockPool {
             return { rows: dialogues };
         }
 
-        // 5. UPDATE last_login / last_opened_at
+        // 5. UPDATE users, projects, ou dialogues
         if (text.startsWith('update users') || text.startsWith('update projects')) {
+            return { rows: [], rowCount: 1 };
+        }
+
+        // 5b. UPDATE dialogues (Save & Reorder)
+        if (text.startsWith('update dialogues set text_studio')) {
+            const dialogue = mockStore.dialogues.find(d => d.id == params[1]);
+            if (dialogue) {
+                dialogue.text_studio = params[0];
+            }
+            return { rows: [], rowCount: 1 };
+        }
+        
+        if (text.startsWith('update dialogues set order_index')) {
+            const dialogue = mockStore.dialogues.find(d => d.id == params[1]);
+            if (dialogue) {
+                dialogue.order_index = params[0];
+            }
             return { rows: [], rowCount: 1 };
         }
 
@@ -129,7 +146,11 @@ class MockPool {
             return { rows: item ? [item] : [] };
         }
 
-        // Fallback
+        // Fallback générique pour BEGIN/COMMIT/ROLLBACK
+        if (['begin', 'commit', 'rollback'].includes(text)) {
+            return { rows: [] };
+        }
+
         console.warn(`[MockDB] Unhandled query: ${queryString}`);
         return { rows: [] };
     }

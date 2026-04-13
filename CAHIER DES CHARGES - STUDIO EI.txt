@@ -1,0 +1,1138 @@
+# 📋 CAHIER DES CHARGES - STUDIO EISF
+
+**Version** : 1.0  
+**Date** : 11/02/2026  
+**Client** : EISF (École d'Ingénierie et de Sciences Fromagères)  
+**Chef de projet** : Martine  
+**Produit** : Studio EISF - Podcast Factory pédagogique
+
+---
+
+## 🎯 VISION PRODUIT
+
+### Objectif
+Transformer automatiquement des cours Storyline (format .docx) en mini-podcasts pédagogiques (4-7 min) avec dialogue naturel entre deux personnages : Anabelle et Bryan.
+
+### Problème résolu
+- Réduire le temps de production de contenus audio pédagogiques (de 2h/cours à 15 min)
+- Offrir un format d'apprentissage accessible (audio pour trajets, révisions)
+- Maintenir la qualité pédagogique des cours EISF
+
+### Public cible
+- **Utilisateurs principaux** : Professeurs et ingénieurs pédagogiques EISF
+- **Bénéficiaires finaux** : Étudiants EISF (apprentis boulangers, pâtissiers)
+
+---
+
+## 👥 PERSONNAGES DU PODCAST
+
+### Anabelle (70% du temps de parole)
+- **Rôle** : Experte EISF, enseignante
+- **Ton** : Bienveillante, pédagogue, structurée
+- **Style** : Tutoiement, utilise "on", explications claires
+- **Fonction** : Transmet le contenu principal du cours
+
+### Bryan (30% du temps de parole)
+- **Rôle** : Apprenant type "NotebookLM"
+- **Ton** : Curieux, spontané, ancre dans le quotidien
+- **Style** : Interpelle ("Attends..."), reformule, fait des liens concrets
+- **Fonction** : Facilite la compréhension, pose les questions que l'étudiant se pose
+
+### Ratio de parole
+- **Anabelle** : 70% (contenu pédagogique principal)
+- **Bryan** : 30% (reformulations, questions, validation)
+
+---
+
+## 🎨 IDENTITÉ VISUELLE
+
+### Charte graphique
+- **Couleur principale** : Bleu #3465AE
+- **Couleur secondaire** : Rouge #E63337
+- **Couleur accent** : Beige #FEECD7
+- **Background** : #FDF8F3
+
+### Style interface
+- **Inspiration** : Notion (épuré, moderne)
+- **Coins** : Arrondis (border-radius: 2xl)
+- **Typographie** : Open Sans (800 pour titres, 400 pour body)
+- **Espacement** : Généreux, aéré
+
+---
+
+## 📊 FORMAT PODCAST
+
+### Contraintes de durée
+- **Durée cible** : 4-7 minutes par podcast
+- **Durée minimum** : 4 minutes
+- **Durée maximum** : 7 minutes
+- **Calcul** : 150 mots/minute (norme TTS)
+
+### Structure type (4-7 min)
+
+```
+1. JINGLE (15 secondes)
+   "Ceci est un podcast produit à partir des cours originaux de l'EISF."
+   Anabelle : "Salut Bryan !"
+   Bryan : "Salut Annabelle ! C'est parti ?"
+   Anabelle : "C'est parti. Aujourd'hui : [TITRE CHAPITRE]."
+
+2. INTRO RAPIDE (20-30 secondes)
+   → Anabelle annonce le sujet
+   → Bryan fait un lien avec le quotidien
+
+3. CONTENU PRINCIPAL AVEC QUIZ INTÉGRÉ (3-5 minutes)
+   → Anabelle explique les concepts (70%)
+   → Bryan questionne, reformule, valide (30%)
+   → Quiz intégré naturellement dans le dialogue
+   
+4. CONCLUSION (20-30 secondes)
+   → Anabelle récapitule en 1 phrase
+   → Bryan valide la compréhension
+   → Transition ("À tout à l'heure !")
+
+Total : 4-7 minutes
+```
+
+### Principe de découpage
+- **1 podcast = 1 chapitre ou sous-chapitre Storyline**
+- **Découpage automatique** : Mode chronologique (suit l'ordre du cours)
+- **Validation manuelle** : L'utilisateur peut ajuster le découpage proposé
+
+---
+
+## 🛠️ FONCTIONNALITÉS DÉTAILLÉES
+
+### ÉTAPE A : IMPORT & PARSING
+
+#### Import fichier
+- **Format accepté** : .docx (export Storyline)
+- **Taille max** : 50 MB
+- **Méthode** : Drag & Drop ou sélection fichier
+- **Bibliothèque** : mammoth.js (lecture Word)
+
+#### Parsing automatique
+```javascript
+Structure détectée :
+- ID Storyline (ignoré)
+- Type de zone (filtré : garde uniquement contenu pédagogique)
+- Texte original (colonne utilisée)
+- Traduction (colonne utilisée)
+```
+
+#### Filtrage intelligent
+**Conservé** :
+- Zones de texte avec contenu pédagogique (>20 caractères)
+- Paragraphes explicatifs
+- Définitions et concepts
+
+**Ignoré** :
+- Métadonnées Storyline (IDs, dates, auteur)
+- Éléments de navigation ("Commencer", "Suivant")
+- Titres de diapositives vides
+- États graphiques (Normal/Survol) sans contenu
+
+#### Détection chapitres
+L'IA détecte automatiquement les sections principales :
+- Titres courts (<50 caractères)
+- Changements de thématique
+- Numérotation (1-, 2-, 3-...)
+
+---
+
+### ÉTAPE B : GÉNÉRATION IA + NORMALISATION
+
+#### B1 - Découpage automatique
+
+**Si cours >1500 mots (>10 min potentiel)** :
+
+```
+L'IA propose un découpage chronologique :
+
+Exemple : Cours "Les Farines" (10 000 mots)
+┌─────────────────────────────────────────┐
+│ ✅ Découpage proposé : 4 podcasts       │
+│                                         │
+│ 📻 Podcast 1 : "Du blé à la farine"    │
+│    Durée estimée : 5 min (750 mots)    │
+│                                         │
+│ 📻 Podcast 2 : "Types de farines"      │
+│    Durée estimée : 6 min (900 mots)    │
+│                                         │
+│ 📻 Podcast 3 : "Conservation"          │
+│    Durée estimée : 4 min (600 mots)    │
+│                                         │
+│ 📻 Podcast 4 : "Utilisation"           │
+│    Durée estimée : 7 min (1050 mots)   │
+│                                         │
+│ [Valider] [Ajuster manuellement]       │
+└─────────────────────────────────────────┘
+```
+
+**Mode "Ajuster manuellement"** :
+- Fusionner 2 podcasts
+- Diviser un podcast en 2
+- Renommer les titres
+- Ajuster les limites de chapitres
+
+#### B2 - Génération dialogue Anabelle/Bryan
+
+**Prompt Gemini** (voir PROMPTS_GEMINI.md) génère :
+
+```
+Format de sortie :
+
+[JINGLE]
+Anabelle : "Ceci est un podcast produit à partir des cours originaux de l'EISF. Salut Bryan !"
+Bryan : "Salut Annabelle ! C'est parti ?"
+Anabelle : "C'est parti. Aujourd'hui : La farine."
+
+[INTRO]
+Anabelle : "Alors Bryan, aujourd'hui on va parler des farines. Tu sais, c'est la base de tout en boulangerie !"
+Bryan : "Carrément ! D'ailleurs moi au supermarché, y'a tellement de types de farine, je sais jamais laquelle prendre..."
+
+[CONTENU]
+Anabelle : "Excellente question ! Déjà, la farine, c'est quoi ? C'est un produit amylacé, c'est-à-dire une poudre qui vient de végétaux."
+Bryan : "Donc en gros, on écrase des graines et ça fait de la farine ?"
+Anabelle : "Exactement ! En pâtisserie, quand on dit 'farine' sans préciser, on parle de farine de blé."
+[...]
+
+[CONCLUSION]
+Anabelle : "Voilà Bryan, retiens bien : farine = blé tendre par défaut. Pour les autres, on précise toujours."
+Bryan : "OK pigé ! Merci Annabelle, à tout à l'heure !"
+```
+
+**Contraintes de génération** :
+- Ratio 70/30 (Anabelle/Bryan)
+- Jingle obligatoire (texte exact fourni)
+- Ton naturel, conversationnel
+- Quiz intégré dans le dialogue (pas de section séparée)
+- Durée cible : 600-1050 mots (4-7 min)
+
+#### B3 - Normalisation automatique
+
+L'IA applique automatiquement ces transformations :
+
+**Chiffres → Lettres**
+```
+150 → cent cinquante
+2024 → deux mille vingt-quatre
+3,5 kg → trois virgule cinq kilogrammes
+```
+
+**Acronymes → Forme phonétique**
+```
+EISF → É-I-S-F
+DLC → Dé-El-Cé
+BTS → Bé-Té-S
+```
+
+**Symboles → Texte**
+```
+& → et
+% → pourcent
+€ → euros
+```
+
+#### B4 - Double version générée
+
+**Version 1 : Studio (pour enregistrement voix)**
+```
+Anabelle : "L'EISF (É-I-S-F) forme chaque année 150 (cent cinquante) apprentis."
+```
+
+**Version 2 : Lecture (pour entendants)**
+```
+Anabelle : "L'EISF forme chaque année 150 apprentis."
+```
+
+---
+
+### ÉTAPE C : VÉRIFICATION IA (Auto-correction)
+
+L'IA analyse automatiquement le script généré et corrige :
+
+#### Vérifications effectuées
+
+**1. Fidélité au contenu source**
+```
+Comparer dialogue généré VS fichier .docx original
+→ Détecte les omissions (concepts non mentionnés)
+→ Détecte les ajouts (inventions de l'IA)
+→ Détecte les erreurs factuelles
+```
+
+**2. Corrections orthographiques**
+```
+Grammaire française
+Accords
+Conjugaisons
+```
+
+**3. Normalisation phonétique**
+```
+Vérifie que TOUS les chiffres sont en lettres
+Vérifie que TOUS les acronymes ont leur forme phonétique
+```
+
+#### Rapport de fidélité
+
+```
+┌─────────────────────────────────────────┐
+│ 📊 Rapport de fidélité au cours        │
+│                                         │
+│ 🟢 Fidélité : 92%                      │
+│                                         │
+│ ✅ Concepts bien retranscrits : 18/20  │
+│ 🟠 Concepts simplifiés : 2/20          │
+│ 🔴 Concepts manquants : 0/20           │
+│                                         │
+│ Détails :                               │
+│ 🟠 "Production française" → Chiffres   │
+│    2019 non mentionnés (simplification │
+│    acceptable)                          │
+│                                         │
+│ [Voir détails] [Valider]               │
+└─────────────────────────────────────────┘
+```
+
+**Code couleur** :
+- **🟢 Vert (>85%)** : Excellente fidélité, script validable
+- **🟠 Orange (70-85%)** : Bonne fidélité, simplifications acceptables
+- **🔴 Rouge (<70%)** : Écarts importants, révision nécessaire
+
+---
+
+### ÉTAPE D : ÉDITION HUMAINE
+
+Interface d'édition WYSIWYG (What You See Is What You Get)
+
+#### Fonctionnalités éditeur
+
+**Éditeur de texte riche**
+- Gras, italique, couleurs
+- Correction orthographique en temps réel
+- Auto-save toutes les 30 secondes
+
+**Modification répliques**
+```
+┌─────────────────────────────────────────┐
+│ [Anabelle ▼]                            │
+│ La farine résulte de la mouture...      │
+│ ────────────────────────────────────────│
+│ 🔄 Régénérer  ✏️ Éditer  🗑️ Supprimer │
+└─────────────────────────────────────────┘
+```
+
+**Drag & Drop répliques**
+- Bibliothèque : react-beautiful-dnd
+- Réorganiser l'ordre du dialogue
+- Équivalent clavier : Ctrl + ↑ / ↓
+
+**Compteur temps réel**
+```
+┌─────────────────────────────────────────┐
+│ ⏱️ Durée actuelle : 5 min 32 s         │
+│ 📊 Mots : 828 / 1050 max               │
+│ 👥 Ratio : Anabelle 68% / Bryan 32%   │
+│                                         │
+│ ⚠️ Attention : Ratio hors cible (70/30)│
+└─────────────────────────────────────────┘
+```
+
+**Modification prénoms**
+- **Global** : Change pour tous les projets futurs
+- **Par projet** : Change uniquement pour ce podcast
+
+```
+Anabelle → Sophie
+Bryan → Thomas
+```
+
+**Bouton "Régénérer cette réplique"**
+```
+Réplique actuelle :
+"La farine résulte de la mouture de graines."
+
+[🔄 Régénérer]
+Options :
+○ Plus simple
+○ Plus détaillé
+○ Reformuler différemment
+```
+
+---
+
+### ÉTAPE E : DOUBLE VÉRIFICATION (Écarts post-édition)
+
+Après édition manuelle, l'IA compare le script final VS le cours original.
+
+#### Détection écarts
+
+**Écarts détectés** :
+```
+🟠 MODIFICATIONS MINEURES
+Ligne 12 : Ajout exemple "comme le pain de campagne"
+→ Enrichissement acceptable
+
+🔴 CONFLIT AVEC SOURCE
+Ligne 34 : "Le blé tendre représente 80% de la production"
+→ ⚠️ Le cours original dit "39 millions de tonnes"
+   Sans mention de pourcentage
+
+┌─────────────────────────────────────────┐
+│ 🔗 Voir le passage source               │
+│ Page 3, paragraphe 2 du cours original │
+│                                         │
+│ [Corriger] [Garder quand même]         │
+└─────────────────────────────────────────┘
+```
+
+#### Lien vers source
+Cliquer sur "Voir le passage source" ouvre une popup :
+
+```
+┌─────────────────────────────────────────┐
+│ 📄 Extrait du cours original            │
+│                                         │
+│ "La France est le premier pays          │
+│ producteur de blé tendre en Europe      │
+│ (39 millions de tonnes de blé tendre   │
+│ produites en 2019 en France)..."        │
+│                                         │
+│ [Fermer]                                │
+└─────────────────────────────────────────┘
+```
+
+---
+
+### ÉTAPE F : EXPORTS MULTIPLES
+
+#### F1 - Export Word Studio (.docx)
+
+**Format tableau** :
+
+| Personnage | Texte | Durée | Notes |
+|------------|-------|-------|-------|
+| Anabelle | Ceci est un podcast produit à partir des cours originaux de l'EISF (É-I-S-F). | 0:05 | Jingle |
+| Bryan | Salut Annabelle ! | 0:01 | |
+| Anabelle | La farine résulte de la mouture de graines de céréales (orges, seigle, riz). | 0:06 | |
+
+**Caractéristiques** :
+- Template EISF (logo, couleurs, en-tête)
+- Forme phonétique entre parenthèses : (É-I-S-F), (cent cinquante)
+- Durée calculée automatiquement (150 mots/min)
+- Colonne "Notes" pour commentaires production
+
+#### F2 - Export Word Lecture (.docx)
+
+**Version fluide sans parenthèses** :
+
+| Personnage | Texte |
+|------------|-------|
+| Anabelle | Ceci est un podcast produit à partir des cours originaux de l'EISF. |
+| Bryan | Salut Annabelle ! |
+| Anabelle | La farine résulte de la mouture de graines de céréales. |
+
+**Fonction** : Version accessible pour personnes entendantes (lecture sans confusion phonétique)
+
+#### F3 - Export JSON
+
+```json
+{
+  "podcast_id": "farine_chapitre_1",
+  "title": "Du blé à la farine",
+  "duration_seconds": 332,
+  "word_count": 830,
+  "created_at": "2026-02-11T14:30:00Z",
+  "characters": {
+    "anabelle": {
+      "speaking_time_percent": 70,
+      "word_count": 581
+    },
+    "bryan": {
+      "speaking_time_percent": 30,
+      "word_count": 249
+    }
+  },
+  "dialogue": [
+    {
+      "order": 1,
+      "character": "anabelle",
+      "text_studio": "Ceci est un podcast produit à partir des cours originaux de l'EISF (É-I-S-F).",
+      "text_reading": "Ceci est un podcast produit à partir des cours originaux de l'EISF.",
+      "duration_seconds": 5,
+      "section": "jingle"
+    },
+    {
+      "order": 2,
+      "character": "bryan",
+      "text_studio": "Salut Annabelle !",
+      "text_reading": "Salut Annabelle !",
+      "duration_seconds": 1,
+      "section": "jingle"
+    }
+  ]
+}
+```
+
+**Fonction** : Prépare intégration future avec API TTS (Text-to-Speech)
+
+---
+
+## 🎨 DESIGN & EXPÉRIENCE UTILISATEUR
+
+### A. GESTION MULTI-PROJETS
+
+#### Dashboard principal
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ 🏠 Studio EISF                          👤 Martine   [Paramètres]│
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│ 🔍 Rechercher...                    [+ Nouveau projet]           │
+│                                                                  │
+│ 🏷️ Filtres : [Tous] [Boulangerie] [Pâtisserie] [Hygiène]        │
+│                                                                  │
+│ ┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐   │
+│ │ Les Farines     │ │ Hygiène HACCP   │ │ Levure & Levain │   │
+│ │ 4 podcasts      │ │ 2 podcasts      │ │ 3 podcasts      │   │
+│ │ 🟢 Finalisé      │ │ 🟡 En cours     │ │ ⚪ Brouillon     │   │
+│ │ Modifié 10/02   │ │ Modifié 09/02   │ │ Créé 08/02      │   │
+│ └─────────────────┘ └─────────────────┘ └─────────────────┘   │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+#### Statuts projets
+- **🟢 Finalisé** : Tous podcasts validés, exports générés
+- **🟡 En cours** : Génération ou édition en cours
+- **⚪ Brouillon** : Projet créé mais pas encore généré
+
+#### Recherche & Tags
+- **Recherche** : Par nom de projet, mots-clés
+- **Tags prédéfinis** : Boulangerie, Pâtisserie, Hygiène, Chocolaterie, Glacerie
+- **Tags personnalisés** : L'utilisateur peut créer ses propres tags
+
+---
+
+### B. MULTI-UTILISATEURS & COLLABORATION
+
+#### Système de comptes
+
+**Création compte** :
+```
+Email : martine@eisf.fr
+Mot de passe : ********** (min 8 caractères)
+☑️ J'accepte les CGU et politique de confidentialité
+```
+
+**Authentification** :
+- Méthode : JWT tokens (JSON Web Tokens)
+- Durée session : 7 jours
+- Stockage : Cookie httpOnly (sécurisé)
+- Hash passwords : bcrypt (12 rounds)
+
+#### Isolation données
+- Chaque utilisateur voit uniquement ses projets
+- Pas d'accès aux projets d'autres utilisateurs (sauf partage explicite)
+
+#### Partage de projets
+
+**Mode 1 : Partage en cours (collaboration)**
+
+```
+┌─────────────────────────────────────────┐
+│ 🔗 Partager "Les Farines"               │
+│                                         │
+│ Email collègue :                        │
+│ [sophie@eisf.fr_____________]           │
+│                                         │
+│ Permissions :                           │
+│ ○ Lecture seule                        │
+│ ● Édition complète                     │
+│                                         │
+│ [Inviter]                               │
+└─────────────────────────────────────────┘
+```
+
+- **Lecture seule** : Voir les podcasts, exporter, mais pas modifier
+- **Édition complète** : Modifier scripts, régénérer, exporter
+
+**Mode 2 : Partage finalisé (diffusion)**
+
+```
+Envoyer par email avec exports attachés :
+- Word Studio (.docx)
+- Word Lecture (.docx)
+- JSON (.json)
+```
+
+**Mode 3 : Collaboration temps réel**
+
+```
+🟢 Sophie est en train d'éditer le podcast 2...
+
+┌─────────────────────────────────────────┐
+│ [Anabelle]                              │
+│ La farine résulte de...                 │
+│ ────────────────────────────────────────│
+│ 👤 Sophie modifie cette réplique        │
+│ ⏳ Auto-save dans 3s...                 │
+└─────────────────────────────────────────┘
+```
+
+Fonctionnement : Mode brouillon collaboratif (comme Google Docs)
+- Plusieurs utilisateurs éditent simultanément
+- Indicateur visuel qui modifie quoi
+- Synchronisation WebSocket en temps réel
+
+---
+
+### C. PARAMÈTRES PERSONNALISABLES
+
+#### Paramètres globaux
+
+```
+┌─────────────────────────────────────────┐
+│ ⚙️ Paramètres                           │
+├─────────────────────────────────────────┤
+│                                         │
+│ 🎙️ PODCAST                              │
+│                                         │
+│ Durée cible par podcast :               │
+│ ○ 4 minutes                            │
+│ ● 5 minutes                            │
+│ ○ 7 minutes                            │
+│                                         │
+│ 👥 PERSONNAGES                          │
+│                                         │
+│ Nom personnage 1 : [Anabelle_______]    │
+│ Nom personnage 2 : [Bryan__________]    │
+│                                         │
+│ Ratio de parole :                       │
+│ ├─────────●───────┤                    │
+│ 60%  70%  80%                           │
+│ (Anabelle 70% / Bryan 30%)              │
+│                                         │
+│ 🎨 INTERFACE                            │
+│                                         │
+│ Thème : ○ Clair ● Auto ○ Sombre        │
+│                                         │
+│ [Enregistrer]                           │
+└─────────────────────────────────────────┘
+```
+
+#### Paramètres par projet
+
+```
+Possibilité de surcharger les paramètres globaux
+pour un projet spécifique :
+
+Projet "Révisions BTS" :
+→ Durée cible : 4 min (au lieu de 5 min global)
+→ Noms : Sophie & Thomas (au lieu de Anabelle & Bryan)
+```
+
+---
+
+### D. ANALYTICS (Phase 3 - Optionnel)
+
+Tableau de bord statistiques :
+
+```
+┌─────────────────────────────────────────┐
+│ 📊 Statistiques                         │
+│                                         │
+│ Podcasts créés : 47                     │
+│ Durée totale : 3h 42min                 │
+│ Fidélité moyenne IA : 89%               │
+│                                         │
+│ 📈 Évolution mensuelle                  │
+│ [Graphique]                             │
+│                                         │
+│ 🏆 Top tags utilisés                    │
+│ 1. Boulangerie (18 podcasts)           │
+│ 2. Hygiène (12 podcasts)               │
+│ 3. Pâtisserie (9 podcasts)             │
+│                                         │
+└─────────────────────────────────────────┘
+```
+
+#### Export SCORM (Phase 3)
+Format e-learning pour intégrer dans Moodle/LMS :
+- Package SCORM 1.2 ou 2004
+- Tracking complétion (podcast écouté ou non)
+- Quiz intégré (si implémenté)
+
+---
+
+### E. BIBLIOTHÈQUE DE TEMPLATES
+
+Templates = Modes de découpage du cours
+
+#### Template unique (Phase 1)
+
+**Template "Chronologique"** (seul disponible Phase 1)
+- Découpe selon l'ordre du cours Storyline
+- Respecte la structure pédagogique originale
+- 1 podcast = 1 chapitre détecté
+
+```
+Cours "Les Farines" (10 000 mots)
+
+Découpage proposé :
+┌─────────────────────────────────────────┐
+│ Chapitre 1 : Du blé à la farine        │
+│ → Podcast 1 (5 min / 750 mots)         │
+├─────────────────────────────────────────┤
+│ Chapitre 2 : Types de farines          │
+│ → Podcast 2 (6 min / 900 mots)         │
+├─────────────────────────────────────────┤
+│ Chapitre 3 : Conservation              │
+│ → Podcast 3 (4 min / 600 mots)         │
+├─────────────────────────────────────────┤
+│ Chapitre 4 : Utilisation               │
+│ → Podcast 4 (7 min / 1050 mots)        │
+└─────────────────────────────────────────┘
+```
+
+#### Templates futurs (Phase 2 - Optionnels)
+
+**Template "Par difficulté"**
+- Bases → Intermédiaire → Expert
+- Réorganise le contenu par niveau
+
+**Template "Par usage pratique"**
+- Regroupe par cas d'usage concret
+- Ex : "Choisir sa farine", "Conserver", "Adapter recettes"
+
+---
+
+### F. EXPORT AUDIO (Phase 2 - Optionnel)
+
+#### Génération audio TTS
+
+```
+┌─────────────────────────────────────────┐
+│ 🎵 Générer audio                        │
+│                                         │
+│ Voix Anabelle : [Gemini FR Female 1 ▼] │
+│ Voix Bryan : [Gemini FR Male 2 ▼]      │
+│                                         │
+│ 🧪 Micro-test (30 secondes)            │
+│ [▶️ Tester 4 répliques]                 │
+│                                         │
+│ Coût estimé : 0.08 €                    │
+│                                         │
+│ ✅ Test validé                          │
+│ [🎬 Générer le podcast complet]         │
+│                                         │
+│ Durée estimée : 2-3 minutes             │
+└─────────────────────────────────────────┘
+```
+
+**API utilisée** : Gemini 2.0 TTS
+**Coût** : ~0.10€ par podcast 7 min
+**Formats export** : MP3, WAV
+
+---
+
+## ♿ ACCESSIBILITÉ & RESPONSIVE
+
+### Navigation clavier obligatoire
+
+| Touche | Action |
+|--------|--------|
+| `Tab` | Navigation entre champs/boutons |
+| `Shift + Tab` | Navigation inverse |
+| `Enter` | Valider formulaire / Ouvrir projet |
+| `Esc` | Fermer popup / Annuler |
+| `Ctrl + S` | Sauvegarder script |
+| `Ctrl + E` | Mode édition |
+| `Ctrl + G` | Générer avec IA |
+| `Ctrl + Z` | Annuler |
+| `Ctrl + Shift + Z` | Rétablir |
+| `↑` `↓` | Sélectionner réplique |
+| `Ctrl + ↑` `↓` | Déplacer réplique (équivalent drag & drop) |
+
+**Focus visible** :
+- Bordure bleue #3465AE 3px
+- Outline bien visible sur tous les éléments interactifs
+
+### Responsive - Breakpoints
+
+```css
+/* Mobile first */
+Base : 320px  /* iPhone SE */
+sm   : 640px  /* Tablette portrait */
+md   : 768px  /* Tablette landscape */
+lg   : 1024px /* Desktop */
+xl   : 1280px /* Large desktop */
+```
+
+**Adaptations** :
+- **Dashboard** : 1 colonne mobile → 3 colonnes desktop
+- **Éditeur** : Panneau vérif IA latéral desktop → en dessous mobile
+- **Drag & Drop** : Fallback boutons ↑↓ sur tactile
+
+---
+
+## 🗂️ GESTION FICHIERS & NETTOYAGE
+
+### Cycle de vie des fichiers
+
+```
+1. ACTIF (en cours de travail)
+   → Aucune limite de durée
+   → Fichier .docx source conservé
+
+2. INACTIF 30 JOURS (pas ouvert depuis 30j)
+   → Popup : "Archiver le fichier source (.docx) ?"
+   ┌─────────────────────────────────────────┐
+   │ ⚠️ Ce projet est inactif depuis 30 jours│
+   │                                         │
+   │ Le fichier source (.docx) occupe 2.3 MB│
+   │ Voulez-vous l'archiver ?                │
+   │                                         │
+   │ [Conserver] [Archiver] [Supprimer]     │
+   └─────────────────────────────────────────┘
+   
+   → Si "Archiver" : Compression + stockage froid
+
+3. ARCHIVÉ 90 JOURS
+   → Avertissement : "Suppression définitive le [date]"
+   → Email rappel J-7
+
+4. SUPPRESSION AUTOMATIQUE
+   → Après 120 jours total (30 + 90)
+   → Conserve les exports (.docx, JSON)
+   → Supprime uniquement le fichier source
+```
+
+**Pourquoi ce système ?**
+- Libérer espace serveur/cache
+- Protéger les projets actifs
+- Donner le contrôle à l'utilisateur
+
+---
+
+## 🔒 SÉCURITÉ - CHECKLIST PRÉ-AUDIT
+
+### Backend obligatoire
+
+- [ ] Variables `.env` (jamais sur GitHub)
+- [ ] JWT tokens expiration 7 jours
+- [ ] Passwords bcrypt (12 rounds minimum)
+- [ ] Rate limiting (5 tentatives/15min)
+- [ ] Validation inputs serveur (anti SQL injection)
+- [ ] CORS restreint (domaines EISF uniquement)
+- [ ] Logs d'accès (qui/quoi/quand)
+
+### Frontend obligatoire
+
+- [ ] Aucune clé API visible côté client
+- [ ] Sanitization inputs (anti XSS)
+- [ ] HTTPS uniquement (certificat self-signed en local OK)
+
+### BDD obligatoire
+
+- [ ] Backup quotidien automatique
+- [ ] Chiffrement données sensibles
+- [ ] Isolation données par user
+
+### ⚠️ AUDIT PRO OBLIGATOIRE
+
+**Avant mise en production** : Faire auditer par un expert sécurité externe.
+
+**Points critiques à vérifier** :
+- Exposition clés API
+- Failles SQL injection
+- Failles XSS (Cross-Site Scripting)
+- RGPD (consentement, droit à l'oubli)
+
+---
+
+## 🌱 HÉBERGEMENT & IA - ROADMAP
+
+### Phase 1 : Sprint (Semaines 1-2)
+
+**Environnement** :
+- **Local** : `localhost:5173` (frontend) + `localhost:3001` (backend)
+- **IA** : Gemini Cloud (API Google)
+- **BDD** : PostgreSQL local (Docker)
+- **Versionning** : GitHub repo privé
+
+**Configuration minimale dev** :
+```
+CPU : 2 cores
+RAM : 8 GB
+Disque : 20 GB
+OS : Ubuntu 24, macOS, Windows 11
+Node.js : 18+
+PostgreSQL : 15+
+```
+
+### Phase 2 : Production (Mois 2-3)
+
+**Environnement** :
+- **Hébergement** : Serveur interne EISF
+- **IA** : Migration optionnelle vers LLM local (Llama 3.1 70B)
+- **BDD** : PostgreSQL serveur EISF
+
+**Pré-requis serveur EISF pour LLM local** :
+- GPU NVIDIA (RTX 4090 ou A6000)
+- 64 GB RAM minimum
+- 500 GB SSD
+- **Budget si achat** : 2000-5000€
+
+**Note** : LLM local uniquement si EISF s'équipe d'un GPU. Sinon, rester sur Gemini Cloud.
+
+### Migration écologique
+
+| Phase | Solution | Impact carbone | Coût |
+|-------|----------|----------------|------|
+| Sprint | Gemini Cloud | ⚡ Moyen | 0.10€/podcast |
+| Prod optionnelle | Llama local | ⚡ Faible | 0€/podcast (après investissement serveur) |
+| Optimisation future | Fine-tuning | ⚡ Très faible | 0€/podcast |
+
+**Motivation écologique validée** : Réduction empreinte carbone par mutualisation serveur EISF.
+
+---
+
+## 🚀 TIMELINE VALIDÉE
+
+### Semaine 1-2 : Sprint Vibe Coder
+
+```
+Jour 1-2  : Setup (React/Node/PostgreSQL) + Auth
+Jour 3-4  : Import Word + Génération IA (Gemini)
+Jour 5    : Éditeur basique
+Jour 6-7  : Vérif IA + Drag & Drop
+Jour 8    : Exports (Word Studio/Lecture + JSON)
+Jour 9-10 : Polish (Navigation clavier + Responsive) + Tests
+```
+
+### Semaine 3-4 : Itérations UX
+
+- Tests avec **3 profs EISF** (testeurs identifiés)
+- Retours sur interfaces
+- Ajustements ergonomie
+- Corrections bugs
+
+### Mois 2-3 : Migration serveur (si Sprint validé)
+
+- Setup LLM local (optionnel si GPU disponible)
+- Fine-tuning modèle (optionnel)
+- Déploiement serveur interne EISF
+
+---
+
+## 🚀 ARCHITECTURE TECHNIQUE
+
+### Stack technologique
+
+```
+Frontend : React + TypeScript + Vite + Tailwind CSS
+Backend  : Node.js + Express
+BDD      : PostgreSQL (Docker local → Serveur EISF)
+IA       : Gemini 2.0 API → Llama 3.1 70B (Phase 2 optionnelle)
+Auth     : JWT tokens + bcrypt
+Files    : Stockage local → Serveur EISF
+```
+
+### Bibliothèques clés
+
+```json
+{
+  "mammoth": "Lecture Word (.docx)",
+  "docx": "Export Word avec template EISF",
+  "react-beautiful-dnd": "Drag & Drop répliques",
+  "bcrypt": "Hash passwords",
+  "nodemailer": "Envoi emails",
+  "@google/genai": "Gemini API (Phase 1)",
+  "ollama": "LLM local (Phase 2 optionnelle)"
+}
+```
+
+### Arborescence projet
+
+```
+/studio-eisf
+├── /client (React + Vite)
+│   ├── /src
+│   │   ├── /components
+│   │   │   ├── Dashboard.tsx
+│   │   │   ├── Editor.tsx
+│   │   │   ├── WordImport.tsx
+│   │   │   ├── ExportPanel.tsx
+│   │   │   └── VerificationPanel.tsx
+│   │   ├── /hooks
+│   │   │   ├── useKeyboardNav.ts (navigation clavier)
+│   │   │   └── useCollaboration.ts (mode collaboratif)
+│   │   ├── /styles (Tailwind)
+│   │   └── App.tsx
+│   └── package.json
+├── /server (Node.js + Express)
+│   ├── /routes
+│   │   ├── auth.js
+│   │   ├── projects.js
+│   │   ├── ai.js (Gemini → Llama)
+│   │   └── cleanup.js (nettoyage auto 30/90j)
+│   ├── /models (Schemas PostgreSQL)
+│   ├── /middleware (JWT + Rate limiting)
+│   └── server.js
+├── .env.example
+├── docker-compose.yml (PostgreSQL local)
+├── README.md
+└── SECURITY.md (checklist audit)
+```
+
+---
+
+## 📊 SCHÉMA BASE DE DONNÉES
+
+### Tables principales
+
+**users**
+```sql
+CREATE TABLE users (
+  id SERIAL PRIMARY KEY,
+  email VARCHAR(255) UNIQUE NOT NULL,
+  password_hash VARCHAR(255) NOT NULL,
+  first_name VARCHAR(100),
+  last_name VARCHAR(100),
+  created_at TIMESTAMP DEFAULT NOW(),
+  last_login TIMESTAMP
+);
+```
+
+**projects**
+```sql
+CREATE TABLE projects (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER REFERENCES users(id),
+  title VARCHAR(255) NOT NULL,
+  status VARCHAR(20) DEFAULT 'draft', -- draft, in_progress, finalized
+  source_file_path VARCHAR(500),
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW(),
+  last_opened_at TIMESTAMP
+);
+```
+
+**podcasts**
+```sql
+CREATE TABLE podcasts (
+  id SERIAL PRIMARY KEY,
+  project_id INTEGER REFERENCES projects(id),
+  title VARCHAR(255) NOT NULL,
+  order_index INTEGER,
+  word_count INTEGER,
+  duration_seconds INTEGER,
+  fidelity_score DECIMAL(5,2), -- 0.00 à 100.00
+  created_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+**dialogues**
+```sql
+CREATE TABLE dialogues (
+  id SERIAL PRIMARY KEY,
+  podcast_id INTEGER REFERENCES podcasts(id),
+  order_index INTEGER,
+  character VARCHAR(50), -- 'anabelle' ou 'bryan'
+  text_studio TEXT NOT NULL,
+  text_reading TEXT NOT NULL,
+  duration_seconds INTEGER,
+  section VARCHAR(50) -- 'jingle', 'intro', 'content', 'conclusion'
+);
+```
+
+**project_shares**
+```sql
+CREATE TABLE project_shares (
+  id SERIAL PRIMARY KEY,
+  project_id INTEGER REFERENCES projects(id),
+  shared_with_user_id INTEGER REFERENCES users(id),
+  permission VARCHAR(20), -- 'read_only', 'edit'
+  created_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+---
+
+## 🎤 ÉCHANTILLON TON ANABELLE/BRYAN
+
+```
+Anabelle : "Bonjour à tous et bienvenue pour ce live cours dynamique. 
+On est toujours dans le temps d'un échange. Salut Bryan, tu vas bien ?"
+
+Bryan : "Salut Annabelle, ça va très bien et toi ? Nickel. 
+Il fait pas très beau mais c'est pas grave."
+
+Anabelle : "Alors, en ce moment, on est vraiment en pleine période d'examen. 
+Donc on a voulu faire un petit cours pour les personnes qui viennent 
+d'arriver sur la plateforme."
+
+Bryan : "Attends Annabelle, donc toutes les farines se valent ? 
+Parce que moi au supermarché..."
+
+Anabelle : "Alors Bryan, aujourd'hui on va parler des farines. 
+Tu sais, c'est la base de tout en boulangerie !"
+```
+
+**Caractéristiques** :
+- **Anabelle** : Tutoie, utilise "on", pédagogue, bienveillante
+- **Bryan** : Interpelle "Attends", reformule, fait liens quotidien
+- **Ton** : Conversationnel, pas académique
+
+---
+
+## 📌 NOTES IMPORTANTES
+
+### Sécurité
+- Ne JAMAIS exposer clé Gemini côté client
+- Toutes les appels IA passent par le backend
+
+### RGPD (Pré-production)
+- Mentions légales obligatoires
+- Checkbox consentement données personnelles
+- Droit à l'oubli (suppression compte + données)
+
+### Performance
+- Pagination dashboard si >100 projets
+- Lazy loading composants
+- Debounce auto-save (500ms)
+
+### Tests
+- Fichier exemple fourni : `Les_farines_export_trad.docx`
+- Tests unitaires fonctions critiques (parsing, normalisation)
+- Tests E2E (Cypress) workflow complet
+
+### Écologie
+- Migration LLM local prioritaire si GPU disponible
+- Motivation : Réduction empreinte carbone
+
+### Accessibilité
+- Navigation clavier = critère de réussite MVP
+- Contraste couleurs WCAG AA minimum
+- Labels ARIA sur tous les boutons
+
+---
+
+## 📄 DOCUMENTS COMPLÉMENTAIRES
+
+Ce cahier des charges est accompagné de :
+
+1. **GUIDE_DEV_VIBE_CODER.md** - Instructions pas-à-pas développement
+2. **PROMPTS_GEMINI.md** - Prompts IA pré-rédigés
+3. **BANQUE_PHRASES_BRYAN.md** - Phrases types personnage Bryan
+4. **SECURITY_CHECKLIST.md** - Validation sécurité pré-audit
+
+---
+
+**Statut** : ✅ Validé  
+**Prêt pour** : Sprint développement Semaines 1-2  
+**Contact** : Martine (Chef de projet IA - EISF)

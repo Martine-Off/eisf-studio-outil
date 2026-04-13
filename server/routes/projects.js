@@ -33,7 +33,7 @@ const upload = multer({
         }
         cb(null, true);
     },
-    limits: { fileSize: 50 * 1024 * 1024 } // 50 MB max
+    limits: { fileSize: 500 * 1024 * 1024 } // 500 MB max
 });
 
 // Lister les projets de l'utilisateur
@@ -53,37 +53,55 @@ router.get('/', authMiddleware, async (req, res) => {
 // Créer projet + upload fichier
 router.post('/create', authMiddleware, upload.single('file'), async (req, res) => {
     try {
-        const { title } = req.body;
+        const { title, content } = req.body;
         const userId = req.userId;
 
-        if (!req.file) {
-            return res.status(400).json({ error: 'Fichier .docx requis' });
+        // Auto-create user if missing (helpful for mock DB transition)
+        const userCheck = await pool.query('SELECT id FROM users WHERE id = $1', [userId]);
+        if (userCheck.rows.length === 0) {
+            const bcrypt = require('bcrypt');
+            const hash = await bcrypt.hash('admin', 12);
+            await pool.query('INSERT INTO users (id, email, password_hash, first_name) VALUES ($1, $2, $3, $4)', [userId, `auto_${userId}@eisf.fr`, hash, 'AutoUser']);
         }
 
-        const filePath = req.file.path;
+        if (!req.file && !content) {
+            return res.status(400).json({ error: 'Fichier .docx ou texte requis' });
+        }
 
-        // Lire le fichier Word
-        const result = await mammoth.extractRawText({ path: filePath });
-        const text = result.value;
+        let cleanedText = '';
+        let wordCount = 0;
+        let filePath = null;
+        let educationalContent = [];
 
-        // Parser le contenu
-        const lines = text.split('\n').filter(line => line.trim());
+        if (req.file) {
+            filePath = req.file.path;
+            // Lire le fichier Word
+            const result = await mammoth.extractRawText({ path: filePath });
+            const text = result.value;
 
-        // Filtrer les lignes pédagogiques
-        const educationalContent = lines.filter(line => {
-            // Ignorer métadonnées Storyline
-            if (line.match(/^[a-zA-Z0-9+/\-]{15,}$/)) return false;
-            if (line.includes('Zone de texte') || line.includes('État Normal')) return false;
-            if (line.length < 20) return false;
-            return true;
-        });
+            // Parser le contenu
+            const lines = text.split('\n').filter(line => line.trim());
 
-        const wordCount = educationalContent.join(' ').split(/\s+/).length;
+            // Filtrer les lignes pédagogiques
+            educationalContent = lines.filter(line => {
+                // Ignorer métadonnées Storyline
+                if (line.match(/^[a-zA-Z0-9+/\-]{15,}$/)) return false;
+                if (line.includes('Zone de texte') || line.includes('État Normal')) return false;
+                if (line.length < 20) return false;
+                return true;
+            });
+            cleanedText = educationalContent.join('\n');
+            wordCount = educationalContent.join(' ').split(/\s+/).length;
+        } else if (content) {
+            cleanedText = content;
+            educationalContent = content.split('\n').filter(line => line.trim().length > 0);
+            wordCount = content.split(/\s+/).length;
+        }
 
         // Créer le projet dans la BDD
         const projectResult = await pool.query(
-            'INSERT INTO projects (user_id, title, source_file_path) VALUES ($1, $2, $3) RETURNING id, title, status, created_at',
-            [userId, title || req.file.originalname, filePath]
+            'INSERT INTO projects (user_id, title, source_file_path, cleaned_text) VALUES ($1, $2, $3, $4) RETURNING id, title, status, created_at',
+            [userId, title || (req.file ? req.file.originalname : 'Nouveau Projet'), filePath, cleanedText]
         );
 
         const project = projectResult.rows[0];
@@ -97,7 +115,7 @@ router.post('/create', authMiddleware, upload.single('file'), async (req, res) =
         });
     } catch (error) {
         console.error('Erreur upload:', error);
-        res.status(500).json({ error: "Erreur lors de l'import" });
+        res.status(500).json({ error: "Erreur lors de l'import: " + error.message });
     }
 });
 

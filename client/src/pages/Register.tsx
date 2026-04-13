@@ -5,12 +5,14 @@ import { Mic, ArrowRight } from 'lucide-react';
 import { motion } from 'framer-motion';
 import api from '../utils/api';
 
-export default function Login() {
+export default function Register() {
+    const [firstName, setFirstName] = useState('');
+    const [lastName, setLastName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
-    const { login } = useAuth();
+    const { login } = useAuth(); // We use login to auto-login after register
     const navigate = useNavigate();
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -19,11 +21,19 @@ export default function Login() {
         setLoading(true);
 
         try {
-            const res = await api.post('/auth/login', { email, password });
-            login(res.data.token, res.data.user);
+            const response = await api.post('/auth/register', {
+                email,
+                password,
+                first_name: firstName,
+                last_name: lastName
+            });
+
+            // Auto-login after successful registration
+            const { token, user } = response.data;
+            login(token, user);
             navigate('/dashboard');
         } catch (err: any) {
-            setError(err.response?.data?.message || 'Erreur de connexion');
+            setError(err.response?.data?.error || "Erreur lors de l'inscription");
         } finally {
             setLoading(false);
         }
@@ -47,7 +57,7 @@ export default function Login() {
                         Studio EISF
                     </h1>
                     <p className="text-lg text-primary-foreground/80 font-medium leading-relaxed">
-                        Transformez vos cours en podcasts pédagogiques engageants avec Inès & Yannick.
+                        Rejoignez la communauté des formateurs et créez vox podcasts en quelques clics.
                     </p>
                 </motion.div>
             </div>
@@ -70,10 +80,35 @@ export default function Login() {
                         </span>
                     </div>
 
-                    <h2 className="mb-2 font-display text-2xl font-bold text-foreground">Connexion</h2>
-                    <p className="mb-8 text-muted-foreground">Accédez à votre espace de création</p>
+                    <h2 className="mb-2 font-display text-2xl font-bold text-foreground">Inscription</h2>
+                    <p className="mb-8 text-muted-foreground">Créez votre compte formateur</p>
 
                     <form onSubmit={handleSubmit} className="space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="mb-1.5 block text-sm font-medium text-foreground">Prénom</label>
+                                <input
+                                    type="text"
+                                    value={firstName}
+                                    onChange={(e) => setFirstName(e.target.value)}
+                                    placeholder="Jean"
+                                    className="w-full rounded-lg border border-input bg-card px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all hover:border-primary/50"
+                                    required
+                                />
+                            </div>
+                            <div>
+                                <label className="mb-1.5 block text-sm font-medium text-foreground">Nom</label>
+                                <input
+                                    type="text"
+                                    value={lastName}
+                                    onChange={(e) => setLastName(e.target.value)}
+                                    placeholder="Dupont"
+                                    className="w-full rounded-lg border border-input bg-card px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all hover:border-primary/50"
+                                    required
+                                />
+                            </div>
+                        </div>
+
                         <div>
                             <label className="mb-1.5 block text-sm font-medium text-foreground">Email</label>
                             <input
@@ -87,10 +122,7 @@ export default function Login() {
                         </div>
 
                         <div>
-                            <div className="flex items-center justify-between mb-1.5">
-                                <label className="block text-sm font-medium text-foreground">Mot de passe</label>
-                                <a href="#" className="text-xs text-primary hover:underline font-medium">Oublié ?</a>
-                            </div>
+                            <label className="mb-1.5 block text-sm font-medium text-foreground">Mot de passe</label>
                             <input
                                 type="password"
                                 value={password}
@@ -102,7 +134,7 @@ export default function Login() {
                         </div>
 
                         {error && (
-                            <div className="p-3 bg-red-50 text-eisf-red text-sm rounded-lg font-medium animate-fade-in border border-red-100">
+                            <div className="p-3 bg-destructive/10 text-destructive text-sm rounded-lg font-medium animate-fade-in border border-destructive/20">
                                 {error}
                             </div>
                         )}
@@ -112,15 +144,15 @@ export default function Login() {
                             disabled={loading}
                             className="flex w-full items-center justify-center gap-2 rounded-lg eisf-gradient px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition-all hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-md active:scale-[0.99]"
                         >
-                            {loading ? 'Connexion…' : 'Se connecter'}
+                            {loading ? 'Inscription…' : "S'inscrire"}
                             {!loading && <ArrowRight className="h-4 w-4" />}
                         </button>
                     </form>
 
                     <p className="mt-6 text-center text-sm text-muted-foreground">
-                        Pas encore de compte ?{' '}
-                        <Link to="/register" className="font-medium text-primary hover:underline transition-colors">
-                            Créer un compte
+                        Déjà un compte ?{' '}
+                        <Link to="/login" className="font-medium text-primary hover:underline transition-colors">
+                            Se connecter
                         </Link>
                     </p>
                 </motion.div>
