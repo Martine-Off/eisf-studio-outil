@@ -9,12 +9,17 @@ async function run() {
     try {
         console.log("Adding cleaned_text to projects...");
         await pool.query('ALTER TABLE projects ADD COLUMN IF NOT EXISTS cleaned_text TEXT;');
-        
-        // On profite pour s'assurer que fidelity_score est dans podcasts
+
         console.log("Adding fidelity_score to podcasts...");
         await pool.query('ALTER TABLE podcasts ADD COLUMN IF NOT EXISTS fidelity_score DECIMAL(5,2);');
-        
-        console.log("Success!");
+
+        console.log("Adding ia_feedback to podcasts...");
+        await pool.query('ALTER TABLE podcasts ADD COLUMN IF NOT EXISTS ia_feedback JSONB;');
+
+        console.log("Adding audio_url to podcasts...");
+        await pool.query('ALTER TABLE podcasts ADD COLUMN IF NOT EXISTS audio_url VARCHAR(500);');
+
+        console.log("All migrations OK!");
     } catch (e) {
         console.error("Error:", e);
     } finally {

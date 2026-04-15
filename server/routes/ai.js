@@ -186,28 +186,28 @@ CONTRAINTES STRICTES :
 - Personnages : Inès (70%) et Yannick (30%)
 - Inès = experte, ton posé, professionnel. Explique les concepts clairement.
 - Yannick = apprenant curieux, spontané. Pose des questions, reformule, fait des liens concrets.
-- Jingle obligatoire (première réplique d'Inès) : "Ceci est un podcast produit à partir des cours originaux de l'EISF."
+- Jingle obligatoire (première réplique d'Inès) : "Ceci est un podcast produit à partir des cours originaux de l'EISF (É-I-S-F)."
 - Structure : Jingle (15s) + Intro (30s) + Contenu avec quiz intégré (3-5min) + Conclusion (30s)
 - Quiz : Intégré naturellement dans le dialogue, pas de section séparée
 - Ton conversationnel et naturel (pas "Chers auditeurs", pas "Bienvenue dans ce cours")
+${NORMALIZATION_INSTRUCTIONS}
 CONTENU SOURCE :
 ${content}
 GÉNÈRE LE DIALOGUE AU FORMAT JSON UNIQUEMENT (pas de texte avant/après) :
 {
   "title": "Titre accrocheur du podcast (max 50 caractères)",
   "dialogues": [
-    {"character": "ines", "text": "...", "section": "jingle"},
-    {"character": "yannick", "text": "...", "section": "jingle"},
-    {"character": "ines", "text": "...", "section": "intro"}
+    {"character": "ines", "text_studio": "...", "text_reading": "...", "section": "jingle"},
+    {"character": "yannick", "text_studio": "...", "text_reading": "...", "section": "jingle"},
+    {"character": "ines", "text_studio": "...", "text_reading": "...", "section": "intro"}
   ]
 }
 VÉRIFIE AVANT D'ENVOYER :
 ✅ Jingle = première réplique d'Inès avec texte exact du jingle
 ✅ Ratio Inès/Yannick ≈ 70/30
 ✅ Durée totale = ${targetDuration} min (±30 secondes OK)
-✅ Ton conversationnel
-✅ Quiz intégré dans dialogue
-✅ JSON valide`;
+✅ Ton conversationnel, quiz intégré
+✅ JSON valide avec text_studio ET text_reading`;
 
         let generatedText;
 
@@ -414,21 +414,21 @@ Génère un dialogue naturel entre Inès (experte, 70% du temps) et Yannick (app
 
 RÈGLES DE TRANSFORMATION AUDIO (obligatoires) :
 - Reformuler tout le jargon technique en langage parlé
-  Exemple : ❌ "Le taux de cendres correspond au poids de cendres obtenu après calcination"
-            ✅ "Le taux de cendres, c'est simplement un indicateur pour savoir si ta farine est plutôt blanche ou complète"
+  Exemple : "Le taux de cendres, c'est simplement un indicateur pour savoir si ta farine est plutôt blanche ou complète"
 - Ajouter systématiquement : exemples concrets, analogies visuelles, liens avec une pâte ou une recette réelle
 - Yannick pose les questions qu'un apprenti se pose vraiment (pas des questions génériques)
 - Inès répond avec des exemples tirés du métier
-- Prévoir des micro-reformulations ("donc si je résume...", "attends, tu veux dire que...") 
+- Prévoir des micro-reformulations ("donc si je résume...", "attends, tu veux dire que...")
   pour ancrer la mémorisation
 - Structure obligatoire :
-  1. Jingle (Inès : "Ceci est un podcast produit à partir des cours originaux de l'EISF.")
+  1. Jingle (Inès : "Ceci est un podcast produit à partir des cours originaux de l'EISF (É-I-S-F).")
   2. Intro : relier ce podcast au précédent en 1 phrase
   3. Contenu : tout le contenu source transformé (rien ne peut être omis)
   4. Conclusion : 1 phrase de résumé + 1 annonce du prochain podcast
+${NORMALIZATION_INSTRUCTIONS}
 
 TITRE DE L'ÉPISODE : ${segment.title}
-CONTENU SOURCE À TRANSFORMER (tout garder) :
+CONTENU SOURCE À TRANSFORMER (tout garder, aucun concept ne doit être omis) :
 ${segment.content}
 
 Durée cible : 5 à 8 minutes (750 à 1200 mots au total)
@@ -446,7 +446,12 @@ Réponds UNIQUEMENT en JSON valide :
             console.log(`[GENERATE-PROJECT] Gemini répondu pour segment ${idx + 1}`);
 
             const dialogue = parseJSON(rawText);
-            const actualWordCount = dialogue.dialogues.reduce((sum, d) => sum + (d.text_studio ? d.text_studio.split(/\s+/).length : 0), 0);
+            const dialoguesNorm = (dialogue.dialogues || []).map(line => ({
+                ...line,
+                text_studio: normalizeText(line.text_studio || line.text || ''),
+                text_reading: line.text_reading || line.text_studio || line.text || '',
+            }));
+            const actualWordCount = dialoguesNorm.reduce((sum, d) => sum + (d.text_studio ? d.text_studio.split(/\s+/).length : 0), 0);
             const durationSecs = Math.round((actualWordCount / 130) * 60);
 
             const podcastResult = await pool.query(
@@ -456,8 +461,8 @@ Réponds UNIQUEMENT en JSON valide :
             const podcastId = podcastResult.rows[0].id;
             allPodcasts.push({ podcastId, title: dialogue.title });
 
-            for (let i = 0; i < dialogue.dialogues.length; i++) {
-                const d = dialogue.dialogues[i];
+            for (let i = 0; i < dialoguesNorm.length; i++) {
+                const d = dialoguesNorm[i];
                 const wCount = d.text_studio ? d.text_studio.split(/\s+/).length : 0;
                 const eDuration = Math.round((wCount / 130) * 60);
                 await pool.query(
@@ -717,19 +722,41 @@ router.post('/verify', authMiddleware, async (req, res) => {
             return res.json({ fidelityScore: 85, missingConcepts: [], addedConcepts: [] });
         }
 
-        const prompt = `Analyse l'écart entre le cours brut (Source) et le podcast généré.
-Source:
-${cleanedText}
-Podcast généré:
-${dialogueText}
-Retourne UNIQUEMENT ce JSON :
-{
-  "fidelityScore": 87,
-  "missingConcepts": ["concept manquant 1"],
-  "addedConcepts": ["élément inventé 1"]
-}`;
+        const systemPrompt = `Tu es un expert en vérification pédagogique. Ta mission est d'être EXHAUSTIF et CHIRURGICAL. Tu ne t'arrêtes jamais à 5 éléments. Tu parcours l'intégralité du texte source du début à la fin, concept par concept, chiffre par chiffre, terme technique par terme technique. Un oubli de ta part = une erreur pédagogique pour un étudiant.`;
 
-        const rawText = await callGemini(null, prompt);
+        const prompt = `Tu dois comparer exhaustivement le cours source et le podcast généré.
+
+MÉTHODE OBLIGATOIRE :
+1. Lis le cours source et dresse mentalement la liste complète de TOUS les concepts, chiffres, termes techniques, définitions, et exemples.
+2. Pour chaque élément de cette liste, vérifie s'il est présent dans le podcast.
+3. Ne t'arrête pas avant d'avoir vérifié le dernier mot du cours source.
+
+COURS SOURCE (texte de référence) :
+${cleanedText}
+
+PODCAST GÉNÉRÉ (à vérifier) :
+${dialogueText}
+
+Retourne UNIQUEMENT ce JSON valide, sans markdown, sans explication :
+{
+  "fidelityScore": <nombre entre 0 et 100>,
+  "missingConcepts": [
+    "concept manquant 1 (suffisamment précis pour retrouver dans le cours)",
+    ...TOUS les concepts manquants, sans limite de nombre
+  ],
+  "addedConcepts": [
+    "élément inventé ou absent du cours source",
+    ...TOUS les ajouts, sans limite de nombre
+  ],
+  "incorrectFacts": [
+    "fait déformé : podcast dit X, source dit Y",
+    ...TOUS les faits incorrects
+  ]
+}
+
+RÈGLE ABSOLUE : Les listes doivent être COMPLÈTES. S'il y a 20 concepts manquants, tu en listes 20. Ne jamais tronquer.`;
+
+        const rawText = await callGemini(prompt, systemPrompt);
         const resultJson = parseJSON(rawText);
 
         await pool.query('UPDATE podcasts SET fidelity_score = $1 WHERE id = $2', [resultJson.fidelityScore || null, podcastId]);
@@ -798,36 +825,241 @@ Renvoie UNIQUEMENT ce JSON :
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// ROUTE : /auto-verify-and-fix  — boucle jusqu'à 95% de fidélité
+// ─────────────────────────────────────────────────────────────────────────────
+router.post('/auto-verify-and-fix', authMiddleware, async (req, res) => {
+    const { podcastId } = req.body;
+    if (!podcastId) return res.status(400).json({ error: 'podcastId requis' });
+
+    const MAX_ITERATIONS = 4;
+    const TARGET_SCORE = 95;
+    const history = [];
+
+    try {
+        // Récupérer le texte source
+        const podcastRes = await pool.query('SELECT project_id FROM podcasts WHERE id = $1', [podcastId]);
+        if (podcastRes.rows.length === 0) return res.status(404).json({ error: 'Podcast non trouvé' });
+        const projectRes = await pool.query('SELECT cleaned_text FROM projects WHERE id = $1', [podcastRes.rows[0].project_id]);
+        const cleanedText = projectRes.rows[0]?.cleaned_text || '';
+
+        if (!cleanedText) {
+            return res.status(400).json({ error: 'Texte source introuvable pour ce projet' });
+        }
+
+        let currentScore = 0;
+        let iteration = 0;
+
+        while (iteration < MAX_ITERATIONS && currentScore < TARGET_SCORE) {
+            iteration++;
+            console.log(`[AUTO-VERIFY] Itération ${iteration}/${MAX_ITERATIONS}...`);
+
+            // ── Étape 1 : Vérification ────────────────────────────────────────
+            const dialoguesRes = await pool.query(
+                'SELECT text_studio FROM dialogues WHERE podcast_id = $1 ORDER BY order_index ASC',
+                [podcastId]
+            );
+            const dialogueText = dialoguesRes.rows.map(d => d.text_studio).join('\n');
+
+            const verifyPrompt = `Tu dois comparer exhaustivement le cours source et le podcast généré.
+
+MÉTHODE OBLIGATOIRE :
+1. Lis le cours source et dresse la liste complète de TOUS les concepts, chiffres, termes techniques, définitions et exemples.
+2. Pour chaque élément, vérifie s'il est présent dans le podcast.
+3. Ne t'arrête pas avant d'avoir vérifié le dernier mot du cours source.
+
+COURS SOURCE :
+${cleanedText}
+
+PODCAST GÉNÉRÉ :
+${dialogueText}
+
+Retourne UNIQUEMENT ce JSON valide :
+{
+  "fidelityScore": <0 à 100>,
+  "missingConcepts": ["concept 1", "concept 2", ...TOUS les manquants],
+  "incorrectFacts": ["podcast dit X, source dit Y", ...]
+}
+RÈGLE ABSOLUE : listes complètes, jamais tronquées.`;
+
+            const verifyRaw = await callGemini(
+                "Tu es un expert en vérification pédagogique. Sois exhaustif et chirurgical.",
+                verifyPrompt
+            );
+            const verifyResult = parseJSON(verifyRaw);
+            currentScore = verifyResult.fidelityScore || 0;
+
+            await pool.query('UPDATE podcasts SET fidelity_score = $1 WHERE id = $2', [currentScore, podcastId]);
+
+            history.push({
+                iteration,
+                score: currentScore,
+                missingCount: verifyResult.missingConcepts?.length || 0,
+            });
+
+            console.log(`[AUTO-VERIFY] Score itération ${iteration} : ${currentScore}%`);
+
+            // Si score suffisant, on arrête
+            if (currentScore >= TARGET_SCORE || (verifyResult.missingConcepts?.length === 0 && verifyResult.incorrectFacts?.length === 0)) {
+                console.log(`[AUTO-VERIFY] Objectif atteint : ${currentScore}%`);
+                break;
+            }
+
+            // ── Étape 2 : Correction ──────────────────────────────────────────
+            const allDialoguesRes = await pool.query(
+                'SELECT * FROM dialogues WHERE podcast_id = $1 ORDER BY order_index ASC',
+                [podcastId]
+            );
+            const allDialogues = allDialoguesRes.rows;
+            const dialogueContext = allDialogues.map((d, i) => `[${i}|${d.character}] ${d.text_studio}`).join('\n');
+
+            const fixPrompt = `Tu es un expert pédagogique. Réécris chaque réplique du podcast pour intégrer TOUS les éléments manquants sans en omettre aucun.
+${NORMALIZATION_INSTRUCTIONS}
+
+DIALOGUE ACTUEL :
+${dialogueContext}
+
+CONCEPTS MANQUANTS À INTÉGRER (obligatoire, tous) :
+${(verifyResult.missingConcepts || []).map(c => '- ' + c).join('\n')}
+
+FAITS INCORRECTS À CORRIGER :
+${(verifyResult.incorrectFacts || []).map(f => '- ' + f).join('\n')}
+
+Conserve le style Inès/Yannick, le ratio 70/30, la structure (jingle, intro, contenu, conclusion).
+
+Réponds UNIQUEMENT avec ce JSON :
+{"dialogues":[{"id":<index_original>,"text_studio":"...","text_reading":"..."},...]}`;
+
+            const fixRaw = await callGemini("Tu es un expert pédagogique.", fixPrompt);
+            const fixResult = parseJSON(fixRaw);
+
+            // Mettre à jour chaque réplique en base
+            const client = await pool.connect();
+            try {
+                await client.query('BEGIN');
+                for (const d of (fixResult.dialogues || [])) {
+                    const original = allDialogues[d.id];
+                    if (!original) continue;
+                    const studioNorm = normalizeText(d.text_studio || '');
+                    await client.query(
+                        'UPDATE dialogues SET text_studio = $1, text_reading = $2 WHERE id = $3',
+                        [studioNorm, d.text_reading || studioNorm, original.id]
+                    );
+                }
+                await client.query('COMMIT');
+            } catch (err) {
+                await client.query('ROLLBACK');
+                throw err;
+            } finally {
+                client.release();
+            }
+
+            // Pause pour éviter le rate limit n8n/ChatGPT
+            if (iteration < MAX_ITERATIONS && currentScore < TARGET_SCORE) {
+                await new Promise(r => setTimeout(r, 3000));
+            }
+        }
+
+        res.json({
+            finalScore: currentScore,
+            targetReached: currentScore >= TARGET_SCORE,
+            iterations: iteration,
+            history,
+        });
+
+    } catch (error) {
+        console.error('[AUTO-VERIFY] Erreur:', error);
+        res.status(500).json({ error: 'Erreur vérification automatique', details: error.message });
+    }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Normalisation texte (chiffres → lettres, acronymes → phonétique)
 // ─────────────────────────────────────────────────────────────────────────────
+
+function unitsToFr(n) {
+    const u = ['zéro','un','deux','trois','quatre','cinq','six','sept','huit','neuf',
+                'dix','onze','douze','treize','quatorze','quinze','seize','dix-sept',
+                'dix-huit','dix-neuf'];
+    return u[n];
+}
+
+function tensToFr(n) {
+    if (n < 20) return unitsToFr(n);
+    const tens = ['','','vingt','trente','quarante','cinquante','soixante','soixante','quatre-vingt','quatre-vingt'];
+    const t = Math.floor(n / 10);
+    const u = n % 10;
+    if (t === 7 || t === 9) {
+        const base = t === 7 ? 60 : 80;
+        const sub = n - base;
+        const subStr = sub === 1 && t === 7 ? 'et onze' : (sub < 20 ? unitsToFr(sub) : tensToFr(sub));
+        return (t === 9 ? 'quatre-vingt-' : 'soixante-') + subStr;
+    }
+    if (u === 0) return tens[t] + (t === 8 ? 's' : '');
+    if (u === 1 && t !== 8) return tens[t] + '-et-un';
+    return tens[t] + '-' + unitsToFr(u);
+}
+
+function intToFr(n) {
+    if (n < 0) return 'moins ' + intToFr(-n);
+    if (n < 100) return tensToFr(n);
+    if (n < 1000) {
+        const c = Math.floor(n / 100);
+        const r = n % 100;
+        const centStr = c === 1 ? 'cent' : (unitsToFr(c) + ' cent' + (r === 0 && c > 1 ? 's' : ''));
+        return r === 0 ? centStr : centStr + ' ' + tensToFr(r);
+    }
+    if (n < 1000000) {
+        const m = Math.floor(n / 1000);
+        const r = n % 1000;
+        const milleStr = m === 1 ? 'mille' : intToFr(m) + ' mille';
+        return r === 0 ? milleStr : milleStr + ' ' + intToFr(r);
+    }
+    const m = Math.floor(n / 1000000);
+    const r = n % 1000000;
+    const millionStr = intToFr(m) + ' million' + (m > 1 ? 's' : '');
+    return r === 0 ? millionStr : millionStr + ' ' + intToFr(r);
+}
+
+function numberToFr(str) {
+    // Gère décimales : "3,5" ou "3.5"
+    if (/^\d+[,\.]\d+$/.test(str)) {
+        const parts = str.replace(',', '.').split('.');
+        return intToFr(parseInt(parts[0])) + ' virgule ' + parts[1].split('').map(d => unitsToFr(parseInt(d))).join(' ');
+    }
+    return intToFr(parseInt(str));
+}
+
 function normalizeText(text) {
     let normalized = text;
 
-    const numberMap = {
-        '0': 'zéro', '1': 'un', '2': 'deux', '3': 'trois', '4': 'quatre',
-        '5': 'cinq', '6': 'six', '7': 'sept', '8': 'huit', '9': 'neuf',
-        '10': 'dix', '11': 'onze', '12': 'douze', '13': 'treize', '14': 'quatorze',
-        '15': 'quinze', '16': 'seize', '20': 'vingt', '30': 'trente',
-        '40': 'quarante', '50': 'cinquante', '60': 'soixante', '100': 'cent',
-        '150': 'cent cinquante', '200': 'deux cents', '500': 'cinq cents',
-        '1000': 'mille', '2024': 'deux mille vingt-quatre', '2025': 'deux mille vingt-cinq',
-        '2026': 'deux mille vingt-six',
-    };
-    for (const [num, word] of Object.entries(numberMap)) {
-        normalized = normalized.replace(new RegExp(`\\b${num}\\b`, 'g'), word);
-    }
+    // Chiffres isolés → lettres (pas ceux déjà dans une parenthèse phonétique)
+    normalized = normalized.replace(/(?<!\()\b(\d{1,7}(?:[,\.]\d+)?)\b(?!\s*\))/g, (match) => {
+        try { return numberToFr(match); } catch { return match; }
+    });
 
+    // Unités courantes après conversion
+    normalized = normalized.replace(/(\w+)\s*%/g, '$1 pourcent');
+    normalized = normalized.replace(/(\w+)\s*€/g, '$1 euros');
+    normalized = normalized.replace(/(\w+)\s*°C/g, '$1 degrés Celsius');
+    normalized = normalized.replace(/(\w+)\s*°/g, '$1 degrés');
+    normalized = normalized.replace(/\s*&\s*/g, ' et ');
+
+    // Acronymes → phonétique (uniquement si pas déjà suivi d'une parenthèse)
     const acronymMap = {
-        'EISF': 'EISF (É-I-S-F)',
-        'DLC': 'DLC (Dé-El-Cé)',
-        'HACCP': 'HACCP (H-A-C-C-P)',
-        'DLUO': 'DLUO (Dé-El-U-O)',
-        'IGP': 'IGP (I-Gé-Pé)',
-        'AOP': 'AOP (A-O-Pé)',
-        'AOC': 'AOC (A-O-Cé)',
-        'CAP': 'CAP (Cé-A-Pé)',
-        'BEP': 'BEP (Bé-E-Pé)',
-        'pH': 'pH (pé-ache)',
+        'EISF':  'EISF (É-I-S-F)',
+        'DLC':   'DLC (Dé-El-Cé)',
+        'HACCP': 'HACCP (Ha-A-Cé-Cé-Pé)',
+        'DLUO':  'DLUO (Dé-El-U-O)',
+        'IGP':   'IGP (I-Gé-Pé)',
+        'AOP':   'AOP (A-O-Pé)',
+        'AOC':   'AOC (A-O-Cé)',
+        'CAP':   'CAP (Cé-A-Pé)',
+        'BEP':   'BEP (Bé-E-Pé)',
+        'BTS':   'BTS (Bé-Té-S)',
+        'pH':    'pH (pé-ache)',
+        'TVA':   'TVA (Té-Vé-A)',
+        'TTC':   'TTC (Té-Té-Cé)',
+        'HT':    'HT (Ache-Té)',
     };
     for (const [acronym, phonetic] of Object.entries(acronymMap)) {
         normalized = normalized.replace(new RegExp(`\\b${acronym}\\b(?!\\s*\\()`, 'g'), phonetic);
@@ -836,4 +1068,13 @@ function normalizeText(text) {
     return normalized;
 }
 
-module.exports = router;
+// Instructions de normalisation à injecter dans chaque prompt IA
+const NORMALIZATION_INSTRUCTIONS = `
+NORMALISATION OBLIGATOIRE DU TEXTE (applique à chaque réplique) :
+- Tous les chiffres en toutes lettres : "150" → "cent cinquante", "3,5" → "trois virgule cinq"
+- Tous les acronymes avec phonétique entre parenthèses : "EISF" → "EISF (É-I-S-F)", "HACCP" → "HACCP (Ha-A-Cé-Cé-Pé)"
+- "%" → "pourcent", "€" → "euros", "°C" → "degrés Celsius", "&" → "et"
+- text_studio = version avec phonétique pour la voix TTS (ex: "l'EISF (É-I-S-F) forme cent cinquante apprentis")
+- text_reading = version lisible sans parenthèses (ex: "l'EISF forme 150 apprentis")`;
+
+module.exports = { router, normalizeText, NORMALIZATION_INSTRUCTIONS };

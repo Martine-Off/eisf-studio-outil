@@ -11,6 +11,7 @@ import {
     X
 } from 'lucide-react';
 import { motion } from 'framer-motion';
+import WordImport from '../components/WordImport';
 
 export default function Create() {
     const navigate = useNavigate();
@@ -153,48 +154,13 @@ export default function Create() {
                             </label>
 
                             <div className="space-y-4">
-                                {!file ? (
-                                    <div
-                                        onClick={() => fileInputRef.current?.click()}
-                                        onDragOver={(e) => e.preventDefault()}
-                                        onDrop={handleDrop}
-                                        className="border-2 border-dashed border-border hover:border-primary/50 hover:bg-secondary/30 transition-all rounded-2xl p-8 text-center cursor-pointer group"
-                                    >
-                                        <input
-                                            type="file"
-                                            ref={fileInputRef}
-                                            onChange={handleFileSelect}
-                                            accept=".docx,.doc,.txt,.md"
-                                            className="hidden"
-                                        />
-                                        <div className="flex flex-col items-center">
-                                            <div className="h-12 w-12 bg-secondary rounded-full flex items-center justify-center text-primary group-hover:scale-110 transition-transform mb-3">
-                                                <Upload size={24} />
-                                            </div>
-                                            <p className="font-bold text-foreground">
-                                                Déposez votre cours Word ici
-                                            </p>
-                                            <p className="text-sm text-muted-foreground mt-1">
-                                                Ou cliquez pour parcourir vos fichiers
-                                            </p>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div className="border border-primary/20 bg-primary/5 rounded-2xl p-6 flex flex-col items-center justify-center relative group">
-                                        <button
-                                            type="button"
-                                            onClick={(e) => { e.stopPropagation(); setFile(null); }}
-                                            className="absolute top-4 right-4 p-2 bg-card rounded-xl text-muted-foreground hover:text-destructive shadow-sm opacity-0 group-hover:opacity-100 transition-opacity border border-border"
-                                        >
-                                            <X size={16} />
-                                        </button>
-                                        <div className="h-14 w-14 bg-white rounded-2xl shadow-sm flex items-center justify-center mb-3">
-                                            <FileText size={32} className="text-primary" />
-                                        </div>
-                                        <span className="font-bold text-foreground px-4 text-center truncate w-full max-w-xs">{file.name}</span>
-                                        <span className="text-xs text-primary font-bold mt-2 bg-primary/10 px-3 py-1 rounded-full uppercase tracking-widest">Fichier prêt</span>
-                                    </div>
-                                )}
+                                <WordImport 
+                                    onImportComplete={(text) => {
+                                        setContent(text);
+                                        setFile(null); // We now have the text content
+                                    }}
+                                    onError={(msg) => setError(msg)}
+                                />
 
                                 <div className="relative">
                                     <div className="absolute inset-x-0 top-0 flex items-center" aria-hidden="true">

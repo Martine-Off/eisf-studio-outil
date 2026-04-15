@@ -7,8 +7,8 @@ import Editor from './pages/Editor';
 import Create from './pages/Create';
 import ProtectedRoute from './components/ProtectedRoute';
 import { AuthProvider } from './context/AuthContext';
-import ProjectPodcasts from './pages/ProjectPodcasts';
-import PodcastEditor from './pages/PodcastEditor';
+import ProjectPodcasts from './components/ProjectPodcasts';
+import PodcastEditor from './components/PodcastEditor';
 
 function App() {
   return (

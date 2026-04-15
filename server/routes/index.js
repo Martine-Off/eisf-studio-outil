@@ -2,7 +2,7 @@ const express = require('express');
 
 const authRoutes = require('./auth');
 const projectRoutes = require('./projects');
-const aiRoutes = require('./ai');
+const { router: aiRoutes } = require('./ai');
 const podcastRoutes = require('./podcasts');
 const dialogueRoutes = require('./dialogues');
 const exportRoutes = require('./export');

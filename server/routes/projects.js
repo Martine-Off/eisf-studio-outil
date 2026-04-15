@@ -5,8 +5,10 @@ const pool = require('../models/db');
 const authMiddleware = require('../middleware/auth');
 const path = require('path');
 const fs = require('fs');
+const { OpenAI } = require('openai');
 
 const router = express.Router();
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 // Assurer que le dossier uploads/ existe
 const uploadsDir = path.join(__dirname, '..', 'uploads');
@@ -204,6 +206,85 @@ router.delete('/:projectId', authMiddleware, async (req, res) => {
     } catch (error) {
         console.error('Erreur suppression projet:', error);
         res.status(500).json({ error: 'Erreur serveur' });
+    }
+});
+
+// POST /api/projects/:id/macro-verify
+router.post('/:id/macro-verify', async (req, res) => {
+    try {
+        const projectId = req.params.id;
+
+        // 1. Récupération des scripts via la table dialogues
+        const dialoguesRes = await pool.query(
+            `SELECT p.id as podcast_id, d.character, d.text_studio 
+             FROM podcasts p 
+             JOIN dialogues d ON p.id = d.podcast_id 
+             WHERE p.project_id = $1 
+             ORDER BY p.order_index ASC, d.order_index ASC`,
+            [projectId]
+        );
+
+        if (dialoguesRes.rows.length === 0) {
+            return res.status(404).json({ error: 'Aucun dialogue trouvé pour ce projet.' });
+        }
+
+        // 2. Concaténation robuste
+        const podcastsMap = new Map();
+        dialoguesRes.rows.forEach(d => {
+            if (!podcastsMap.has(d.podcast_id)) {
+                podcastsMap.set(d.podcast_id, []);
+            }
+            podcastsMap.get(d.podcast_id).push(`${d.character || 'Intervenant'}: ${d.text_studio || ''}`);
+        });
+
+        const fullContent = Array.from(podcastsMap.values())
+            .map(dialogues => dialogues.join('\n'))
+            .join('\n\n--- ÉPISODE SUIVANT ---\n\n');
+
+        // 3. Appel OpenAI (gpt-4o-mini avec JSON object forcé)
+        const systemPrompt = `Tu es un expert pédagogique et éditorial.
+Évalue cet ensemble de scripts de podcasts concernant un cours.
+Vérifie si le cours entier est bien couvert de façon cohérente, globale, et si rien d'important n'a été oublié.
+
+Renvoie UNIQUEMENT un objet JSON valide avec cette structure stricte :
+{
+  "score": <entier sur 100>,
+  "observations": [
+    "<observation 1>",
+    "<observation 2>"
+  ]
+}`;
+
+        const completion = await openai.chat.completions.create({
+            model: 'gpt-4o-mini',
+            messages: [
+                { role: 'system', content: systemPrompt },
+                { role: 'user', content: `Voici les scripts concaténés :\n\n${fullContent}` }
+            ],
+            response_format: { type: 'json_object' },
+            temperature: 0.3
+        });
+
+        const parsedResponse = JSON.parse(completion.choices[0].message.content);
+        const macroScore = parseInt(parsedResponse.score, 10) || 0;
+        const macroFeedback = JSON.stringify(parsedResponse.observations || []); 
+
+        // 4. Update de la base de données
+        await pool.query(
+            'UPDATE projects SET macro_score = $1, macro_feedback = $2 WHERE id = $3',
+            [macroScore, macroFeedback, projectId]
+        );
+
+        // 5. Réponse
+        res.json({
+            success: true,
+            score: macroScore,
+            observations: parsedResponse.observations
+        });
+
+    } catch (error) {
+        console.error('Erreur lors du macro-verify:', error);
+        res.status(500).json({ error: 'Erreur serveur lors de la vérification globale.' });
     }
 });
 

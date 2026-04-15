@@ -230,6 +230,8 @@ export default function Editor() {
     const [editableChapters, setEditableChapters] = useState<Chapter[]>([]);
     const [generatingChapters, setGeneratingChapters] = useState<Set<number>>(new Set());
     const [generatedChapters, setGeneratedChapters] = useState<Set<number>>(new Set());
+    const [generatedIdMap, setGeneratedIdMap] = useState<Record<number, number>>({});
+    const [isGeneratingAll, setIsGeneratingAll] = useState(false);
 
     const sensors = useSensors(
         useSensor(PointerSensor),
@@ -404,8 +406,10 @@ export default function Editor() {
                 document.body.appendChild(link);
                 link.click();
                 link.remove();
-            } catch (err) {
+            } catch (err: unknown) {
                 console.error('Erreur export:', err);
+                const msg = err instanceof Error ? err.message : 'Erreur inconnue';
+                alert(`Echec de l'export : ${msg}. Verifiez que le serveur est demarré.`);
             } finally {
                 setExporting(false);
             }
@@ -425,17 +429,26 @@ export default function Editor() {
     };
 
     const handleGenerate = async () => {
+        if (isGeneratingAll) return;
+        setIsGeneratingAll(true);
         setGenerating(true);
+        
         try {
-            await api.post('/ai/generate-from-project', {
-                projectId: Number(projectId),
-                segments: editableChapters // Utilise les chapitres potentiellement renommés
-            });
+            // Boucle frontend pour éviter les timeouts serveur et montrer la progression
+            for (let i = 0; i < editableChapters.length; i++) {
+                // On saute ceux déjà générés manuellement
+                if (generatedChapters.has(i)) continue;
+                
+                await handleGenerateSingle(i);
+            }
+            
+            // Une fois fini, on va au dashboard du projet
             navigate(`/project/${projectId}/podcasts`);
         } catch (error) {
-            console.error('Erreur génération:', error);
+            console.error('Erreur génération globale:', error);
         } finally {
             setGenerating(false);
+            setIsGeneratingAll(false);
         }
     };
 
@@ -449,19 +462,27 @@ export default function Editor() {
 
         setGeneratingChapters(prev => new Set(prev).add(index));
         try {
-            await api.post('/ai/generate-single-chapter', {
+            const res = await api.post('/ai/generate-single-chapter', {
                 projectId: Number(projectId),
                 segment: chapter,
                 orderIndex: index
             });
+            
+            const newPodcastId = res.data.podcastId;
             setGeneratedChapters(prev => new Set(prev).add(index));
+            setGeneratedIdMap(prev => ({ ...prev, [index]: newPodcastId }));
             
             // Notification succès
-            setSaveStatus('saved');
-            setShowToast(true);
-            setTimeout(() => setShowToast(false), 3000);
+            if (!isGeneratingAll) {
+                setSaveStatus('saved');
+                setShowToast(true);
+                setTimeout(() => setShowToast(false), 3000);
+            }
+            
+            return newPodcastId;
         } catch (error) {
             console.error('Erreur génération unitaire:', error);
+            throw error; // Important pour arrêter la boucle globale en cas d'erreur
         } finally {
             setGeneratingChapters(prev => {
                 const next = new Set(prev);
@@ -719,7 +740,18 @@ export default function Editor() {
                                     const isGenerated = generatedChapters.has(i);
                                     
                                     return (
-                                        <div key={i} className={`flex items-center gap-4 bg-secondary rounded-xl px-5 py-4 transition-all ${isGenerated ? 'opacity-60 grayscale-[0.5] border border-green-500/30' : ''}`}>
+                                        <div key={i} 
+                                             onClick={() => {
+                                                 if (isGenerated) {
+                                                     const podcastId = generatedIdMap[i];
+                                                     if (podcastId) {
+                                                         navigate(`/project/${projectId}/podcast/${podcastId}/edit`);
+                                                     } else {
+                                                         navigate(`/project/${projectId}/podcasts`);
+                                                     }
+                                                 }
+                                             }}
+                                             className={`flex items-center gap-4 bg-secondary rounded-xl px-5 py-4 transition-all ${isGenerated ? 'opacity-90 border border-green-500/30 cursor-pointer hover:bg-green-50/50 hover:border-green-500/50 group' : ''}`}>
                                             <div className="flex-shrink-0 w-10 h-10 bg-background rounded-lg flex items-center justify-center text-xl shadow-sm">
                                                 {isGenerated ? '✅' : '📻'}
                                             </div>
@@ -761,6 +793,30 @@ export default function Editor() {
                                 })}
                             </div>
                         </div>
+
+                        {/* Barre de progression pendant la génération globale */}
+                        {isGeneratingAll && (
+                            <div className="bg-card border border-primary/20 rounded-2xl p-6 shadow-sm animate-in fade-in slide-in-from-bottom-4 duration-500 mb-2">
+                                <div className="flex justify-between items-center mb-2">
+                                    <span className="text-sm font-bold text-primary flex items-center gap-2">
+                                        <Loader2 size={16} className="animate-spin" />
+                                        Génération des chapitres en cours...
+                                    </span>
+                                    <span className="text-sm font-black text-primary">
+                                        {generatedChapters.size} / {editableChapters.length}
+                                    </span>
+                                </div>
+                                <div className="w-full h-3 bg-secondary rounded-full overflow-hidden border border-border">
+                                    <div 
+                                        className="h-full eisf-gradient transition-all duration-500 ease-out shadow-[0_0_10px_rgba(52,101,174,0.3)]"
+                                        style={{ width: `${(generatedChapters.size / editableChapters.length) * 100}%` }}
+                                    ></div>
+                                </div>
+                                <p className="text-[10px] text-muted-foreground mt-2 uppercase font-bold tracking-widest text-center">
+                                    Estimation restante : {Math.ceil((editableChapters.length - generatedChapters.size) * 0.5)} minute(s)
+                                </p>
+                            </div>
+                        )}
 
                         {/* Sélecteur durée + bouton générer */}
                         <div className="bg-card border border-border rounded-2xl p-6">
@@ -899,6 +955,7 @@ export default function Editor() {
                                 <div>
                                     <h2 className="font-bold text-lg">Vérification de l'IA</h2>
                                     <p className="text-sm text-muted-foreground mt-1">Analyse de fidélité au script d'origine</p>
+                                    <p className="text-xs text-muted-foreground mt-1">⚠️ Ne fermez pas ce panneau pendant l'analyse ou la correction.</p>
                                 </div>
                                 <button onClick={() => setShowVerificationPanel(false)} className="p-2 hover:bg-secondary rounded-full">
                                     <ChevronRight size={20} className="text-muted-foreground" />

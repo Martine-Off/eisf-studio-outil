@@ -3,7 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Loader2, ChevronLeft, Mic } from 'lucide-react';
 import api from '../utils/api';
 import AppLayout from '../components/AppLayout';
-
+import ProjectMacroAnalysis from '../components/ProjectMacroAnalysis';
+import type { Project } from '../types';
 interface Podcast {
     id: number;
     title: string;
@@ -15,20 +16,23 @@ export default function ProjectPodcasts() {
     const { projectId } = useParams();
     const navigate = useNavigate();
     const [podcasts, setPodcasts] = useState<Podcast[]>([]);
+    const [projectData, setProjectData] = useState<Project | null>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const fetchPodcasts = async () => {
+        const fetchProjectAndPodcasts = async () => {
             try {
-                const res = await api.get(`/podcasts?projectId=${projectId}`);
-                setPodcasts(res.data);
+                // Modifié pour récupérer à la fois le projet et les podcasts associés
+                const res = await api.get(`/projects/${projectId}`);
+                setProjectData(res.data.project);
+                setPodcasts(res.data.podcasts || []);
             } catch (error) {
-                console.error('Erreur récupération podcasts:', error);
+                console.error('Erreur récupération projet et podcasts:', error);
             } finally {
                 setLoading(false);
             }
         };
-        fetchPodcasts();
+        fetchProjectAndPodcasts();
     }, [projectId]);
 
     return (
@@ -53,6 +57,15 @@ export default function ProjectPodcasts() {
                         Nouveau Podcast (Éditeur de projet)
                     </button>
                 </div>
+
+                {/* Encart de Synthèse Globale IA */}
+                {!loading && projectData && (
+                    <ProjectMacroAnalysis 
+                        projectId={projectId || ''} 
+                        initialScore={projectData.macro_score} 
+                        initialObservations={projectData.macro_feedback ? (projectData.macro_feedback as any).suggestions || [] : []} 
+                    />
+                )}
 
                 {loading ? (
                     <div className="flex items-center justify-center py-20">

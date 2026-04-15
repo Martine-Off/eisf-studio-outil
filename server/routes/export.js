@@ -1,5 +1,5 @@
 const express = require('express');
-const { Document, Packer, Paragraph, Table, TableRow, TableCell, TextRun, WidthType, AlignmentType, HeadingLevel, BorderStyle } = require('docx');
+const { Document, Packer, Paragraph, Table, TableRow, TableCell, TextRun, WidthType, AlignmentType, HeadingLevel, BorderStyle, ShadingType } = require('docx');
 const PDFDocument = require('pdfkit');
 const pool = require('../models/db');
 const authMiddleware = require('../middleware/auth');
@@ -53,23 +53,23 @@ router.get('/word-studio/:podcastId', authMiddleware, async (req, res) => {
             children: [
                 new TableCell({
                     borders,
-                    children: [new Paragraph({ children: [new TextRun({ text: 'Personnage', bold: true, font: 'Open Sans', size: 20 })] })],
-                    shading: { fill: '3465AE' },
+                    children: [new Paragraph({ children: [new TextRun({ text: 'Personnage', bold: true, color: 'FFFFFF', font: 'Open Sans', size: 20 })] })],
+                    shading: { type: ShadingType.CLEAR, color: 'auto', fill: '3465AE' },
                 }),
                 new TableCell({
                     borders,
-                    children: [new Paragraph({ children: [new TextRun({ text: 'Texte', bold: true, font: 'Open Sans', size: 20 })] })],
-                    shading: { fill: '3465AE' },
+                    children: [new Paragraph({ children: [new TextRun({ text: 'Texte', bold: true, color: 'FFFFFF', font: 'Open Sans', size: 20 })] })],
+                    shading: { type: ShadingType.CLEAR, color: 'auto', fill: '3465AE' },
                 }),
                 new TableCell({
                     borders,
-                    children: [new Paragraph({ children: [new TextRun({ text: 'Durée', bold: true, font: 'Open Sans', size: 20 })] })],
-                    shading: { fill: '3465AE' },
+                    children: [new Paragraph({ children: [new TextRun({ text: 'Duree', bold: true, color: 'FFFFFF', font: 'Open Sans', size: 20 })] })],
+                    shading: { type: ShadingType.CLEAR, color: 'auto', fill: '3465AE' },
                 }),
                 new TableCell({
                     borders,
-                    children: [new Paragraph({ children: [new TextRun({ text: 'Section', bold: true, font: 'Open Sans', size: 20 })] })],
-                    shading: { fill: '3465AE' },
+                    children: [new Paragraph({ children: [new TextRun({ text: 'Section', bold: true, color: 'FFFFFF', font: 'Open Sans', size: 20 })] })],
+                    shading: { type: ShadingType.CLEAR, color: 'auto', fill: '3465AE' },
                 }),
             ],
         });
@@ -114,7 +114,7 @@ router.get('/word-studio/:podcastId', authMiddleware, async (req, res) => {
             sections: [{
                 children: [
                     new Paragraph({
-                        children: [new TextRun({ text: '🎙️ Podcast EISF - Version Studio', bold: true, size: 32, font: 'Open Sans' })],
+                        children: [new TextRun({ text: 'Podcast EISF - Version Studio', bold: true, size: 32, font: 'Open Sans', color: '3465AE' })],
                         heading: HeadingLevel.HEADING_1,
                         spacing: { after: 200 },
                     }),
@@ -165,7 +165,7 @@ router.get('/word-lecture/:podcastId', authMiddleware, async (req, res) => {
             sections: [{
                 children: [
                     new Paragraph({
-                        children: [new TextRun({ text: '📖 Podcast EISF - Version Lecture', bold: true, size: 32, font: 'Open Sans' })],
+                        children: [new TextRun({ text: 'Podcast EISF - Version Lecture', bold: true, size: 32, font: 'Open Sans', color: '3465AE' })],
                         heading: HeadingLevel.HEADING_1,
                         spacing: { after: 400 },
                     }),

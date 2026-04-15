@@ -35,6 +35,8 @@ CREATE TABLE IF NOT EXISTS podcasts (
   word_count INTEGER,
   duration_seconds INTEGER,
   fidelity_score DECIMAL(5,2),
+  ia_feedback JSONB,
+  audio_url VARCHAR(500),
   created_at TIMESTAMP DEFAULT NOW()
 );
 

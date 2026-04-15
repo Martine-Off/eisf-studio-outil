@@ -11,6 +11,8 @@ import { Loader2, CheckCircle, ChevronLeft, ChevronRight, GripVertical } from 'l
 import api from '../utils/api';
 import { useKeyboardNav } from '../hooks/useKeyboardNav';
 import AppLayout from '../components/AppLayout';
+import { AIVerificationPanel } from './AIVerificationPanel';
+import GenerateAudioModal from '../components/GenerateAudioModal';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface Dialogue {
@@ -73,9 +75,9 @@ export default function PodcastEditor() {
     const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved');
     const [podcastInfo, setPodcastInfo] = useState<{title: string}>({ title: 'Chargement...' });
 
-    const [verifying, setVerifying] = useState(false);
-    const [verificationReport, setVerificationReport] = useState<any>(null);
     const [showVerificationPanel, setShowVerificationPanel] = useState(false);
+    const [isAudioModalOpen, setIsAudioModalOpen] = useState(false);
+    const [audioUrl, setAudioUrl] = useState<string | null>(null);
 
     const sensors = useSensors(useSensor(PointerSensor), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }));
     const saveStateRef = useRef({ status: saveStatus, dialogues });
@@ -146,16 +148,19 @@ export default function PodcastEditor() {
         }
     };
 
-    const handleVerify = async () => {
-        setVerifying(true);
+    const handleVerify = () => {
         setShowVerificationPanel(true);
+    };
+
+    const handleGenerateAudio = async () => {
         try {
-            const res = await api.post('/ai/verify', { podcastId });
-            setVerificationReport(res.data);
+            const response = await api.post(`/podcasts/${podcastId}/generate-audio`);
+            setAudioUrl(response.data.audio_url);
+            setIsAudioModalOpen(false);
+            alert("Audio généré avec succès !");
         } catch (error) {
-            console.error('Erreur vérification:', error);
-        } finally {
-            setVerifying(false);
+            console.error("Erreur TTS:", error);
+            alert("Erreur lors de la génération audio.");
         }
     };
 
@@ -178,13 +183,30 @@ export default function PodcastEditor() {
                     </div>
 
                     <div className="flex items-center gap-4">
-                        <button onClick={handleVerify} disabled={verifying} className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold transition-all shadow-sm bg-accent/10 border border-accent/20 text-accent hover:bg-accent/20">
-                            {verifying ? <Loader2 size={16} className="animate-spin" /> : '✨ Vérifier (IA)'}
+                        <button onClick={() => window.open(`/api/podcasts/${podcastId}/export-word/studio`)} className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold transition-all shadow-sm bg-blue-50 border border-blue-200 text-blue-700 hover:bg-blue-100">
+                            📄 Export Studio
+                        </button>
+                        <button onClick={() => window.open(`/api/podcasts/${podcastId}/export-word/lecture`)} className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold transition-all shadow-sm bg-green-50 border border-green-200 text-green-700 hover:bg-green-100">
+                            📄 Export Lecture
+                        </button>
+                        <button onClick={handleVerify} className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold transition-all shadow-sm bg-accent/10 border border-accent/20 text-accent hover:bg-accent/20">
+                            ✨ Vérifier (IA)
                         </button>
                         <button onClick={() => handleSaveAction(dialogues)} disabled={saveStatus === 'saving'} className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold transition-all shadow-sm bg-card border border-border text-foreground hover:bg-secondary">
                             {saveStatus === 'saving' && <Loader2 size={16} className="animate-spin" />}
                             {saveStatus === 'saved' && <CheckCircle size={16} className="text-green-500" />}
                             Sauvegarder
+                        </button>
+                        <button
+                            onClick={() => setIsAudioModalOpen(true)}
+                            disabled={audioUrl !== null}
+                            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold transition-all shadow-sm ${
+                                audioUrl
+                                    ? 'bg-green-100 text-green-700 cursor-default'
+                                    : 'bg-indigo-600 text-white hover:bg-indigo-700'
+                            }`}
+                        >
+                            {audioUrl ? '✅ Audio prêt' : '🎙️ Générer le podcast'}
                         </button>
                     </div>
                 </div>
@@ -210,26 +232,25 @@ export default function PodcastEditor() {
                                 <button onClick={() => setShowVerificationPanel(false)} className="p-2 hover:bg-secondary rounded-full"><ChevronRight size={20} className="text-muted-foreground" /></button>
                             </div>
                             <div className="p-6 flex-1 overflow-y-auto">
-                                {verifying ? (
-                                    <div className="flex flex-col items-center justify-center py-20 text-center"><Loader2 className="animate-spin text-primary mb-4" size={40} /><p className="font-bold">Analyse en cours...</p></div>
-                                ) : verificationReport ? (
-                                    <div className="space-y-6">
-                                        <div className="bg-secondary rounded-2xl p-6 text-center border border-border">
-                                            <p className="text-sm font-bold text-muted-foreground mb-2 uppercase tracking-wider">Score de Fidélité</p>
-                                            <div className="flex items-baseline justify-center gap-1">
-                                                <span className={`text-6xl font-extrabold tracking-tighter ${verificationReport?.fidelityScore > 85 ? 'text-green-500' : verificationReport?.fidelityScore > 70 ? 'text-orange-500' : 'text-red-500'}`}>
-                                                    {verificationReport?.fidelityScore}%
-                                                </span>
-                                            </div>
-                                        </div>
-                                        <button className="w-full bg-accent text-accent-foreground font-bold py-3 rounded-xl mt-4">Ajouter les concepts manquants ✨</button>
-                                    </div>
-                                ) : null}
+                                <AIVerificationPanel podcastId={podcastId!} onAutoCorrectSuccess={loadData} />
                             </div>
                         </motion.div>
                     </>
                 )}
             </AnimatePresence>
+
+            <GenerateAudioModal
+                isOpen={isAudioModalOpen}
+                onCancel={() => setIsAudioModalOpen(false)}
+                onConfirm={handleGenerateAudio}
+            />
+
+            {audioUrl && (
+                <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-white p-2 rounded-full shadow-2xl border flex items-center gap-4 px-6">
+                    <span className="text-sm font-bold text-gray-500">Aperçu Audio :</span>
+                    <audio src={audioUrl} controls className="h-8" />
+                </div>
+            )}
         </AppLayout>
     );
 }
