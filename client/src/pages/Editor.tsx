@@ -221,10 +221,15 @@ export default function Editor() {
     const [verifying, setVerifying] = useState(false);
     const [verificationReport, setVerificationReport] = useState<VerificationReport | null>(null);
     const [showVerificationPanel, setShowVerificationPanel] = useState(false);
+    const [autoFixing, setAutoFixing] = useState(false);
+    const [autoFixProgress, setAutoFixProgress] = useState('');
     const [exporting, setExporting] = useState(false);
     
     const [selectedPodcastId, setSelectedPodcastId] = useState<number | null>(null);
     const [availablePodcasts, setAvailablePodcasts] = useState<{id: number, title: string}[]>([]);
+    const [generatingAudio, setGeneratingAudio] = useState(false);
+    const [audioUrl, setAudioUrl] = useState<string | null>(null);
+    const [audioError, setAudioError] = useState<string | null>(null);
     
     // États pour le découpage manuel/unitaire
     const [editableChapters, setEditableChapters] = useState<Chapter[]>([]);
@@ -539,6 +544,54 @@ export default function Editor() {
             console.error('Erreur correction:', error);
         } finally {
             setVerifying(false);
+        }
+    };
+
+    const handleAutoVerifyAndFix = async () => {
+        const podcastId = selectedPodcastId || dialogues[0]?.podcast_id;
+        if (!podcastId) return;
+        setAutoFixing(true);
+        setAutoFixProgress('Passe 1 — analyse...');
+        try {
+            const res = await api.post('/ai/auto-verify-and-fix', { podcastId }, { timeout: 300000 });
+            const { finalScore, iterations, targetReached } = res.data;
+            setAutoFixProgress('');
+            // Recharger les dialogues corrigés
+            const dlgRes = await api.get(`/podcasts/${podcastId}/dialogues`);
+            setDialogues(dlgRes.data);
+            // Mettre à jour le rapport affiché
+            setVerificationReport({
+                fidelityScore: finalScore,
+                missingConcepts: [],
+                addedConcepts: [],
+                errors: []
+            });
+            setShowToast(true);
+            setTimeout(() => setShowToast(false), 4000);
+            console.log(`[AUTO-FIX] Score final : ${finalScore}% en ${iterations} passe(s), objectif ${targetReached ? 'atteint' : 'non atteint'}`);
+        } catch (error) {
+            console.error('Erreur auto-correction:', error);
+            alert('Erreur lors de la correction automatique. Vérifiez que le serveur est démarré.');
+        } finally {
+            setAutoFixing(false);
+            setAutoFixProgress('');
+        }
+    };
+
+    const handleGenerateAudio = async () => {
+        const podcastId = selectedPodcastId || dialogues[0]?.podcast_id;
+        if (!podcastId) return;
+        setGeneratingAudio(true);
+        setAudioError(null);
+        try {
+            const res = await api.post(`/podcasts/${podcastId}/generate-audio`, {}, { timeout: 300000 });
+            const url = `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}${res.data.audio_url}`;
+            setAudioUrl(url);
+        } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : 'Erreur inconnue';
+            setAudioError(`Echec de la generation audio : ${msg}`);
+        } finally {
+            setGeneratingAudio(false);
         }
     };
 
@@ -905,26 +958,100 @@ export default function Editor() {
                 {/* ============================================================ */}
                 {step === 'audio' && (
                     <div className="space-y-6">
-                        <div className="bg-card border border-border rounded-3xl p-12 text-center shadow-sm">
-                            <div className="w-16 h-16 bg-primary/10 text-primary rounded-2xl flex items-center justify-center mx-auto mb-4">
-                                🎧
+                        <div className="bg-card border border-border rounded-3xl p-10 shadow-sm space-y-6">
+                            <div className="text-center">
+                                <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-4 text-3xl">
+                                    🎧
+                                </div>
+                                <h2 className="text-2xl font-bold text-foreground">Generation Audio</h2>
+                                <p className="text-muted-foreground mt-2 text-sm max-w-md mx-auto">
+                                    Deux voix IA distinctes : <strong>Ines</strong> (voix feminine) et <strong>Yannick</strong> (voix masculine).
+                                    Le fichier MP3 est genere replique par replique puis assemble.
+                                </p>
                             </div>
-                            <h2 className="text-2xl font-bold text-foreground mb-2">Génération Audio</h2>
-                            <p className="text-muted-foreground max-w-lg mx-auto">
-                                Cette section permettra d'exporter et de générer l'audio directement via nos voix d'IA pour Inès et Yannick.
-                            </p>
-                            <div className="mt-8">
-                                <button className="bg-primary text-primary-foreground font-bold px-8 py-4 rounded-xl shadow-eisf opacity-50 cursor-not-allowed">
-                                    Connexion aux voix en cours d'intégration...
-                                </button>
+
+                            {/* Info voix */}
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="bg-secondary rounded-xl p-4 text-center border border-border">
+                                    <p className="font-bold text-foreground">Ines</p>
+                                    <p className="text-xs text-muted-foreground mt-1">Voix Nova — experte</p>
+                                    <div className="mt-2 h-1.5 rounded-full bg-primary/20">
+                                        <div className="h-full w-[70%] rounded-full bg-primary"></div>
+                                    </div>
+                                    <p className="text-[10px] text-muted-foreground mt-1">70% du dialogue</p>
+                                </div>
+                                <div className="bg-secondary rounded-xl p-4 text-center border border-border">
+                                    <p className="font-bold text-foreground">Yannick</p>
+                                    <p className="text-xs text-muted-foreground mt-1">Voix Echo — apprenant</p>
+                                    <div className="mt-2 h-1.5 rounded-full bg-[#E63337]/20">
+                                        <div className="h-full w-[30%] rounded-full bg-[#E63337]"></div>
+                                    </div>
+                                    <p className="text-[10px] text-muted-foreground mt-1">30% du dialogue</p>
+                                </div>
                             </div>
+
+                            {/* Bouton generation */}
+                            {!audioUrl && (
+                                <div className="text-center">
+                                    <button
+                                        onClick={handleGenerateAudio}
+                                        disabled={generatingAudio || dialogues.length === 0}
+                                        className="eisf-gradient text-primary-foreground font-bold px-10 py-4 rounded-xl shadow-eisf hover:opacity-90 active:scale-95 transition-all disabled:opacity-50 flex items-center gap-3 mx-auto"
+                                    >
+                                        {generatingAudio
+                                            ? <><Loader2 size={20} className="animate-spin" /> Generation en cours ({dialogues.length} repliques)...</>
+                                            : <> Generer le podcast audio</>
+                                        }
+                                    </button>
+                                    {generatingAudio && (
+                                        <p className="text-xs text-muted-foreground mt-3">
+                                            Environ {Math.ceil(dialogues.length * 0.3)} secondes — ne fermez pas la page.
+                                        </p>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Lecteur audio */}
+                            {audioUrl && (
+                                <div className="bg-secondary rounded-2xl p-6 border border-border space-y-4">
+                                    <p className="font-bold text-foreground text-center">Podcast genere</p>
+                                    <audio
+                                        controls
+                                        src={audioUrl}
+                                        className="w-full rounded-lg"
+                                        style={{ colorScheme: 'light' }}
+                                    />
+                                    <div className="flex gap-3 justify-center flex-wrap">
+                                        <a
+                                            href={audioUrl}
+                                            download
+                                            className="flex items-center gap-2 px-5 py-2.5 bg-primary text-primary-foreground rounded-xl font-bold text-sm hover:opacity-90 transition-all"
+                                        >
+                                            <FileDown size={16} /> Telecharger MP3
+                                        </a>
+                                        <button
+                                            onClick={handleGenerateAudio}
+                                            disabled={generatingAudio}
+                                            className="flex items-center gap-2 px-5 py-2.5 bg-card border border-border text-foreground rounded-xl font-bold text-sm hover:bg-secondary transition-all disabled:opacity-50"
+                                        >
+                                            {generatingAudio ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
+                                            Regenerer
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {audioError && (
+                                <p className="text-red-600 text-sm text-center bg-red-50 p-3 rounded-xl">{audioError}</p>
+                            )}
                         </div>
-                        <div className="pt-4">
+
+                        <div className="pt-2">
                             <button
                                 onClick={() => saveAndGoTo('editor')}
                                 className="text-muted-foreground hover:text-foreground text-sm font-medium transition-colors"
                             >
-                                ← Retour à l'éditeur
+                                ← Retour a l'editeur
                             </button>
                         </div>
                     </div>
@@ -1024,21 +1151,29 @@ export default function Editor() {
                                 )}
                             </div>
                             {verificationReport && (
-                                <div className="p-6 border-t border-border bg-secondary/50">
-                                    <button 
+                                <div className="p-6 border-t border-border bg-secondary/50 flex flex-col gap-2">
+                                    {autoFixing && (
+                                        <div className="flex items-center gap-2 text-sm text-primary font-semibold mb-1">
+                                            <Loader2 size={14} className="animate-spin" />
+                                            {autoFixProgress || 'Correction automatique en cours...'}
+                                        </div>
+                                    )}
+                                    {verificationReport?.missingConcepts.length > 0 && (
+                                        <button
+                                            onClick={handleAutoVerifyAndFix}
+                                            disabled={autoFixing}
+                                            className="w-full bg-[#E63337] hover:bg-red-700 text-white font-bold py-3 rounded-xl transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                                        >
+                                            {autoFixing ? <Loader2 size={16} className="animate-spin" /> : null}
+                                            Corriger automatiquement jusqu'a 95%
+                                        </button>
+                                    )}
+                                    <button
                                         onClick={() => setShowVerificationPanel(false)}
                                         className="w-full bg-card hover:bg-secondary border border-border text-foreground font-bold py-3 rounded-xl transition-all"
                                     >
-                                        J'ai compris
+                                        Fermer
                                     </button>
-                                    {verificationReport?.missingConcepts.length > 0 && (
-                                        <button 
-                                            onClick={handleFixMissing}
-                                            className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold py-3 rounded-xl transition-all"
-                                        >
-                                            Laisser l'IA corriger
-                                        </button>
-                                    )}
                                 </div>
                             )}
                         </motion.div>

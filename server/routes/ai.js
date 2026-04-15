@@ -3,7 +3,7 @@ const pool = require('../models/db');
 const authMiddleware = require('../middleware/auth');
 const mammoth = require('mammoth');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
-const fetch = require('node-fetch');
+// fetch est natif depuis Node 18 — pas besoin de node-fetch
 
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);

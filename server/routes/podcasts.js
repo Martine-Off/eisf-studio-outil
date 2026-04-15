@@ -6,7 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, HeadingLevel, WidthType } = require('docx');
 
-const fetch = require('node-fetch');
+// fetch est natif depuis Node 18 — pas besoin de node-fetch
 
 async function callGemini(systemPrompt, userPrompt) {
     const prompt = systemPrompt ? `${systemPrompt}\n\n${userPrompt}` : userPrompt;
