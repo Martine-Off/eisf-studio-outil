@@ -223,6 +223,7 @@ export default function Editor() {
     const [showVerificationPanel, setShowVerificationPanel] = useState(false);
     const [autoFixing, setAutoFixing] = useState(false);
     const [autoFixProgress, setAutoFixProgress] = useState('');
+    const [autoFixToastMsg, setAutoFixToastMsg] = useState('');
     const [exporting, setExporting] = useState(false);
     
     const [selectedPodcastId, setSelectedPodcastId] = useState<number | null>(null);
@@ -515,10 +516,14 @@ export default function Editor() {
     };
 
     const handleVerify = async () => {
+        const podcastId = selectedPodcastId || dialogues[0]?.podcast_id;
+        if (!podcastId) {
+            alert('Generez d\'abord un podcast avant de lancer la verification.');
+            return;
+        }
         setVerifying(true);
         setShowVerificationPanel(true);
         try {
-            const podcastId = selectedPodcastId || dialogues[0]?.podcast_id;
             const res = await api.post('/ai/verify', { podcastId });
             setVerificationReport(res.data);
         } catch (error) {
@@ -549,16 +554,29 @@ export default function Editor() {
 
     const handleAutoVerifyAndFix = async () => {
         const podcastId = selectedPodcastId || dialogues[0]?.podcast_id;
-        if (!podcastId) return;
+        if (!podcastId) {
+            alert('Selectionnez un podcast avant de lancer la correction.');
+            return;
+        }
         setAutoFixing(true);
-        setAutoFixProgress('Passe 1 — analyse...');
+        setAutoFixProgress('Analyse en cours...');
         try {
             const res = await api.post('/ai/auto-verify-and-fix', { podcastId }, { timeout: 300000 });
             const { finalScore, iterations, targetReached } = res.data;
-            setAutoFixProgress('');
-            // Recharger les dialogues corrigés
+            setAutoFixProgress('Rechargement des dialogues...');
+
+            // Recharger uniquement les dialogues du podcast corrigé
+            // et les fusionner avec les dialogues des autres podcasts
             const dlgRes = await api.get(`/podcasts/${podcastId}/dialogues`);
-            setDialogues(dlgRes.data);
+            const correctedDialogues: Dialogue[] = dlgRes.data;
+            setDialogues(prev => {
+                const others = prev.filter(d => d.podcast_id !== podcastId);
+                return [...others, ...correctedDialogues].sort((a, b) => {
+                    if (a.podcast_id !== b.podcast_id) return (a.podcast_id ?? 0) - (b.podcast_id ?? 0);
+                    return a.order_index - b.order_index;
+                });
+            });
+
             // Mettre à jour le rapport affiché
             setVerificationReport({
                 fidelityScore: finalScore,
@@ -566,12 +584,12 @@ export default function Editor() {
                 addedConcepts: [],
                 errors: []
             });
-            setShowToast(true);
-            setTimeout(() => setShowToast(false), 4000);
-            console.log(`[AUTO-FIX] Score final : ${finalScore}% en ${iterations} passe(s), objectif ${targetReached ? 'atteint' : 'non atteint'}`);
+
+            setAutoFixToastMsg(`Script corrige — ${finalScore}% de fidelite${targetReached ? '' : ' (correction partielle)'} en ${iterations} passe(s)`);
+            setTimeout(() => setAutoFixToastMsg(''), 5000);
         } catch (error) {
             console.error('Erreur auto-correction:', error);
-            alert('Erreur lors de la correction automatique. Vérifiez que le serveur est démarré.');
+            alert('Erreur lors de la correction automatique. Verifiez que le serveur est demarre.');
         } finally {
             setAutoFixing(false);
             setAutoFixProgress('');
@@ -697,6 +715,9 @@ export default function Editor() {
                                         <div className="text-[10px] font-bold text-muted-foreground px-2 py-1 mt-1 uppercase tracking-wider">PDF</div>
                                         <button onClick={() => handleExport('pdf', 'studio')} className="text-left px-3 py-2 hover:bg-secondary rounded-lg text-sm transition-colors text-foreground font-medium">Version Studio</button>
                                         <button onClick={() => handleExport('pdf', 'lecture')} className="text-left px-3 py-2 hover:bg-secondary rounded-lg text-sm transition-colors text-foreground font-medium">Version Lecture</button>
+                                        <div className="h-[1px] bg-border my-1"></div>
+                                        <div className="text-[10px] font-bold text-muted-foreground px-2 py-1 mt-1 uppercase tracking-wider">Donnees</div>
+                                        <button onClick={() => handleExport('json', '')} className="text-left px-3 py-2 hover:bg-secondary rounded-lg text-sm transition-colors text-foreground font-medium">JSON (.json)</button>
                                     </div>
                                 </div>
                                 <button
@@ -995,11 +1016,11 @@ export default function Editor() {
                                 <div className="text-center">
                                     <button
                                         onClick={handleGenerateAudio}
-                                        disabled={generatingAudio || dialogues.length === 0}
+                                        disabled={generatingAudio || displayedDialogues.length === 0}
                                         className="eisf-gradient text-primary-foreground font-bold px-10 py-4 rounded-xl shadow-eisf hover:opacity-90 active:scale-95 transition-all disabled:opacity-50 flex items-center gap-3 mx-auto"
                                     >
                                         {generatingAudio
-                                            ? <><Loader2 size={20} className="animate-spin" /> Generation en cours ({dialogues.length} repliques)...</>
+                                            ? <><Loader2 size={20} className="animate-spin" /> Generation en cours ({displayedDialogues.length} repliques)...</>
                                             : <> Generer le podcast audio</>
                                         }
                                     </button>
@@ -1181,7 +1202,22 @@ export default function Editor() {
                 )}
             </AnimatePresence>
 
-            {/* Toast Notifications */}
+            {/* Toast auto-fix */}
+            <AnimatePresence>
+                {autoFixToastMsg && (
+                    <motion.div
+                        initial={{ opacity: 0, y: 50, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 20, scale: 0.95 }}
+                        className="fixed bottom-24 left-1/2 -translate-x-1/2 bg-[#E63337] text-white px-6 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3 z-[100] font-bold max-w-sm text-center text-sm"
+                    >
+                        <CheckCircle size={18} className="flex-shrink-0" />
+                        {autoFixToastMsg}
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Toast sauvegarde */}
             <AnimatePresence>
                 {showToast && (
                     <motion.div
@@ -1193,7 +1229,7 @@ export default function Editor() {
                         <div className="h-6 w-6 rounded-full bg-green-500 flex items-center justify-center">
                             <CheckCircle size={14} className="text-white" />
                         </div>
-                        Sauvegardé avec succès
+                        Sauvegarde avec succes
                     </motion.div>
                 )}
             </AnimatePresence>

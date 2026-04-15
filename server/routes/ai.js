@@ -756,7 +756,7 @@ Retourne UNIQUEMENT ce JSON valide, sans markdown, sans explication :
 
 RÈGLE ABSOLUE : Les listes doivent être COMPLÈTES. S'il y a 20 concepts manquants, tu en listes 20. Ne jamais tronquer.`;
 
-        const rawText = await callGemini(prompt, systemPrompt);
+        const rawText = await callGemini(systemPrompt, prompt);
         const resultJson = parseJSON(rawText);
 
         await pool.query('UPDATE podcasts SET fidelity_score = $1 WHERE id = $2', [resultJson.fidelityScore || null, podcastId]);
