@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import api from '../utils/api'; 
 
 interface ProjectMacroAnalysisProps {
@@ -22,16 +22,13 @@ export default function ProjectMacroAnalysis({
       const response = await api.post(`/projects/${projectId}/macro-verify`);
       setScore(response.data.macro_score ?? response.data.score);
       
-      let parsedObservations = [];
-      if (response.data.macro_feedback) {
-        if (typeof response.data.macro_feedback === 'string') {
-          parsedObservations = JSON.parse(response.data.macro_feedback);
-        } else {
-          // Si c'est déjà un objet
-          parsedObservations = response.data.macro_feedback.suggestions || [];
-        }
-      } else if (response.data.observations) {
+      let parsedObservations: string[] = [];
+      if (Array.isArray(response.data.observations)) {
         parsedObservations = response.data.observations;
+      } else if (Array.isArray(response.data.macro_feedback)) {
+        parsedObservations = response.data.macro_feedback;
+      } else if (typeof response.data.macro_feedback === 'string') {
+        try { parsedObservations = JSON.parse(response.data.macro_feedback); } catch { /* ignore */ }
       }
       setObservations(parsedObservations);
     } catch (error) {

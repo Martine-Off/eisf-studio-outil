@@ -19,6 +19,12 @@ async function run() {
         console.log("Adding audio_url to podcasts...");
         await pool.query('ALTER TABLE podcasts ADD COLUMN IF NOT EXISTS audio_url VARCHAR(500);');
 
+        console.log("Adding macro_score to projects...");
+        await pool.query('ALTER TABLE projects ADD COLUMN IF NOT EXISTS macro_score INTEGER;');
+
+        console.log("Adding macro_feedback to projects...");
+        await pool.query('ALTER TABLE projects ADD COLUMN IF NOT EXISTS macro_feedback JSONB;');
+
         console.log("All migrations OK!");
     } catch (e) {
         console.error("Error:", e);

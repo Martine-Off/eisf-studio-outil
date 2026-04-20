@@ -4,13 +4,7 @@ import { Loader2, ChevronLeft, Mic } from 'lucide-react';
 import api from '../utils/api';
 import AppLayout from '../components/AppLayout';
 import ProjectMacroAnalysis from '../components/ProjectMacroAnalysis';
-import type { Project } from '../types';
-interface Podcast {
-    id: number;
-    title: string;
-    word_count: number;
-    duration_seconds: number;
-}
+import type { Project, Podcast } from '../types';
 
 export default function ProjectPodcasts() {
     const { projectId } = useParams();
@@ -60,10 +54,10 @@ export default function ProjectPodcasts() {
 
                 {/* Encart de Synthèse Globale IA */}
                 {!loading && projectData && (
-                    <ProjectMacroAnalysis 
-                        projectId={projectId || ''} 
-                        initialScore={projectData.macro_score} 
-                        initialObservations={projectData.macro_feedback ? (projectData.macro_feedback as any).suggestions || [] : []} 
+                    <ProjectMacroAnalysis
+                        projectId={projectId || ''}
+                        initialScore={projectData.macro_score}
+                        initialObservations={Array.isArray(projectData.macro_feedback) ? projectData.macro_feedback : []}
                     />
                 )}
 
@@ -92,10 +86,24 @@ export default function ProjectPodcasts() {
                                 <div className="w-12 h-12 bg-primary/10 text-primary rounded-xl flex items-center justify-center mb-4">
                                     <Mic size={24} />
                                 </div>
-                                <h3 className="font-bold text-lg text-foreground mb-1 line-clamp-2">{podcast.title || `Podcast #${podcast.id}`}</h3>
-                                <div className="text-sm text-muted-foreground mb-6 flex gap-4 font-medium">
+                                <div className="w-full flex items-start justify-between gap-2 mb-1">
+                                    <h3 className="font-bold text-lg text-foreground line-clamp-2">{podcast.title || `Podcast #${podcast.id}`}</h3>
+                                    {podcast.fidelity_score != null && (
+                                        <span className={`flex-shrink-0 text-xs font-bold px-2 py-0.5 rounded-full border ${
+                                            podcast.fidelity_score >= 95 ? 'bg-green-100 text-green-800 border-green-200' :
+                                            podcast.fidelity_score >= 70 ? 'bg-orange-100 text-orange-800 border-orange-200' :
+                                                                            'bg-red-100 text-red-800 border-red-200'
+                                        }`}>
+                                            {Math.round(podcast.fidelity_score)}%
+                                        </span>
+                                    )}
+                                </div>
+                                <div className="text-sm text-muted-foreground mb-6 flex gap-2 font-medium flex-wrap">
                                     <span className="bg-secondary px-2.5 py-1 rounded-md">{podcast.word_count ? podcast.word_count.toLocaleString() : 0} mots</span>
                                     <span className="bg-secondary px-2.5 py-1 rounded-md">~{Math.ceil((podcast.duration_seconds || 0) / 60)} min</span>
+                                    {podcast.audio_url && (
+                                        <span className="bg-green-100 text-green-700 px-2.5 py-1 rounded-md text-xs font-bold">Audio ✓</span>
+                                    )}
                                 </div>
                                 <div className="mt-auto w-full pt-4 border-t border-border">
                                     <button

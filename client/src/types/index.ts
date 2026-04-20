@@ -1,31 +1,32 @@
-// 1. On définit la structure exacte que l'IA devra nous renvoyer
 export interface IAFeedback {
   concepts_manquants: string[];
   informations_erronees: string[];
   suggestions: string[];
 }
 
-// 2. On met à jour l'interface du Podcast (l'épisode de 4-7 min)
 export interface Podcast {
-  id: string; // ou number selon ta BDD
-  project_id: string;
+  id: number;
+  project_id: number;
   title: string;
-  script_content: any; // La structure JSON de tes blocs Dnd-kit (Inès/Yannick)
-  word_count: number;
-  duration_minutes: number;
-  
-  // Nouvelles colonnes ajoutées pour la V2
+  order_index?: number;
+  word_count?: number;
+  duration_seconds?: number;
+  fidelity_score?: number | null;
   ia_feedback?: IAFeedback | null;
   audio_url?: string | null;
+  created_at?: string;
 }
 
-// 3. On met à jour l'interface du Projet (le cours global)
 export interface Project {
-  id: string;
+  id: number;
+  user_id?: number;
   title: string;
-  original_docx_path: string;
-  
-  // Nouvelles colonnes pour la macro-analyse
+  status?: string;
+  source_file_path?: string;
+  cleaned_text?: string;
   macro_score?: number | null;
-  macro_feedback?: any | null;
+  macro_feedback?: string[] | null;
+  created_at?: string;
+  updated_at?: string;
+  podcast_count?: number;
 }

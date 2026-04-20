@@ -11,6 +11,7 @@ interface Project {
     status: string;
     created_at: string;
     updated_at: string;
+    podcast_count: number;
 }
 
 export default function Dashboard() {
@@ -152,7 +153,7 @@ export default function Dashboard() {
                                 <div className="pt-4 border-t border-border flex items-center justify-between text-xs font-semibold text-muted-foreground">
                                     <div className="flex items-center gap-2">
                                         <Clock size={14} />
-                                        <span>~5 min</span>
+                                        <span>{project.podcast_count > 0 ? `${project.podcast_count} podcast${project.podcast_count > 1 ? 's' : ''}` : 'Aucun podcast'}</span>
                                     </div>
                                     <div className="flex items-center gap-2 text-primary group-hover:translate-x-1 transition-transform">
                                         <span>Ouvrir</span>

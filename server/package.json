@@ -5,7 +5,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "nodemon server.js"
+    "dev": "npx kill-port 3001 && nodemon --delay 500ms --ignore uploads/ server.js"
   },
   "dependencies": {
     "@google/generative-ai": "^0.21.0",

@@ -533,25 +533,6 @@ export default function Editor() {
         }
     };
 
-    const handleFixMissing = async () => {
-        if (!verificationReport) return;
-        setVerifying(true);
-        try {
-            const podcastId = selectedPodcastId || dialogues[0]?.podcast_id;
-            const res = await api.post('/ai/fix-missing-concepts', {
-                podcastId,
-                missingConcepts: verificationReport.missingConcepts
-            });
-            setDialogues(prev => [...prev, ...res.data.newDialogues]);
-            setShowVerificationPanel(false);
-            setSaveStatus('unsaved');
-        } catch (error) {
-            console.error('Erreur correction:', error);
-        } finally {
-            setVerifying(false);
-        }
-    };
-
     const handleAutoVerifyAndFix = async () => {
         const podcastId = selectedPodcastId || dialogues[0]?.podcast_id;
         if (!podcastId) {
@@ -605,9 +586,13 @@ export default function Editor() {
             const res = await api.post(`/podcasts/${podcastId}/generate-audio`, {}, { timeout: 300000 });
             const url = `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}${res.data.audio_url}`;
             setAudioUrl(url);
-        } catch (err: unknown) {
-            const msg = err instanceof Error ? err.message : 'Erreur inconnue';
-            setAudioError(`Echec de la generation audio : ${msg}`);
+        } catch (err: any) {
+            if (err?.response?.data?.error === 'tts_not_configured') {
+                setAudioError('La génération audio sera disponible prochainement (configuration n8n en cours).');
+            } else {
+                const msg = err instanceof Error ? err.message : 'Erreur inconnue';
+                setAudioError(`Echec de la generation audio : ${msg}`);
+            }
         } finally {
             setGeneratingAudio(false);
         }
@@ -681,7 +666,7 @@ export default function Editor() {
                         {step === 'editor' && availablePodcasts.length > 1 && (
                             <select 
                                 value={selectedPodcastId || ''} 
-                                onChange={(e) => setSelectedPodcastId(Number(e.target.value))}
+                                onChange={(e) => { setSelectedPodcastId(Number(e.target.value)); setAudioUrl(null); }}
                                 className="bg-secondary text-foreground text-sm font-bold px-4 py-2 rounded-xl focus:ring-0 outline-none border border-border"
                             >
                                 {availablePodcasts.map(p => (

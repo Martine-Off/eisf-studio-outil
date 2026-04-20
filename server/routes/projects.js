@@ -5,10 +5,9 @@ const pool = require('../models/db');
 const authMiddleware = require('../middleware/auth');
 const path = require('path');
 const fs = require('fs');
-const { OpenAI } = require('openai');
+const callGPT = require('../utils/callGPT');
 
 const router = express.Router();
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 // Assurer que le dossier uploads/ existe
 const uploadsDir = path.join(__dirname, '..', 'uploads');
@@ -22,7 +21,9 @@ const storage = multer.diskStorage({
         cb(null, uploadsDir);
     },
     filename: (req, file, cb) => {
-        cb(null, Date.now() + '-' + file.originalname);
+        // Sanitize : conserver seulement le basename, remplacer les caractères dangereux
+        const safeName = path.basename(file.originalname).replace(/[^a-zA-Z0-9.\-_\u00C0-\u017F]/g, '_');
+        cb(null, Date.now() + '-' + safeName);
     },
 });
 
@@ -33,16 +34,29 @@ const upload = multer({
         if (ext !== '.docx' && ext !== '.doc') {
             return cb(new Error('Seuls les fichiers Word (.docx, .doc) sont acceptés'));
         }
+        // Vérifier aussi le MIME type déclaré
+        const allowedMimes = [
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'application/msword',
+            'application/octet-stream', // certains OS déclarent ainsi
+        ];
+        if (!allowedMimes.includes(file.mimetype)) {
+            return cb(new Error('Type MIME invalide pour un fichier Word'));
+        }
         cb(null, true);
     },
-    limits: { fileSize: 500 * 1024 * 1024 } // 500 MB max
+    limits: { fileSize: 25 * 1024 * 1024 } // 25 MB max
 });
 
 // Lister les projets de l'utilisateur
 router.get('/', authMiddleware, async (req, res) => {
     try {
         const result = await pool.query(
-            'SELECT * FROM projects WHERE user_id = $1 ORDER BY updated_at DESC',
+            `SELECT p.*,
+                (SELECT COUNT(*) FROM podcasts WHERE project_id = p.id)::int AS podcast_count
+             FROM projects p
+             WHERE p.user_id = $1
+             ORDER BY p.updated_at DESC`,
             [req.userId]
         );
         res.json(result.rows);
@@ -57,14 +71,6 @@ router.post('/create', authMiddleware, upload.single('file'), async (req, res) =
     try {
         const { title, content } = req.body;
         const userId = req.userId;
-
-        // Auto-create user if missing (helpful for mock DB transition)
-        const userCheck = await pool.query('SELECT id FROM users WHERE id = $1', [userId]);
-        if (userCheck.rows.length === 0) {
-            const bcrypt = require('bcrypt');
-            const hash = await bcrypt.hash('admin', 12);
-            await pool.query('INSERT INTO users (id, email, password_hash, first_name) VALUES ($1, $2, $3, $4)', [userId, `auto_${userId}@eisf.fr`, hash, 'AutoUser']);
-        }
 
         if (!req.file && !content) {
             return res.status(400).json({ error: 'Fichier .docx ou texte requis' });
@@ -210,9 +216,18 @@ router.delete('/:projectId', authMiddleware, async (req, res) => {
 });
 
 // POST /api/projects/:id/macro-verify
-router.post('/:id/macro-verify', async (req, res) => {
+router.post('/:id/macro-verify', authMiddleware, async (req, res) => {
     try {
         const projectId = req.params.id;
+
+        // Vérifier que le projet appartient à l'utilisateur
+        const ownerCheck = await pool.query(
+            'SELECT id FROM projects WHERE id = $1 AND user_id = $2',
+            [projectId, req.userId]
+        );
+        if (ownerCheck.rows.length === 0) {
+            return res.status(404).json({ error: 'Projet introuvable ou accès refusé' });
+        }
 
         // 1. Récupération des scripts via la table dialogues
         const dialoguesRes = await pool.query(
@@ -237,16 +252,21 @@ router.post('/:id/macro-verify', async (req, res) => {
             podcastsMap.get(d.podcast_id).push(`${d.character || 'Intervenant'}: ${d.text_studio || ''}`);
         });
 
-        const fullContent = Array.from(podcastsMap.values())
+        // Construire le contenu et le tronquer à 10 000 chars pour rester dans le contexte GPT
+        const MAX_CONTENT = 10000;
+        let fullContent = Array.from(podcastsMap.values())
             .map(dialogues => dialogues.join('\n'))
             .join('\n\n--- ÉPISODE SUIVANT ---\n\n');
+        if (fullContent.length > MAX_CONTENT) {
+            fullContent = fullContent.substring(0, MAX_CONTENT) + '\n[... contenu tronqué ...]';
+        }
 
-        // 3. Appel OpenAI (gpt-4o-mini avec JSON object forcé)
+        // 3. Appel GPT via n8n
         const systemPrompt = `Tu es un expert pédagogique et éditorial.
 Évalue cet ensemble de scripts de podcasts concernant un cours.
 Vérifie si le cours entier est bien couvert de façon cohérente, globale, et si rien d'important n'a été oublié.
 
-Renvoie UNIQUEMENT un objet JSON valide avec cette structure stricte :
+Renvoie UNIQUEMENT un objet JSON valide avec cette structure stricte, sans texte avant ni après :
 {
   "score": <entier sur 100>,
   "observations": [
@@ -255,24 +275,16 @@ Renvoie UNIQUEMENT un objet JSON valide avec cette structure stricte :
   ]
 }`;
 
-        const completion = await openai.chat.completions.create({
-            model: 'gpt-4o-mini',
-            messages: [
-                { role: 'system', content: systemPrompt },
-                { role: 'user', content: `Voici les scripts concaténés :\n\n${fullContent}` }
-            ],
-            response_format: { type: 'json_object' },
-            temperature: 0.3
-        });
-
-        const parsedResponse = JSON.parse(completion.choices[0].message.content);
+        const rawText = await callGPT(systemPrompt, `Voici les scripts concaténés :\n\n${fullContent}`);
+        const cleaned = rawText.replace(/```json\n?|```/g, '').trim();
+        const parsedResponse = JSON.parse(cleaned);
         const macroScore = parseInt(parsedResponse.score, 10) || 0;
-        const macroFeedback = JSON.stringify(parsedResponse.observations || []); 
+        const macroFeedback = parsedResponse.observations || [];
 
         // 4. Update de la base de données
         await pool.query(
             'UPDATE projects SET macro_score = $1, macro_feedback = $2 WHERE id = $3',
-            [macroScore, macroFeedback, projectId]
+            [macroScore, JSON.stringify(macroFeedback), projectId]
         );
 
         // 5. Réponse
@@ -284,7 +296,7 @@ Renvoie UNIQUEMENT un objet JSON valide avec cette structure stricte :
 
     } catch (error) {
         console.error('Erreur lors du macro-verify:', error);
-        res.status(500).json({ error: 'Erreur serveur lors de la vérification globale.' });
+        res.status(500).json({ error: 'Erreur serveur lors de la vérification globale.', details: error.message });
     }
 });
 

@@ -23,7 +23,9 @@ CREATE TABLE IF NOT EXISTS projects (
   cleaned_text TEXT,
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW(),
-  last_opened_at TIMESTAMP
+  last_opened_at TIMESTAMP,
+  macro_score INTEGER,
+  macro_feedback JSONB
 );
 
 -- Table podcasts

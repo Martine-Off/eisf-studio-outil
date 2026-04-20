@@ -78,6 +78,7 @@ export default function PodcastEditor() {
     const [showVerificationPanel, setShowVerificationPanel] = useState(false);
     const [isAudioModalOpen, setIsAudioModalOpen] = useState(false);
     const [audioUrl, setAudioUrl] = useState<string | null>(null);
+    const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
 
     const sensors = useSensors(useSensor(PointerSensor), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }));
     const saveStateRef = useRef({ status: saveStatus, dialogues });
@@ -100,9 +101,15 @@ export default function PodcastEditor() {
 
     const loadData = async () => {
         try {
-            const infoRes = await api.get(`/podcasts/${podcastId}`);
+            const [infoRes, dlgsRes] = await Promise.all([
+                api.get(`/podcasts/${podcastId}`),
+                api.get(`/podcasts/${podcastId}/dialogues`),
+            ]);
             setPodcastInfo(infoRes.data);
-            const dlgsRes = await api.get(`/podcasts/${podcastId}/dialogues`);
+            if (infoRes.data.audio_url) {
+                const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+                setAudioUrl(`${baseUrl}${infoRes.data.audio_url}`);
+            }
             setDialogues(dlgsRes.data || []);
         } catch (error) {
             console.error('Erreur chargement podcast:', error);
@@ -153,14 +160,22 @@ export default function PodcastEditor() {
     };
 
     const handleGenerateAudio = async () => {
+        setIsAudioModalOpen(false);
+        setIsGeneratingAudio(true);
         try {
-            const response = await api.post(`/podcasts/${podcastId}/generate-audio`);
-            setAudioUrl(response.data.audio_url);
-            setIsAudioModalOpen(false);
-            alert("Audio généré avec succès !");
-        } catch (error) {
-            console.error("Erreur TTS:", error);
-            alert("Erreur lors de la génération audio.");
+            const response = await api.post(`/podcasts/${podcastId}/generate-audio`, {}, { timeout: 300000 });
+            const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+            setAudioUrl(`${baseUrl}${response.data.audio_url}`);
+        } catch (error: any) {
+            const msg = error?.response?.data?.error;
+            if (msg === 'tts_not_configured') {
+                alert("La génération audio sera disponible prochainement (configuration n8n en cours).");
+            } else {
+                console.error("Erreur TTS:", error);
+                alert("Erreur lors de la génération audio.");
+            }
+        } finally {
+            setIsGeneratingAudio(false);
         }
     };
 
@@ -198,15 +213,19 @@ export default function PodcastEditor() {
                             Sauvegarder
                         </button>
                         <button
-                            onClick={() => setIsAudioModalOpen(true)}
-                            disabled={audioUrl !== null}
+                            onClick={() => !audioUrl && !isGeneratingAudio && setIsAudioModalOpen(true)}
+                            disabled={isGeneratingAudio}
                             className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold transition-all shadow-sm ${
                                 audioUrl
                                     ? 'bg-green-100 text-green-700 cursor-default'
+                                    : isGeneratingAudio
+                                    ? 'bg-indigo-200 text-indigo-500 cursor-wait'
                                     : 'bg-indigo-600 text-white hover:bg-indigo-700'
                             }`}
                         >
-                            {audioUrl ? '✅ Audio prêt' : '🎙️ Générer le podcast'}
+                            {audioUrl ? '✅ Audio prêt' : isGeneratingAudio ? (
+                                <><Loader2 size={16} className="animate-spin" /> Génération en cours...</>
+                            ) : '🎙️ Générer le podcast'}
                         </button>
                     </div>
                 </div>
@@ -232,7 +251,7 @@ export default function PodcastEditor() {
                                 <button onClick={() => setShowVerificationPanel(false)} className="p-2 hover:bg-secondary rounded-full"><ChevronRight size={20} className="text-muted-foreground" /></button>
                             </div>
                             <div className="p-6 flex-1 overflow-y-auto">
-                                <AIVerificationPanel podcastId={podcastId!} onAutoCorrectSuccess={loadData} />
+                                <AIVerificationPanel podcastId={podcastId!} onCorrectionDone={loadData} />
                             </div>
                         </motion.div>
                     </>

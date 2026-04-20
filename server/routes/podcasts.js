@@ -1,34 +1,14 @@
 const express = require('express');
 const pool = require('../models/db');
 const authMiddleware = require('../middleware/auth');
-const OpenAI = require('openai');
 const fs = require('fs');
 const path = require('path');
 const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, HeadingLevel, WidthType } = require('docx');
-
-// fetch est natif depuis Node 18 — pas besoin de node-fetch
-
-async function callGemini(systemPrompt, userPrompt) {
-    const prompt = systemPrompt ? `${systemPrompt}\n\n${userPrompt}` : userPrompt;
-    const response = await fetch('http://localhost:5678/webhook/501bb061-982b-4b25-b782-d137b9ea8916', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt })
-    });
-    const data = await response.json();
-    const text = data.output?.[0]?.content?.[0]?.text
-        || data.message?.content
-        || data.text
-        || JSON.stringify(data);
-    return text.replace(/```json\n?|```/g, '').trim();
-}
+const callGPT = require('../utils/callGPT');
+const { normalizeText } = require('./ai');
+const { assertPodcastOwner } = require('../utils/ownershipChecks');
 
 const router = express.Router();
-
-
-const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-});
 
 // Récupérer tous les podcasts d'un projet
 router.get('/', authMiddleware, async (req, res) => {
@@ -39,7 +19,7 @@ router.get('/', authMiddleware, async (req, res) => {
         }
 
         const result = await pool.query(
-            'SELECT id, title, word_count, duration_seconds, created_at FROM podcasts WHERE project_id = $1 ORDER BY id ASC',
+            'SELECT id, title, word_count, duration_seconds, fidelity_score, audio_url, created_at FROM podcasts WHERE project_id = $1 ORDER BY order_index ASC NULLS LAST, id ASC',
             [projectId]
         );
 
@@ -55,6 +35,8 @@ router.get('/:podcastId/dialogues', authMiddleware, async (req, res) => {
     try {
         const { podcastId } = req.params;
 
+        await assertPodcastOwner(podcastId, req.userId);
+
         const result = await pool.query(
             'SELECT * FROM dialogues WHERE podcast_id = $1 ORDER BY order_index ASC',
             [podcastId]
@@ -63,7 +45,7 @@ router.get('/:podcastId/dialogues', authMiddleware, async (req, res) => {
         res.json(result.rows);
     } catch (error) {
         console.error('Erreur récupération dialogues:', error);
-        res.status(500).json({ error: 'Erreur serveur' });
+        res.status(error.statusCode || 500).json({ error: error.statusCode ? error.message : 'Erreur serveur' });
     }
 });
 
@@ -72,6 +54,8 @@ router.put('/:podcastId/reorder', authMiddleware, async (req, res) => {
     try {
         const { podcastId } = req.params;
         const { dialogues } = req.body; // [{ id, order_index }, ...]
+
+        await assertPodcastOwner(podcastId, req.userId);
 
         if (!Array.isArray(dialogues)) {
             return res.status(400).json({ error: 'Format invalide' });
@@ -98,7 +82,7 @@ router.put('/:podcastId/reorder', authMiddleware, async (req, res) => {
         res.json({ success: true });
     } catch (error) {
         console.error('Erreur réorganisation:', error);
-        res.status(500).json({ error: 'Erreur serveur' });
+        res.status(error.statusCode || 500).json({ error: error.statusCode ? error.message : 'Erreur serveur' });
     }
 });
 
@@ -107,9 +91,13 @@ router.get('/:podcastId', authMiddleware, async (req, res) => {
     try {
         const { podcastId } = req.params;
 
+        // Ownership check : retourne directement les infos via la jointure
         const result = await pool.query(
-            'SELECT * FROM podcasts WHERE id = $1',
-            [podcastId]
+            `SELECT podcasts.*
+             FROM podcasts
+             JOIN projects ON podcasts.project_id = projects.id
+             WHERE podcasts.id = $1 AND projects.user_id = $2`,
+            [podcastId, req.userId]
         );
 
         if (result.rows.length === 0) {
@@ -170,8 +158,8 @@ router.post('/:id/verify', authMiddleware, async (req, res) => {
             .map(item => `${item.character || 'Intervenant'}: ${item.text_studio || ''}`)
             .join('\n');
 
-        // 2. Appel Gemini via n8n
-        const geminiPrompt = `Tu dois comparer exhaustivement le cours source et le podcast généré.
+        // 2. Appel GPT via n8n
+        const gptPrompt = `Tu dois comparer exhaustivement le cours source et le podcast généré.
 
 MÉTHODE OBLIGATOIRE :
 1. Lis le cours source et dresse la liste complète de TOUS les concepts, chiffres, termes techniques, définitions et exemples.
@@ -194,9 +182,9 @@ Retourne UNIQUEMENT ce JSON valide, sans markdown, sans explication :
 RÈGLE ABSOLUE : Les listes doivent être COMPLÈTES. S'il y a 20 concepts manquants, tu en listes 20. Ne jamais tronquer.`;
 
         console.log('[VERIFY] Envoi à n8n...');
-        const rawText = await callGemini(
+        const rawText = await callGPT(
             "Tu es un expert en vérification pédagogique. Ta mission est d'être EXHAUSTIF et CHIRURGICAL. Tu ne t'arrêtes jamais à 5 éléments. Tu parcours l'intégralité du texte source du début à la fin, concept par concept, chiffre par chiffre, terme technique par terme technique. Un oubli de ta part = une erreur pédagogique pour un étudiant.",
-            geminiPrompt
+            gptPrompt
         );
         console.log('[VERIFY] Réponse reçue:', rawText?.substring(0, 200));
 
@@ -212,109 +200,29 @@ RÈGLE ABSOLUE : Les listes doivent être COMPLÈTES. S'il y a 20 concepts manqu
             };
         }
 
-        // 4. Sauvegarder en base
+        // 4. Calculer un score de fidélité estimé et sauvegarder
+        const missing = iaFeedback.concepts_manquants?.length || 0;
+        const errors = iaFeedback.informations_erronees?.length || 0;
+        const fidelityScore = Math.max(0, 100 - missing * 4 - errors * 8);
+
         await pool.query(
-            'UPDATE podcasts SET ia_feedback = $1 WHERE id = $2',
-            [JSON.stringify(iaFeedback), id]
+            'UPDATE podcasts SET ia_feedback = $1, fidelity_score = $2 WHERE id = $3',
+            [JSON.stringify(iaFeedback), fidelityScore, id]
         );
 
-        res.json({ success: true, ia_feedback: iaFeedback });
+        res.json({ success: true, ia_feedback: iaFeedback, fidelity_score: fidelityScore });
     } catch (error) {
-        console.error('Erreur vérification Gemini:', error);
+        console.error('Erreur vérification GPT:', error);
         res.status(500).json({ error: 'Erreur serveur lors de la vérification IA' });
     }
 });
 
-// Génération audio TTS — deux voix (Inès = nova, Yannick = echo)
-// text_studio utilisé (avec phonétique) pour une meilleure prononciation TTS
+// Génération audio TTS — en attente de configuration n8n
 router.post('/:id/generate-audio', authMiddleware, async (req, res) => {
-    try {
-        const { id } = req.params;
-
-        // 1. Récupérer tous les dialogues
-        const dialoguesRes = await pool.query(
-            'SELECT character, text_studio, text_reading FROM dialogues WHERE podcast_id = $1 ORDER BY order_index ASC',
-            [id]
-        );
-
-        if (dialoguesRes.rows.length === 0) {
-            return res.status(404).json({ error: 'Aucun dialogue trouvé pour ce podcast.' });
-        }
-
-        const dialogues = dialoguesRes.rows.filter(d => (d.text_studio || '').trim() !== '');
-        if (dialogues.length === 0) {
-            return res.status(400).json({ error: 'Le script est vide.' });
-        }
-
-        // 2. Voix par personnage
-        // nova = voix féminine claire → Inès
-        // echo = voix masculine posée → Yannick
-        const VOICE_INES = 'nova';
-        const VOICE_YANNICK = 'echo';
-
-        console.log(`[TTS] Génération audio pour ${dialogues.length} répliques...`);
-
-        // 3. Générer un buffer MP3 par réplique (en séquentiel pour respecter le rate limit)
-        const audioBuffers = [];
-        for (let i = 0; i < dialogues.length; i++) {
-            const d = dialogues[i];
-            const voice = d.character === 'yannick' ? VOICE_YANNICK : VOICE_INES;
-            // text_studio contient les formes phonétiques — idéal pour le TTS
-            const inputText = d.text_studio.trim();
-
-            console.log(`[TTS] Réplique ${i + 1}/${dialogues.length} (${d.character}, ${voice})`);
-
-            const mp3Response = await openai.audio.speech.create({
-                model: 'tts-1',
-                voice,
-                input: inputText,
-                response_format: 'mp3',
-            });
-
-            const buf = Buffer.from(await mp3Response.arrayBuffer());
-            audioBuffers.push(buf);
-
-            // Courte pause pour éviter le rate limit OpenAI
-            if (i < dialogues.length - 1) {
-                await new Promise(r => setTimeout(r, 200));
-            }
-        }
-
-        // 4. Concaténer tous les buffers MP3
-        // Note : la concaténation directe de fichiers MP3 CBR fonctionne pour la lecture
-        const finalBuffer = Buffer.concat(audioBuffers);
-
-        // 5. Supprimer l'ancien fichier audio s'il existe
-        const uploadDir = path.join(__dirname, '../uploads/audio');
-        if (!fs.existsSync(uploadDir)) {
-            fs.mkdirSync(uploadDir, { recursive: true });
-        }
-
-        const existingRes = await pool.query('SELECT audio_url FROM podcasts WHERE id = $1', [id]);
-        const oldUrl = existingRes.rows[0]?.audio_url;
-        if (oldUrl) {
-            const oldPath = path.join(__dirname, '..', oldUrl);
-            fs.unlink(oldPath, () => {}); // Ignore l'erreur si le fichier n'existe plus
-        }
-
-        // 6. Sauvegarder le nouveau fichier
-        const filename = `podcast_${id}_${Date.now()}.mp3`;
-        const filepath = path.join(uploadDir, filename);
-        await fs.promises.writeFile(filepath, finalBuffer);
-
-        const audioUrl = `/uploads/audio/${filename}`;
-
-        // 7. Mettre à jour la base de données
-        await pool.query('UPDATE podcasts SET audio_url = $1 WHERE id = $2', [audioUrl, id]);
-
-        console.log(`[TTS] Audio généré : ${filename} (${Math.round(finalBuffer.length / 1024)} Ko)`);
-
-        res.json({ success: true, audio_url: audioUrl });
-
-    } catch (error) {
-        console.error('[TTS] Erreur génération audio:', error);
-        res.status(500).json({ error: 'Erreur serveur lors de la génération audio', details: error.message });
-    }
+    return res.status(503).json({
+        error: 'tts_not_configured',
+        message: 'La génération audio est en cours de configuration. Elle sera disponible prochainement.'
+    });
 });
 
 // Auto-correction des dialogues
@@ -363,13 +271,14 @@ Voici les informations erronées à corriger TOUTES :
 ${JSON.stringify(iaFeedback.informations_erronees || [])}
 
 Réécris CHAQUE dialogue en intégrant naturellement ces éléments. Conserve le style Inès/Yannick, le ratio 70/30, et la structure existante.
+ATTENTION : Ne modifie JAMAIS le premier et le dernier dialogue s'il s'agit des phrases d'introduction ou de conclusion officielles.
 
 Réponds UNIQUEMENT avec ce JSON brut (aucun autre texte) :
 {"dialogues":[{"id":1,"text_studio":"...","text_reading":"..."}]}`;
 
         // 3. Appel n8n
         console.log('[AUTO-CORRECT] Envoi à n8n, nb dialogues:', dialogues.length, '| nb concepts:', conceptsManquants.length);
-        const rawResponse = await callGemini(prompt);
+        const rawResponse = await callGPT(null, prompt);
         console.log('[AUTO-CORRECT] Réponse n8n reçue:', rawResponse?.substring(0, 300));
         const cleaned = rawResponse.replace(/```json/g, '').replace(/```/g, '').trim();
         const jsonStart = cleaned.indexOf('{');
@@ -385,9 +294,16 @@ Réponds UNIQUEMENT avec ce JSON brut (aucun autre texte) :
         try {
             await client.query('BEGIN');
             for (const d of updatedDialogues) {
+                const original = dialogues.find(od => od.id === d.id);
+                // Ne jamais modifier l'intro et la conclu obligatoires
+                if (original && (original.section === 'jingle' || original.section === 'conclusion' || original.text_studio.includes('généré par intelligence artificielle'))) {
+                    continue;
+                }
+
+                const studioNorm = normalizeText(d.text_studio || '');
                 await client.query(
                     'UPDATE dialogues SET text_studio = $1, text_reading = $2 WHERE id = $3 AND podcast_id = $4',
-                    [d.text_studio || '', d.text_reading || '', d.id, id]
+                    [studioNorm, d.text_reading || studioNorm, d.id, id]
                 );
             }
             await client.query('COMMIT');

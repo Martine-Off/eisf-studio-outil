@@ -12,6 +12,8 @@ interface AutoFixResult {
     targetReached: boolean;
     iterations: number;
     history: { iteration: number; score: number; missingCount: number }[];
+    remainingConcepts: string[];
+    remainingFacts: string[];
 }
 
 interface AIVerificationPanelProps {
@@ -57,11 +59,7 @@ export const AIVerificationPanel: React.FC<AIVerificationPanelProps> = ({
             const res = await api.post(`/podcasts/${podcastId}/verify`);
             const data = res.data;
             setFeedback(data.ia_feedback);
-            // Score n'est pas retourné par /podcasts/verify, on le déduit
-            const missing = data.ia_feedback?.concepts_manquants?.length || 0;
-            const errors = data.ia_feedback?.informations_erronees?.length || 0;
-            const estimated = Math.max(0, 100 - missing * 5 - errors * 10);
-            setScore(estimated);
+            setScore(data.fidelity_score ?? null);
         } catch (err) {
             setError("Impossible de joindre le serveur de vérification.");
             console.error(err);
@@ -187,28 +185,56 @@ export const AIVerificationPanel: React.FC<AIVerificationPanelProps> = ({
                         <p className={`font-bold text-lg ${autoFixResult.targetReached ? 'text-green-800' : 'text-orange-800'}`}>
                             {autoFixResult.targetReached
                                 ? `Script valide — ${autoFixResult.finalScore}% de fidelite`
-                                : `Score final : ${autoFixResult.finalScore}% (${autoFixResult.iterations} passes effectuees)`}
+                                : `Score final : ${autoFixResult.finalScore}% (${autoFixResult.iterations} passe(s))`}
                         </p>
                         <p className="text-sm text-gray-500 mt-1">
                             {autoFixResult.targetReached
                                 ? 'Le contenu du cours est correctement retranscrit.'
-                                : 'Certains concepts complexes peuvent necessiter une revision manuelle.'}
+                                : 'Correction partielle — voir les points restants ci-dessous.'}
                         </p>
                     </div>
+
+                    {/* Concepts encore manquants → à corriger manuellement */}
+                    {!autoFixResult.targetReached && autoFixResult.remainingConcepts?.length > 0 && (
+                        <div className="bg-orange-50 rounded-lg p-4 border border-orange-200">
+                            <p className="font-bold text-orange-800 mb-2 text-sm">
+                                À ajouter manuellement ({autoFixResult.remainingConcepts.length} concept{autoFixResult.remainingConcepts.length > 1 ? 's' : ''}) :
+                            </p>
+                            <ul className="list-disc list-inside text-sm text-orange-900 space-y-1 max-h-48 overflow-y-auto">
+                                {autoFixResult.remainingConcepts.map((c, i) => (
+                                    <li key={i}>{c}</li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
+
+                    {!autoFixResult.targetReached && autoFixResult.remainingFacts?.length > 0 && (
+                        <div className="bg-red-50 rounded-lg p-4 border border-red-200">
+                            <p className="font-bold text-red-800 mb-2 text-sm">
+                                Faits à vérifier ({autoFixResult.remainingFacts.length}) :
+                            </p>
+                            <ul className="list-disc list-inside text-sm text-red-900 space-y-1 max-h-32 overflow-y-auto">
+                                {autoFixResult.remainingFacts.map((f, i) => (
+                                    <li key={i}>{f}</li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
 
                     <div className="text-xs text-gray-400 space-y-1">
                         <p className="font-semibold text-gray-500">Detail des passes :</p>
                         {autoFixResult.history.map(h => (
                             <div key={h.iteration} className="flex justify-between">
                                 <span>Passe {h.iteration}</span>
-                                <span>{h.score}% — {h.missingCount} concept(s) manquant(s)</span>
+                                <span>{h.score}% — {h.missingCount >= 0 ? `${h.missingCount} concept(s)` : 'erreur'}</span>
                             </div>
                         ))}
                     </div>
 
                     <button
                         onClick={runAutoFix}
-                        className="text-xs text-gray-400 hover:text-gray-600 underline self-center"
+                        disabled={isAutoFixing}
+                        className="text-xs text-gray-400 hover:text-gray-600 underline self-center disabled:opacity-50"
                     >
                         Relancer une correction
                     </button>

@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import mammoth from 'mammoth';
-import { Upload, CheckCircle2, Loader2, AlertCircle } from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
+import { Upload, CheckCircle2, Loader2 } from 'lucide-react';
 
 interface ParseProgress {
   step: string;

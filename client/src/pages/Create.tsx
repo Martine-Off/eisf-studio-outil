@@ -1,13 +1,11 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import api from '../utils/api';
 import AppLayout from '../components/AppLayout';
 import {
     ChevronLeft,
     Wand2,
-    Upload,
     Loader2,
-    FileText,
     X
 } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -15,39 +13,12 @@ import WordImport from '../components/WordImport';
 
 export default function Create() {
     const navigate = useNavigate();
-    const fileInputRef = useRef<HTMLInputElement>(null);
 
     const [title, setTitle] = useState('');
     const [file, setFile] = useState<File | null>(null);
     const [content, setContent] = useState('');
     const [isUploading, setIsUploading] = useState(false);
     const [error, setError] = useState('');
-
-    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const selectedFile = e.target.files?.[0];
-        if (selectedFile) {
-            setFile(selectedFile);
-            setContent(''); // Clear content if file selected
-            if (!title) {
-                // Auto-fill title from filename
-                setTitle(selectedFile.name.replace(/\.[^/.]+$/, ""));
-            }
-        }
-    };
-
-    const handleDrop = (e: React.DragEvent) => {
-        e.preventDefault();
-        e.stopPropagation();
-
-        const droppedFile = e.dataTransfer.files?.[0];
-        if (droppedFile) {
-            setFile(droppedFile);
-            setContent('');
-            if (!title) {
-                setTitle(droppedFile.name.replace(/\.[^/.]+$/, ""));
-            }
-        }
-    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -204,7 +175,7 @@ export default function Create() {
                             {isUploading ? (
                                 <>
                                     <Loader2 className="animate-spin" size={24} />
-                                    <span>Génération en cours avec OpenAI...</span>
+                                    <span>Création du projet en cours...</span>
                                 </>
                             ) : (
                                 <>
