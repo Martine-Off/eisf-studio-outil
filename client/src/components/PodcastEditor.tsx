@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
     DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent
@@ -7,7 +7,7 @@ import {
     arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Loader2, CheckCircle, ChevronLeft, ChevronRight, GripVertical } from 'lucide-react';
+import { Loader2, CheckCircle, ChevronLeft, ChevronRight, GripVertical, Pencil, X } from 'lucide-react';
 import api from '../utils/api';
 import { useKeyboardNav } from '../hooks/useKeyboardNav';
 import AppLayout from '../components/AppLayout';
@@ -26,73 +26,222 @@ interface Dialogue {
     podcast_id?: number;
 }
 
-// Composant de réplique
+interface TextPart {
+    type: 'text' | 'proposition';
+    content: string;
+    fullMatch: string;
+}
+
+interface PropositionRef {
+    dialogueId: number;
+    partIndex: number;
+    fullMatch: string;
+    content: string;
+}
+
+function parseTextParts(text: string): TextPart[] {
+    const parts: TextPart[] = [];
+    const regex = /\[PROPOSITION:\s*(.*?)\]/g;
+    let lastIndex = 0;
+    let match;
+    while ((match = regex.exec(text)) !== null) {
+        if (match.index > lastIndex) {
+            parts.push({ type: 'text', content: text.slice(lastIndex, match.index), fullMatch: '' });
+        }
+        parts.push({ type: 'proposition', content: match[1].trim(), fullMatch: match[0] });
+        lastIndex = match.index + match[0].length;
+    }
+    if (lastIndex < text.length) {
+        parts.push({ type: 'text', content: text.slice(lastIndex), fullMatch: '' });
+    }
+    return parts;
+}
+
+function hasPropositions(text: string): boolean {
+    return /\[PROPOSITION:/i.test(text);
+}
+
+// ─── Composant réplique ───────────────────────────────────────────────────────
 function SortableDialogue({
-    dialogue, onUpdate
+    dialogue, onUpdate, onAccept, onReject, activePropositionMatch, elementRef
 }: {
     dialogue: Dialogue;
     onUpdate: (id: number, field: 'studio' | 'reading', text: string) => void;
+    onAccept: (id: number, fullMatch: string) => void;
+    onReject: (id: number, fullMatch: string) => void;
+    activePropositionMatch: string | null;
+    elementRef: (el: HTMLDivElement | null) => void;
 }) {
-    const [editingField, setEditingField] = useState<'studio' | 'reading'>('studio');
+    const [editingField, setEditingField] = useState<'studio' | 'reading' | null>(null);
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: dialogue.id });
 
-    const style = { transform: CSS.Transform.toString(transform), transition, zIndex: isDragging ? 50 : 'auto', opacity: isDragging ? 0.8 : 1 };
+    const style = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+        zIndex: isDragging ? 50 : 'auto',
+        opacity: isDragging ? 0.8 : 1
+    };
     const isInes = dialogue.character.toLowerCase() === 'ines';
+    const textStudioParts = parseTextParts(dialogue.text_studio);
+    const studioHasProps = textStudioParts.some(p => p.type === 'proposition');
+
+    const mergedRef = useCallback((el: HTMLDivElement | null) => {
+        setNodeRef(el);
+        elementRef(el);
+    }, [setNodeRef, elementRef]);
 
     return (
-        <div ref={setNodeRef} style={style} {...attributes} {...listeners} className={`group relative flex gap-4 p-6 rounded-2xl border-2 transition-all duration-200 outline-none ${isDragging ? 'shadow-xl scale-[1.01] border-primary' : ''} ${isInes ? 'bg-card border-transparent hover:border-primary/30 shadow-sm' : 'bg-accent/5 border-transparent hover:border-accent/30 shadow-sm'}`}>
-            <div className="w-20 flex flex-col items-center py-6 gap-3 flex-shrink-0">
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm shadow-sm ${isInes ? 'bg-secondary text-primary' : 'bg-card border border-accent/20 text-accent'}`}>{isInes ? 'I' : 'Y'}</div>
-            </div>
-            
-            <div className="w-8 flex flex-col items-center justify-center gap-2 cursor-grab text-muted-foreground hover:text-primary transition-colors" {...attributes} {...listeners}>
+        <div
+            ref={mergedRef}
+            style={style}
+            {...attributes}
+            className={`group relative flex gap-4 p-6 rounded-2xl border-2 transition-all duration-200 outline-none
+                ${isDragging ? 'shadow-xl scale-[1.01] border-primary' : ''}
+                ${studioHasProps ? 'border-amber-300 bg-amber-50/40' : isInes
+                    ? 'bg-card border-transparent hover:border-primary/30 shadow-sm'
+                    : 'bg-accent/5 border-transparent hover:border-accent/30 shadow-sm'
+                }`}
+        >
+            {/* Drag handle */}
+            <div className="w-8 flex flex-col items-center justify-center gap-2 cursor-grab text-muted-foreground hover:text-primary transition-colors flex-shrink-0" {...listeners}>
                 <GripVertical size={20} />
             </div>
-            
-            <div className="flex-1">
+
+            {/* Avatar */}
+            <div className="w-10 flex-shrink-0 flex flex-col items-center pt-1">
+                <div className={`w-10 h-10 rounded-full flex flex-col items-center justify-center font-bold text-sm shadow-inner
+                    ${isInes ? 'bg-[#f4ebe1] text-[#3465ae]' : 'bg-[#fcebdf] text-[#e63337]'}`}>
+                    {isInes ? 'I' : 'Y'}
+                </div>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-3">
-                        <div className={`w-10 h-10 rounded-full flex flex-col items-center justify-center font-bold text-sm shadow-inner ${isInes ? 'bg-[#f4ebe1] text-[#3465ae]' : 'bg-[#fcebdf] text-[#e63337]'}`}>{isInes ? 'I' : 'Y'}</div>
-                        <span className={`font-black uppercase tracking-wide text-sm ${isInes ? 'text-[#3465ae]' : 'text-[#e63337]'}`}>{isInes ? 'Inès' : 'Yannick'}</span>
-                    </div>
+                    <span className={`font-black uppercase tracking-wide text-sm ${isInes ? 'text-[#3465ae]' : 'text-[#e63337]'}`}>
+                        {isInes ? 'Inès' : 'Yannick'}
+                    </span>
+                    {studioHasProps && editingField === null && (
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 bg-amber-100 px-2 py-0.5 rounded-full">
+                            ⚠ propositions en attente
+                        </span>
+                    )}
                 </div>
 
-                <div className="flex items-center gap-2 mb-2 mt-1">
-                    <button onClick={() => setEditingField('studio')} className={`text-[10px] px-2 py-1 rounded uppercase tracking-wider font-bold transition-all ${editingField === 'studio' ? 'bg-primary text-white shadow-sm' : 'bg-secondary border border-border text-muted-foreground hover:bg-secondary/80'}`}>Texte Studio</button>
-                    <button onClick={() => setEditingField('reading')} className={`text-[10px] px-2 py-1 rounded uppercase tracking-wider font-bold transition-all ${editingField === 'reading' ? 'bg-accent text-white shadow-sm' : 'bg-secondary border border-border text-muted-foreground hover:bg-secondary/80'}`}>Texte Export (Lecture)</button>
+                {/* Texte Studio */}
+                <div className="mb-3">
+                    <div className="flex items-center gap-2 mb-1">
+                        <span className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground/60">Texte Studio</span>
+                        <button
+                            onClick={() => setEditingField(editingField === 'studio' ? null : 'studio')}
+                            className="text-[10px] px-2 py-0.5 rounded border border-border text-muted-foreground hover:text-foreground transition-all flex items-center gap-1"
+                        >
+                            {editingField === 'studio' ? <><X size={10} /> Fermer</> : <><Pencil size={10} /> Éditer</>}
+                        </button>
+                    </div>
+
+                    {editingField === 'studio' ? (
+                        <textarea
+                            data-no-dnd="true"
+                            onPointerDown={(e) => e.stopPropagation()}
+                            className="w-full bg-transparent border border-border rounded-lg p-2 text-base text-foreground leading-relaxed resize-none focus:ring-1 focus:ring-primary outline-none font-sans"
+                            value={dialogue.text_studio}
+                            onChange={(e) => onUpdate(dialogue.id, 'studio', e.target.value)}
+                            rows={Math.max(3, Math.ceil(dialogue.text_studio.length / 90))}
+                            spellCheck={false}
+                        />
+                    ) : (
+                        <div className="text-base text-foreground leading-relaxed font-sans whitespace-pre-wrap">
+                            {textStudioParts.map((part, i) =>
+                                part.type === 'proposition' ? (
+                                    <span
+                                        key={i}
+                                        className={`inline-flex items-baseline gap-1 rounded px-1.5 py-0.5 mx-0.5 text-amber-900 font-medium
+                                            ${part.fullMatch === activePropositionMatch
+                                                ? 'bg-amber-300 ring-2 ring-amber-500'
+                                                : 'bg-amber-100 border border-amber-300'
+                                            }`}
+                                    >
+                                        <span>{part.content}</span>
+                                        <button
+                                            onClick={() => onAccept(dialogue.id, part.fullMatch)}
+                                            title="Garder cette proposition"
+                                            className="ml-1 text-green-700 hover:text-green-900 font-bold text-sm leading-none"
+                                        >✓</button>
+                                        <button
+                                            onClick={() => onReject(dialogue.id, part.fullMatch)}
+                                            title="Supprimer cette proposition"
+                                            className="text-red-500 hover:text-red-700 font-bold text-sm leading-none"
+                                        >✗</button>
+                                    </span>
+                                ) : (
+                                    <span key={i}>{part.content}</span>
+                                )
+                            )}
+                        </div>
+                    )}
                 </div>
-                <textarea data-no-dnd="true" onPointerDown={(e) => e.stopPropagation()} className="w-full bg-transparent border-none p-0 text-lg text-foreground leading-relaxed resize-none focus:ring-0 outline-none font-sans" value={editingField === 'studio' ? dialogue.text_studio : (dialogue.text_reading ?? dialogue.text_studio)} onChange={(e) => onUpdate(dialogue.id, editingField, e.target.value)} rows={Math.max(2, Math.ceil((editingField === 'studio' ? dialogue.text_studio : (dialogue.text_reading ?? dialogue.text_studio)).length / 80))} spellCheck={false} placeholder="Écrivez le dialogue ici..." />
+
+                {/* Texte Lecture */}
+                <div>
+                    <div className="flex items-center gap-2 mb-1">
+                        <span className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground/60">Texte Export (Lecture)</span>
+                        <button
+                            onClick={() => setEditingField(editingField === 'reading' ? null : 'reading')}
+                            className="text-[10px] px-2 py-0.5 rounded border border-border text-muted-foreground hover:text-foreground transition-all flex items-center gap-1"
+                        >
+                            {editingField === 'reading' ? <><X size={10} /> Fermer</> : <><Pencil size={10} /> Éditer</>}
+                        </button>
+                    </div>
+                    {editingField === 'reading' ? (
+                        <textarea
+                            data-no-dnd="true"
+                            onPointerDown={(e) => e.stopPropagation()}
+                            className="w-full bg-transparent border border-border rounded-lg p-2 text-sm text-muted-foreground leading-relaxed resize-none focus:ring-1 focus:ring-primary outline-none font-sans"
+                            value={dialogue.text_reading ?? dialogue.text_studio}
+                            onChange={(e) => onUpdate(dialogue.id, 'reading', e.target.value)}
+                            rows={Math.max(2, Math.ceil((dialogue.text_reading ?? dialogue.text_studio).length / 90))}
+                            spellCheck={false}
+                        />
+                    ) : (
+                        <p className="text-sm text-muted-foreground leading-relaxed">
+                            {dialogue.text_reading ?? dialogue.text_studio}
+                        </p>
+                    )}
+                </div>
             </div>
         </div>
     );
 }
 
+// ─── Composant principal ──────────────────────────────────────────────────────
 export default function PodcastEditor() {
     const { projectId, podcastId } = useParams();
     const navigate = useNavigate();
     const [dialogues, setDialogues] = useState<Dialogue[]>([]);
     const [loading, setLoading] = useState(true);
     const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved');
-    const [podcastInfo, setPodcastInfo] = useState<{title: string}>({ title: 'Chargement...' });
-
+    const [podcastInfo, setPodcastInfo] = useState<{ title: string }>({ title: 'Chargement...' });
     const [showVerificationPanel, setShowVerificationPanel] = useState(false);
     const [isAudioModalOpen, setIsAudioModalOpen] = useState(false);
     const [audioUrl, setAudioUrl] = useState<string | null>(null);
     const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
 
-    const sensors = useSensors(useSensor(PointerSensor), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }));
+    // Proposition navigation
+    const [currentPropGlobalIdx, setCurrentPropGlobalIdx] = useState(0);
+    const dialogueElRefs = useRef<Map<number, HTMLDivElement>>(new Map());
+
+    const sensors = useSensors(
+        useSensor(PointerSensor),
+        useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+    );
     const saveStateRef = useRef({ status: saveStatus, dialogues });
     useEffect(() => { saveStateRef.current = { status: saveStatus, dialogues }; }, [saveStatus, dialogues]);
 
-    useEffect(() => {
-        if (podcastId) loadData();
-    }, [podcastId]);
-
+    useEffect(() => { if (podcastId) loadData(); }, [podcastId]);
     useEffect(() => {
         const timer = setInterval(() => {
-            if (saveStateRef.current.status === 'unsaved') {
-                handleSaveAction(saveStateRef.current.dialogues);
-            }
+            if (saveStateRef.current.status === 'unsaved') handleSaveAction(saveStateRef.current.dialogues);
         }, 30000);
         return () => clearInterval(timer);
     }, []);
@@ -118,18 +267,78 @@ export default function PodcastEditor() {
         }
     };
 
+    // Toutes les propositions à traiter (liste plate)
+    const allPropositions: PropositionRef[] = dialogues.flatMap(d => {
+        const parts = parseTextParts(d.text_studio);
+        return parts
+            .filter(p => p.type === 'proposition')
+            .map((p, partIndex) => ({
+                dialogueId: d.id,
+                partIndex,
+                fullMatch: p.fullMatch,
+                content: p.content,
+            }));
+    });
+
+    const activeProp = allPropositions[currentPropGlobalIdx] ?? null;
+
+    const scrollToProposition = useCallback((idx: number) => {
+        const prop = allPropositions[idx];
+        if (!prop) return;
+        const el = dialogueElRefs.current.get(prop.dialogueId);
+        el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, [allPropositions]);
+
+    const goPrev = () => {
+        const idx = Math.max(0, currentPropGlobalIdx - 1);
+        setCurrentPropGlobalIdx(idx);
+        scrollToProposition(idx);
+    };
+    const goNext = () => {
+        const idx = Math.min(allPropositions.length - 1, currentPropGlobalIdx + 1);
+        setCurrentPropGlobalIdx(idx);
+        scrollToProposition(idx);
+    };
+
     const handleUpdate = (id: number, field: 'studio' | 'reading', text: string) => {
-        setDialogues(items => items.map(item => item.id === id ? { ...item, [field === 'studio' ? 'text_studio' : 'text_reading']: text } : item));
+        setDialogues(items => items.map(item =>
+            item.id === id ? { ...item, [field === 'studio' ? 'text_studio' : 'text_reading']: text } : item
+        ));
         setSaveStatus('unsaved');
+    };
+
+    const handleAccept = (dialogueId: number, fullMatch: string) => {
+        // Extraire le texte de la proposition et le garder sans les crochets
+        const content = fullMatch.replace(/\[PROPOSITION:\s*(.*?)\]/, '$1').trim();
+        setDialogues(items => items.map(item =>
+            item.id === dialogueId
+                ? { ...item, text_studio: item.text_studio.replace(fullMatch, content) }
+                : item
+        ));
+        setSaveStatus('unsaved');
+        // Recentrer sur la proposition suivante si elle existe
+        setCurrentPropGlobalIdx(idx => Math.max(0, Math.min(idx, allPropositions.length - 2)));
+    };
+
+    const handleReject = (dialogueId: number, fullMatch: string) => {
+        setDialogues(items => items.map(item =>
+            item.id === dialogueId
+                ? { ...item, text_studio: item.text_studio.replace(fullMatch, '').replace(/\s{2,}/g, ' ').trim() }
+                : item
+        ));
+        setSaveStatus('unsaved');
+        setCurrentPropGlobalIdx(idx => Math.max(0, Math.min(idx, allPropositions.length - 2)));
     };
 
     const handleSaveAction = async (currentDialogues: Dialogue[]) => {
         if (saveStatus === 'saving') return;
         setSaveStatus('saving');
-
         try {
             await Promise.all(currentDialogues.map(d =>
-                api.patch(`/dialogues/${d.id}`, { text_studio: d.text_studio, text_reading: d.text_reading || d.text_studio })
+                api.patch(`/dialogues/${d.id}`, {
+                    text_studio: d.text_studio,
+                    text_reading: d.text_reading || d.text_studio
+                })
             ));
             if (currentDialogues.length > 0) {
                 await api.patch(`/dialogues/reorder`, {
@@ -155,10 +364,6 @@ export default function PodcastEditor() {
         }
     };
 
-    const handleVerify = () => {
-        setShowVerificationPanel(true);
-    };
-
     const handleGenerateAudio = async () => {
         setIsAudioModalOpen(false);
         setIsGeneratingAudio(true);
@@ -179,53 +384,136 @@ export default function PodcastEditor() {
         }
     };
 
-
     if (loading) return (
-        <div className="h-screen flex items-center justify-center bg-background"><Loader2 className="animate-spin text-primary" size={40} /></div>
+        <div className="h-screen flex items-center justify-center bg-background">
+            <Loader2 className="animate-spin text-primary" size={40} />
+        </div>
     );
+
+    const hasPendingPropositions = allPropositions.length > 0;
 
     return (
         <AppLayout>
-            <div className="max-w-5xl mx-auto pb-20 mt-8">
+            {/* Barre de navigation des propositions */}
+            <AnimatePresence>
+                {hasPendingPropositions && (
+                    <motion.div
+                        initial={{ y: -60, opacity: 0 }}
+                        animate={{ y: 0, opacity: 1 }}
+                        exit={{ y: -60, opacity: 0 }}
+                        className="fixed top-0 left-0 right-0 z-50 bg-amber-50 border-b-2 border-amber-300 shadow-md px-6 py-3 flex items-center gap-4 flex-wrap"
+                    >
+                        <span className="text-amber-800 font-bold text-sm">
+                            ⚠ {allPropositions.length} proposition{allPropositions.length > 1 ? 's' : ''} à valider
+                        </span>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={goPrev}
+                                disabled={currentPropGlobalIdx === 0}
+                                className="p-1.5 rounded-lg border border-amber-300 text-amber-700 hover:bg-amber-100 disabled:opacity-30 transition-all"
+                            >
+                                <ChevronLeft size={16} />
+                            </button>
+                            <span className="text-sm font-bold text-amber-800 tabular-nums min-w-[60px] text-center">
+                                {currentPropGlobalIdx + 1} / {allPropositions.length}
+                            </span>
+                            <button
+                                onClick={goNext}
+                                disabled={currentPropGlobalIdx >= allPropositions.length - 1}
+                                className="p-1.5 rounded-lg border border-amber-300 text-amber-700 hover:bg-amber-100 disabled:opacity-30 transition-all"
+                            >
+                                <ChevronRight size={16} />
+                            </button>
+                        </div>
+                        {activeProp && (
+                            <>
+                                <button
+                                    onClick={() => handleAccept(activeProp.dialogueId, activeProp.fullMatch)}
+                                    className="px-3 py-1.5 rounded-lg bg-green-100 border border-green-300 text-green-800 font-bold text-sm hover:bg-green-200 transition-all flex items-center gap-1"
+                                >
+                                    ✓ Garder
+                                </button>
+                                <button
+                                    onClick={() => handleReject(activeProp.dialogueId, activeProp.fullMatch)}
+                                    className="px-3 py-1.5 rounded-lg bg-red-50 border border-red-200 text-red-700 font-bold text-sm hover:bg-red-100 transition-all flex items-center gap-1"
+                                >
+                                    ✗ Supprimer
+                                </button>
+                                <span className="text-xs text-amber-700 italic truncate max-w-xs">
+                                    « {activeProp.content.slice(0, 60)}{activeProp.content.length > 60 ? '…' : ''} »
+                                </span>
+                            </>
+                        )}
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            <div className={`max-w-5xl mx-auto pb-20 ${hasPendingPropositions ? 'mt-20' : 'mt-8'}`}>
                 <div className="flex flex-col md:flex-row justify-between gap-6 mb-8 mt-4">
                     <div className="flex items-center gap-4">
-                        <button onClick={() => { handleSaveAction(dialogues); navigate(`/project/${projectId}/podcasts`); }} className="p-2.5 bg-card border border-border rounded-xl hover:bg-secondary text-muted-foreground hover:text-foreground transition-all shadow-sm">
+                        <button
+                            onClick={() => { handleSaveAction(dialogues); navigate(`/project/${projectId}/podcasts`); }}
+                            className="p-2.5 bg-card border border-border rounded-xl hover:bg-secondary text-muted-foreground hover:text-foreground transition-all shadow-sm"
+                        >
                             <ChevronLeft size={20} />
                         </button>
                         <div>
-                            <h1 className="text-3xl font-extrabold text-foreground tracking-tight font-display">{podcastInfo.title || 'Éditeur de podcast'}</h1>
+                            <h1 className="text-3xl font-extrabold text-foreground tracking-tight font-display">
+                                {podcastInfo.title || 'Éditeur de podcast'}
+                            </h1>
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-4">
-                        <button onClick={() => window.open(`/api/podcasts/${podcastId}/export-word/studio`)} className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold transition-all shadow-sm bg-blue-50 border border-blue-200 text-blue-700 hover:bg-blue-100">
+                    <div className="flex items-center gap-4 flex-wrap">
+                        <button
+                            onClick={() => window.open(`/api/podcasts/${podcastId}/export-word/studio`)}
+                            className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold transition-all shadow-sm bg-blue-50 border border-blue-200 text-blue-700 hover:bg-blue-100"
+                        >
                             📄 Export Studio
                         </button>
-                        <button onClick={() => window.open(`/api/podcasts/${podcastId}/export-word/lecture`)} className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold transition-all shadow-sm bg-green-50 border border-green-200 text-green-700 hover:bg-green-100">
+                        <button
+                            onClick={() => window.open(`/api/podcasts/${podcastId}/export-word/lecture`)}
+                            className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold transition-all shadow-sm bg-green-50 border border-green-200 text-green-700 hover:bg-green-100"
+                        >
                             📄 Export Lecture
                         </button>
-                        <button onClick={handleVerify} className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold transition-all shadow-sm bg-accent/10 border border-accent/20 text-accent hover:bg-accent/20">
+                        <button
+                            onClick={() => setShowVerificationPanel(true)}
+                            className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold transition-all shadow-sm bg-accent/10 border border-accent/20 text-accent hover:bg-accent/20"
+                        >
                             ✨ Vérifier (IA)
                         </button>
-                        <button onClick={() => handleSaveAction(dialogues)} disabled={saveStatus === 'saving'} className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold transition-all shadow-sm bg-card border border-border text-foreground hover:bg-secondary">
+                        <button
+                            onClick={() => handleSaveAction(dialogues)}
+                            disabled={saveStatus === 'saving'}
+                            className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold transition-all shadow-sm bg-card border border-border text-foreground hover:bg-secondary"
+                        >
                             {saveStatus === 'saving' && <Loader2 size={16} className="animate-spin" />}
                             {saveStatus === 'saved' && <CheckCircle size={16} className="text-green-500" />}
                             Sauvegarder
                         </button>
                         <button
-                            onClick={() => !audioUrl && !isGeneratingAudio && setIsAudioModalOpen(true)}
-                            disabled={isGeneratingAudio}
+                            onClick={() => !audioUrl && !isGeneratingAudio && !hasPendingPropositions && setIsAudioModalOpen(true)}
+                            disabled={isGeneratingAudio || hasPendingPropositions}
+                            title={hasPendingPropositions ? 'Validez toutes les propositions avant de générer l\'audio' : ''}
                             className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold transition-all shadow-sm ${
                                 audioUrl
                                     ? 'bg-green-100 text-green-700 cursor-default'
+                                    : hasPendingPropositions
+                                    ? 'bg-amber-100 text-amber-600 cursor-not-allowed border border-amber-200'
                                     : isGeneratingAudio
                                     ? 'bg-indigo-200 text-indigo-500 cursor-wait'
                                     : 'bg-indigo-600 text-white hover:bg-indigo-700'
                             }`}
                         >
-                            {audioUrl ? '✅ Audio prêt' : isGeneratingAudio ? (
-                                <><Loader2 size={16} className="animate-spin" /> Génération en cours...</>
-                            ) : '🎙️ Générer le podcast'}
+                            {audioUrl
+                                ? '✅ Audio prêt'
+                                : hasPendingPropositions
+                                ? `⚠ ${allPropositions.length} proposition${allPropositions.length > 1 ? 's' : ''} en attente`
+                                : isGeneratingAudio
+                                ? <><Loader2 size={16} className="animate-spin" /> Génération en cours...</>
+                                : '🎙️ Générer le podcast'
+                            }
                         </button>
                     </div>
                 </div>
@@ -234,7 +522,18 @@ export default function PodcastEditor() {
                     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                         <SortableContext items={dialogues.map(d => d.id)} strategy={verticalListSortingStrategy}>
                             {dialogues.map(d => (
-                                <SortableDialogue key={d.id} dialogue={d} onUpdate={handleUpdate} />
+                                <SortableDialogue
+                                    key={d.id}
+                                    dialogue={d}
+                                    onUpdate={handleUpdate}
+                                    onAccept={handleAccept}
+                                    onReject={handleReject}
+                                    activePropositionMatch={activeProp?.dialogueId === d.id ? activeProp.fullMatch : null}
+                                    elementRef={(el) => {
+                                        if (el) dialogueElRefs.current.set(d.id, el);
+                                        else dialogueElRefs.current.delete(d.id);
+                                    }}
+                                />
                             ))}
                         </SortableContext>
                     </DndContext>
@@ -244,11 +543,25 @@ export default function PodcastEditor() {
             <AnimatePresence>
                 {showVerificationPanel && (
                     <>
-                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowVerificationPanel(false)} className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40" />
-                        <motion.div initial={{ x: '100%', opacity: 0.5 }} animate={{ x: 0, opacity: 1 }} exit={{ x: '100%', opacity: 0.5 }} transition={{ type: "spring", damping: 25, stiffness: 200 }} className="fixed right-0 top-0 bottom-0 w-[400px] bg-card border-l border-border shadow-2xl z-50 flex flex-col">
+                        <motion.div
+                            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                            onClick={() => setShowVerificationPanel(false)}
+                            className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40"
+                        />
+                        <motion.div
+                            initial={{ x: '100%', opacity: 0.5 }} animate={{ x: 0, opacity: 1 }}
+                            exit={{ x: '100%', opacity: 0.5 }}
+                            transition={{ type: "spring", damping: 25, stiffness: 200 }}
+                            className="fixed right-0 top-0 bottom-0 w-[400px] bg-card border-l border-border shadow-2xl z-50 flex flex-col"
+                        >
                             <div className="p-6 border-b border-border flex items-center justify-between">
-                                <div><h2 className="font-bold text-lg">Vérification de l'IA</h2><p className="text-sm text-muted-foreground mt-1">Analyse de fidélité au script d'origine</p></div>
-                                <button onClick={() => setShowVerificationPanel(false)} className="p-2 hover:bg-secondary rounded-full"><ChevronRight size={20} className="text-muted-foreground" /></button>
+                                <div>
+                                    <h2 className="font-bold text-lg">Vérification de l'IA</h2>
+                                    <p className="text-sm text-muted-foreground mt-1">Analyse de fidélité au script d'origine</p>
+                                </div>
+                                <button onClick={() => setShowVerificationPanel(false)} className="p-2 hover:bg-secondary rounded-full">
+                                    <ChevronRight size={20} className="text-muted-foreground" />
+                                </button>
                             </div>
                             <div className="p-6 flex-1 overflow-y-auto">
                                 <AIVerificationPanel podcastId={podcastId!} onCorrectionDone={loadData} />

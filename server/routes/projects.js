@@ -1,11 +1,11 @@
 const express = require('express');
 const multer = require('multer');
-const mammoth = require('mammoth');
 const pool = require('../models/db');
 const authMiddleware = require('../middleware/auth');
 const path = require('path');
 const fs = require('fs');
 const callGPT = require('../utils/callGPT');
+const { parseStorylineFile } = require('../utils/storylineParser');
 
 const router = express.Router();
 
@@ -83,23 +83,11 @@ router.post('/create', authMiddleware, upload.single('file'), async (req, res) =
 
         if (req.file) {
             filePath = req.file.path;
-            // Lire le fichier Word
-            const result = await mammoth.extractRawText({ path: filePath });
-            const text = result.value;
-
-            // Parser le contenu
-            const lines = text.split('\n').filter(line => line.trim());
-
-            // Filtrer les lignes pédagogiques
-            educationalContent = lines.filter(line => {
-                // Ignorer métadonnées Storyline
-                if (line.match(/^[a-zA-Z0-9+/\-]{15,}$/)) return false;
-                if (line.includes('Zone de texte') || line.includes('État Normal')) return false;
-                if (line.length < 20) return false;
-                return true;
-            });
-            cleanedText = educationalContent.join('\n');
-            wordCount = educationalContent.join(' ').split(/\s+/).length;
+            const { chapters, markdown } = await parseStorylineFile(filePath);
+            cleanedText = markdown;
+            wordCount = cleanedText.split(/\s+/).filter(w => w).length;
+            educationalContent = cleanedText.split('\n').filter(l => l.trim());
+            console.log(`[IMPORT] ${chapters.length} chapitre(s) Storyline détecté(s), ${wordCount} mots.`);
         } else if (content) {
             cleanedText = content;
             educationalContent = content.split('\n').filter(line => line.trim().length > 0);
@@ -114,11 +102,13 @@ router.post('/create', authMiddleware, upload.single('file'), async (req, res) =
 
         const project = projectResult.rows[0];
 
+        const headingsFound = (cleanedText.match(/^#{1,3} .+/gm) || []).length;
         res.json({
             project,
             wordCount,
             contentLines: educationalContent.length,
-            needsSplitting: wordCount > 1500, // >10 min
+            headingsFound,
+            needsAiSplitting: headingsFound < 2,
             contentPreview: educationalContent.slice(0, 5).join('\n'),
         });
     } catch (error) {

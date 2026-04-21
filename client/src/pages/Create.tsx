@@ -125,10 +125,10 @@ export default function Create() {
                             </label>
 
                             <div className="space-y-4">
-                                <WordImport 
-                                    onImportComplete={(text) => {
-                                        setContent(text);
-                                        setFile(null); // We now have the text content
+                                <WordImport
+                                    onFileReady={(f) => {
+                                        setFile(f);
+                                        setContent('');
                                     }}
                                     onError={(msg) => setError(msg)}
                                 />

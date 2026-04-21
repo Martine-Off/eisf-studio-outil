@@ -71,11 +71,133 @@ async function cleanStorylineText(rawText) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// SPLIT PAR TITRES MARKDOWN (gratuit, 0 appel IA)
+// ─────────────────────────────────────────────────────────────────────────────
+function splitByHeadings(markdown) {
+    const lines = markdown.split('\n');
+    const segments = [];
+    let currentTitle = null;
+    let currentLines = [];
+
+    for (const line of lines) {
+        const m = line.match(/^(#{1,3})\s+(.+)/);
+        if (m) {
+            if (currentTitle !== null) {
+                const content = currentLines.join('\n').trim();
+                if (content) {
+                    const wordCount = content.split(/\s+/).filter(w => w).length;
+                    segments.push({ title: currentTitle, content, wordCount, estimatedMinutes: Math.round(wordCount / 150), thematic_note: `Chapitre : ${currentTitle}` });
+                }
+            }
+            currentTitle = m[2].trim();
+            currentLines = [];
+        } else {
+            currentLines.push(line);
+        }
+    }
+    if (currentTitle !== null) {
+        const content = currentLines.join('\n').trim();
+        if (content) {
+            const wordCount = content.split(/\s+/).filter(w => w).length;
+            segments.push({ title: currentTitle, content, wordCount, estimatedMinutes: Math.round(wordCount / 150), thematic_note: `Chapitre : ${currentTitle}` });
+        }
+    }
+    return segments;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RÉÉQUILIBRAGE DES SEGMENTS (fusion si trop courts, split si trop longs)
+// ─────────────────────────────────────────────────────────────────────────────
+function findSentenceBoundary(text, nearChar) {
+    const range = 400;
+    const start = Math.max(0, nearChar - range);
+    const end = Math.min(text.length, nearChar + range);
+    const excerpt = text.substring(start, end);
+    const re = /[.!?]\s+/g;
+    let best = null;
+    let m;
+    while ((m = re.exec(excerpt)) !== null) {
+        const pos = start + m.index + m[0].length;
+        if (best === null || Math.abs(pos - nearChar) < Math.abs(best - nearChar)) best = pos;
+    }
+    return best !== null ? best : nearChar;
+}
+
+function rebalanceSegments(segments, minWords = 350, maxWords = 1200) {
+    // Fusion des segments trop courts
+    const merged = [];
+    let i = 0;
+    while (i < segments.length) {
+        const seg = { ...segments[i] };
+        while (seg.wordCount < minWords && i + 1 < segments.length) {
+            i++;
+            const next = segments[i];
+            seg.content = seg.content + '\n\n' + next.content;
+            seg.wordCount += next.wordCount;
+            seg.estimatedMinutes = Math.round(seg.wordCount / 150);
+            seg.thematic_note = seg.thematic_note + ' + ' + next.thematic_note;
+        }
+        merged.push(seg);
+        i++;
+    }
+
+    // Split des segments trop longs
+    const result = [];
+    for (const seg of merged) {
+        if (seg.wordCount <= maxWords) {
+            result.push(seg);
+            continue;
+        }
+        const words = seg.content.split(/\s+/);
+        const midChar = words.slice(0, Math.floor(words.length / 2)).join(' ').length;
+        const cutPoint = findSentenceBoundary(seg.content, midChar);
+        const part1 = seg.content.substring(0, cutPoint).trim();
+        const part2 = seg.content.substring(cutPoint).trim();
+        const wc1 = part1.split(/\s+/).filter(w => w).length;
+        const wc2 = part2.split(/\s+/).filter(w => w).length;
+        result.push({ ...seg, content: part1, wordCount: wc1, estimatedMinutes: Math.round(wc1 / 150), title: seg.title + ' (1/2)' });
+        if (part2) result.push({ ...seg, content: part2, wordCount: wc2, estimatedMinutes: Math.round(wc2 / 150), title: seg.title + ' (2/2)' });
+    }
+    return result;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EXTRACTION D'UNE SECTION PAR INDICE (pour vérification par chapitre)
+// ─────────────────────────────────────────────────────────────────────────────
+function extractSectionByIndex(cleanedText, orderIndex) {
+    const sections = [];
+    let currentLines = null;
+    for (const line of cleanedText.split('\n')) {
+        if (/^#{1,3}\s+/.test(line)) {
+            if (currentLines !== null) sections.push(currentLines.join('\n'));
+            currentLines = [line];
+        } else if (currentLines !== null) {
+            currentLines.push(line);
+        }
+    }
+    if (currentLines !== null) sections.push(currentLines.join('\n'));
+    if (sections.length === 0) return cleanedText;
+    const idx = Math.max(0, Math.min(orderIndex, sections.length - 1));
+    return sections[idx];
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // DÉCOUPAGE STORYLINE : extrait les vrais chapitres d'un .docx (texte nettoyé)
 // ─────────────────────────────────────────────────────────────────────────────
 async function extractStorylineChapters(rawText, projectId = null) {
+    // Si le texte est déjà du Markdown structuré (titres Storyline préservés), split + rééquilibrage gratuit
+    const headings = (rawText.match(/^#{1,3} .+/gm) || []);
+    if (headings.length >= 2) {
+        const rawSegments = splitByHeadings(rawText);
+        const segments = rebalanceSegments(rawSegments);
+        const avgWords = segments.reduce((s, seg) => s + seg.wordCount, 0) / (segments.length || 1);
+        console.log(`[CHAPTERS] ${headings.length} titres Markdown → ${segments.length} segments après rééquilibrage, moy. ${Math.round(avgWords)} mots.`);
+        return { cleanedText: rawText, segments };
+    }
+
+    // Sinon : nettoyage Storyline + découpage IA
     const cleanedText = await cleanStorylineText(rawText);
-    
+
     if (projectId) {
         await pool.query('UPDATE projects SET cleaned_text = $1 WHERE id = $2', [cleanedText, projectId]);
     }
@@ -113,17 +235,16 @@ async function extractStorylineChapters(rawText, projectId = null) {
 
     const prompt = `Tu es un expert en pédagogie audio.
 
-Voici le contenu brut d'un cours. Tu dois le découper en podcasts
-de 5 à 8 minutes (750 à 1200 mots chacun).
+Voici le contenu brut d'un cours. Tu dois le regrouper en podcasts de maximum 8 minutes.
+Le dialogue généré sera environ 2 à 3 fois plus long que le contenu source (reformulations, questions, exemples).
+Adapte donc le nombre de podcasts à la densité réelle du contenu : si tout tient en un podcast, fais-en un seul.
 
 RÈGLES ABSOLUES :
-1. Chaque podcast = une unité mentale cohérente (un seul sujet compréhensible à l'oral)
-2. Ne jamais mélanger deux sujets différents dans un même podcast
+1. Chaque podcast = une unité thématique cohérente et compréhensible à l'oral
+2. Fusionner les sujets courts et proches thématiquement pour éviter les épisodes trop légers
 3. Tout le contenu source doit être conservé, aucune information ne doit être perdue
-4. Si un sujet est trop court pour 750 mots seul → le fusionner avec le sujet le plus proche THÉMATIQUEMENT (pas forcément le suivant)
-5. Si un sujet dépasse 1200 mots → le découper en deux parties logiques (pas à mi-chemin au hasard, mais à la rupture de sous-thème)
-6. Chaque podcast doit pouvoir : introduire une idée, la relier à la précédente, donner un exemple concret, ancrer dans la pratique professionnelle
-7. Les titres doivent être accrocheurs et parlants pour un apprenant : "Comprendre ce qu'est X" pas "Introduction"
+4. Maximum 8 minutes par podcast (≈ 1200 mots de dialogue généré)
+5. Les titres doivent être accrocheurs et parlants pour un apprenant : "Comprendre ce qu'est X" pas "Introduction"
 
 CONTENU SOURCE :
 ${cleanedText}
@@ -413,7 +534,7 @@ Réponds UNIQUEMENT en JSON valide :
 router.post('/generate-single-chapter', authMiddleware, async (req, res) => {
     try {
         console.log('[GENERATE-SINGLE] Début');
-        const { projectId, segment, orderIndex } = req.body;
+        const { projectId, segment, orderIndex, targetDuration = 7 } = req.body;
 
         if (!segment || !segment.content) {
             return res.status(400).json({ error: 'Segment content is required' });
@@ -457,11 +578,16 @@ router.post('/generate-single-chapter', authMiddleware, async (req, res) => {
         const prompt = `Tu es un scénariste de podcast pédagogique pour l'EISF (École Internationale du Savoir-Faire Français).
 Génère un dialogue naturel entre Inès (experte, 70% du temps) et Yannick (apprenant, 30%).
 
+RÈGLE ABSOLUE — FIDÉLITÉ AU SOURCE :
+- Reformuler le contenu source = AUTORISÉ (paraphrase, analogies tirées du domaine)
+- N'INVENTE JAMAIS de faits, chiffres, dates ou informations absents du contenu source
+- Si tu veux enrichir avec un exemple ou contexte NON PRÉSENT dans le source → marque-le UNIQUEMENT dans text_studio : [PROPOSITION: ton ajout ici]
+- Le text_reading ne contient JAMAIS de balise [PROPOSITION]
+
 RÈGLES DE TRANSFORMATION AUDIO (obligatoires) :
 - Reformuler tout le jargon technique en langage parlé et accessible
-- Ajouter systématiquement : exemples concrets, analogies, liens avec la pratique professionnelle
 - Yannick pose les questions qu'un apprenant se pose vraiment (pas des questions génériques)
-- Inès répond avec des exemples tirés du domaine enseigné
+- Inès répond en s'appuyant sur le contenu source uniquement (ou propose via [PROPOSITION: ...])
 - Prévoir des micro-reformulations ("donc si je résume...", "attends, tu veux dire que...")
   pour ancrer la mémorisation
 - Structure obligatoire :
@@ -471,10 +597,11 @@ RÈGLES DE TRANSFORMATION AUDIO (obligatoires) :
 ${NORMALIZATION_INSTRUCTIONS}
 
 TITRE DE L'ÉPISODE : ${segment.title}
-CONTENU SOURCE À TRANSFORMER (tout garder) :
+CONTENU SOURCE À TRANSFORMER (tout garder, aucun concept ne peut être omis) :
 ${segment.content}
 
-Durée cible : 5 à 8 minutes (750 à 1200 mots au total)
+Durée cible : ${targetDuration} minutes (≈ ${Math.round(targetDuration * 150)} mots de dialogue au total).
+Si le contenu source ne suffit pas à atteindre cette durée sans invention, complète avec des [PROPOSITION: ...] pédagogiquement cohérents (exemples concrets du domaine, cas pratiques, reformulations approfondies) — jamais de faits non vérifiables.
 
 Réponds UNIQUEMENT en JSON valide :
 {
@@ -553,9 +680,13 @@ router.post('/preview', authMiddleware, async (req, res) => {
 
         const { source_file_path, title, cleaned_text: existingCleanedText } = projectResult.rows[0];
 
-        // Récupérer le texte : depuis le fichier si disponible, sinon depuis cleaned_text en base
+        // Si cleaned_text est déjà du Markdown structuré (import récent), l'utiliser directement
         let rawText = '';
-        if (source_file_path) {
+        const hasMarkdownHeadings = existingCleanedText && (existingCleanedText.match(/^#{1,3} .+/gm) || []).length >= 2;
+        if (hasMarkdownHeadings) {
+            console.log(`[PREVIEW] Markdown déjà disponible en base → skip extraction Word.`);
+            rawText = existingCleanedText;
+        } else if (source_file_path) {
             const result = await mammoth.extractRawText({ path: source_file_path });
             rawText = result.value || '';
         } else if (existingCleanedText) {
@@ -636,12 +767,14 @@ router.post('/verify', authMiddleware, async (req, res) => {
     try {
         const { podcastId } = req.body;
 
-        const podcastRes = await pool.query('SELECT project_id FROM podcasts WHERE id = $1', [podcastId]);
+        const podcastRes = await pool.query('SELECT project_id, order_index FROM podcasts WHERE id = $1', [podcastId]);
         if (podcastRes.rows.length === 0) return res.status(404).json({ error: 'Podcast non trouvé' });
 
-        const projectId = podcastRes.rows[0].project_id;
+        const { project_id: projectId, order_index: orderIndex } = podcastRes.rows[0];
         const projectRes = await pool.query('SELECT cleaned_text FROM projects WHERE id = $1', [projectId]);
-        const cleanedText = projectRes.rows[0]?.cleaned_text;
+        const fullText = projectRes.rows[0]?.cleaned_text || '';
+        // Comparer uniquement contre la section source du chapitre, pas tout le document
+        const cleanedText = extractSectionByIndex(fullText, orderIndex);
 
         const dialoguesRes = await pool.query(
             'SELECT text_studio FROM dialogues WHERE podcast_id = $1 ORDER BY order_index ASC',
@@ -662,7 +795,7 @@ MÉTHODE OBLIGATOIRE :
 2. Pour chaque élément de cette liste, vérifie s'il est présent dans le podcast.
 3. Ne t'arrête pas avant d'avoir vérifié le dernier mot du cours source.
 
-COURS SOURCE (texte de référence) :
+COURS SOURCE — SECTION DE CE CHAPITRE UNIQUEMENT (texte de référence) :
 ${cleanedText}
 
 PODCAST GÉNÉRÉ (à vérifier) :
@@ -771,16 +904,18 @@ router.post('/auto-verify-and-fix', authMiddleware, async (req, res) => {
     }
     verifyLocks.add(podcastId);
 
-    const MAX_ITERATIONS = 4;
+    const MAX_ITERATIONS = 3;
     const TARGET_SCORE = 95;
     const history = [];
 
     try {
-        // Récupérer le texte source
-        const podcastRes = await pool.query('SELECT project_id FROM podcasts WHERE id = $1', [podcastId]);
+        // Récupérer le texte source — section du chapitre uniquement
+        const podcastRes = await pool.query('SELECT project_id, order_index FROM podcasts WHERE id = $1', [podcastId]);
         if (podcastRes.rows.length === 0) return res.status(404).json({ error: 'Podcast non trouvé' });
-        const projectRes = await pool.query('SELECT cleaned_text FROM projects WHERE id = $1', [podcastRes.rows[0].project_id]);
-        const cleanedText = projectRes.rows[0]?.cleaned_text || '';
+        const { project_id: avfProjectId, order_index: avfOrderIndex } = podcastRes.rows[0];
+        const projectRes = await pool.query('SELECT cleaned_text FROM projects WHERE id = $1', [avfProjectId]);
+        const fullText = projectRes.rows[0]?.cleaned_text || '';
+        const cleanedText = extractSectionByIndex(fullText, avfOrderIndex);
 
         if (!cleanedText) {
             return res.status(400).json({ error: 'Texte source introuvable pour ce projet' });
@@ -790,8 +925,8 @@ router.post('/auto-verify-and-fix', authMiddleware, async (req, res) => {
         let bestScore = 0;
         let iteration = 0;
         let lastVerifyResult = null; // Garde le résultat de la dernière vérification
-        // Limite de concepts par passe pour éviter les prompts trop longs (→ refus GPT)
-        const MAX_CONCEPTS_PER_PASS = 8;
+        // Tous les concepts en une seule passe = moins d'appels API
+        const MAX_CONCEPTS_PER_PASS = 20;
 
         while (iteration < MAX_ITERATIONS && currentScore < TARGET_SCORE) {
             iteration++;
@@ -805,9 +940,9 @@ router.post('/auto-verify-and-fix', authMiddleware, async (req, res) => {
                 );
                 const dialogueText = dialoguesRes.rows.map(d => d.text_studio).join('\n');
 
-                // Tronquer le texte source si trop long (évite dépassement de contexte)
-                const sourceExcerpt = cleanedText.length > 6000
-                    ? cleanedText.substring(0, 6000) + '\n[... texte tronqué pour la vérification ...]'
+                // Tronquer à 15000 chars pour couvrir les sources longues sans exploser le contexte
+                const sourceExcerpt = cleanedText.length > 15000
+                    ? cleanedText.substring(0, 15000) + '\n[... texte tronqué pour la vérification ...]'
                     : cleanedText;
 
                 const verifyPrompt = `Tu dois comparer le cours source et le podcast généré.
@@ -851,8 +986,8 @@ Note : ne liste que les vrais concepts pédagogiques — ignore les métadonnée
                     break;
                 }
 
-                // Arrêt si le score régresse (correction contre-productive)
-                if (iteration > 1 && currentScore < bestScore - 5) {
+                // Arrêt si score stagne ou régresse
+                if (iteration > 1 && currentScore <= bestScore) {
                     console.log(`[AUTO-VERIFY] Score en régression (${currentScore}% < ${bestScore}%), arrêt.`);
                     // Restaurer le meilleur score en base
                     await pool.query('UPDATE podcasts SET fidelity_score = $1 WHERE id = $2', [bestScore, podcastId]);

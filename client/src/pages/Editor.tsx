@@ -471,7 +471,8 @@ export default function Editor() {
             const res = await api.post('/ai/generate-single-chapter', {
                 projectId: Number(projectId),
                 segment: chapter,
-                orderIndex: index
+                orderIndex: index,
+                targetDuration
             });
             
             const newPodcastId = res.data.podcastId;
@@ -877,26 +878,6 @@ export default function Editor() {
                             </div>
                         )}
 
-                        {/* Sélecteur durée + bouton générer */}
-                        <div className="bg-card border border-border rounded-2xl p-6">
-                            <h3 className="font-bold text-foreground mb-4">⚙️ Paramètres de génération</h3>
-                            <div className="flex items-center gap-4">
-                                <div>
-                                    <label className="text-sm text-muted-foreground font-medium block mb-2">Durée cible du podcast</label>
-                                    <select
-                                        value={targetDuration}
-                                        onChange={(e) => setTargetDuration(Number(e.target.value))}
-                                        className="px-4 py-2.5 rounded-xl border border-border bg-secondary text-foreground font-medium"
-                                    >
-                                        <option value={4}>4 minutes</option>
-                                        <option value={5}>5 minutes</option>
-                                        <option value={6}>6 minutes</option>
-                                        <option value={7}>7 minutes</option>
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
-
                         <div className="flex items-center justify-between">
                             <button
                                 onClick={() => saveAndGoTo('preview')}
@@ -904,14 +885,29 @@ export default function Editor() {
                             >
                                 ← Retour à l'aperçu
                             </button>
-                            <button
-                                onClick={handleGenerate}
-                                disabled={generating}
-                                className="flex items-center gap-2 eisf-gradient text-primary-foreground px-8 py-3 rounded-xl font-bold shadow-eisf hover:opacity-90 active:scale-95 transition-all disabled:opacity-60"
-                            >
-                                {generating ? <Loader2 size={18} className="animate-spin" /> : '🎙️'}
-                                {generating ? 'Génération IA en cours...' : 'Générer le podcast'}
-                            </button>
+                            <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-2">
+                                    <label className="text-sm text-muted-foreground font-medium whitespace-nowrap">Durée cible :</label>
+                                    <select
+                                        value={targetDuration}
+                                        onChange={(e) => setTargetDuration(Number(e.target.value))}
+                                        className="px-3 py-2 rounded-xl border border-border bg-secondary text-foreground font-medium text-sm"
+                                    >
+                                        <option value={4}>4 min</option>
+                                        <option value={5}>5 min</option>
+                                        <option value={6}>6 min</option>
+                                        <option value={7}>7 min</option>
+                                    </select>
+                                </div>
+                                <button
+                                    onClick={handleGenerate}
+                                    disabled={generating}
+                                    className="flex items-center gap-2 eisf-gradient text-primary-foreground px-8 py-3 rounded-xl font-bold shadow-eisf hover:opacity-90 active:scale-95 transition-all disabled:opacity-60"
+                                >
+                                    {generating ? <Loader2 size={18} className="animate-spin" /> : '🎙️'}
+                                    {generating ? 'Génération IA en cours...' : 'Tout générer'}
+                                </button>
+                            </div>
                         </div>
                     </div>
                 )}
