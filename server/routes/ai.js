@@ -30,6 +30,114 @@ function useMock() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+
+async function verifyScriptAgainstSource(segmentContent, scriptText) {
+  // ─── APPEL 1 : Extraction exhaustive des concepts du source ───────────────
+  const extractionResponse = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": process.env.ANTHROPIC_API_KEY,
+      "anthropic-version": "2023-06-01"
+    },
+    body: JSON.stringify({
+      model: "claude-opus-4-5",
+      max_tokens: 2000,
+      system: `Tu es un extracteur de concepts pédagogiques.
+Ton unique rôle : lire un contenu source et lister TOUS ses concepts, faits, chiffres, termes techniques et informations factuelles.
+RÈGLES ABSOLUES :
+- Chaque entrée = 1 seul concept atomique (pas de fusion)
+- Inclure TOUS les chiffres et pourcentages exacts (ex: "Taux d'eau dans la farine : 16% maximum")
+- Inclure TOUS les termes techniques nommés (ex: "plansichter", "indice de Hagberg")
+- Inclure TOUTES les listes et énumérations item par item
+- NE PAS inventer, NE PAS résumer, NE PAS reformuler
+- Réponds UNIQUEMENT en JSON valide, sans texte avant ni après :
+{"concepts": ["concept 1", "concept 2", ...]}`,
+      messages: [
+        {
+          role: "user",
+          content: `Extrais TOUS les concepts de ce contenu source :\n\n${segmentContent}`
+        }
+      ]
+    })
+  });
+
+  const extractionData = await extractionResponse.json();
+  const extractionText = extractionData.content
+    .filter(b => b.type === "text")
+    .map(b => b.text)
+    .join("");
+
+  let concepts = [];
+  try {
+    const clean = extractionText.replace(/```json|```/g, "").trim();
+    concepts = JSON.parse(clean).concepts;
+  } catch (e) {
+    throw new Error("Échec parsing extraction concepts : " + e.message);
+  }
+
+  if (!concepts || concepts.length === 0) {
+    throw new Error("Aucun concept extrait du source");
+  }
+
+  // ─── APPEL 2 : Vérification binaire concept par concept ───────────────────
+  const verificationResponse = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": process.env.ANTHROPIC_API_KEY,
+      "anthropic-version": "2023-06-01"
+    },
+    body: JSON.stringify({
+      model: "claude-opus-4-5",
+      max_tokens: 3000,
+      system: `Tu es un vérificateur de contenu pédagogique.
+Pour chaque concept de la liste, réponds UNIQUEMENT "present" ou "absent" selon qu'il est abordé dans le script (même reformulé).
+RÈGLES :
+- "present" = le concept est abordé dans le script, même avec d'autres mots
+- "absent" = le concept n'est pas du tout mentionné dans le script
+- Ne juge PAS la qualité, seulement la présence/absence
+- Réponds UNIQUEMENT en JSON valide :
+{"results": [{"concept": "...", "status": "present|absent"}]}`,
+      messages: [
+        {
+          role: "user",
+          content: `CONCEPTS À VÉRIFIER :\n${JSON.stringify(concepts)}\n\nSCRIPT DU PODCAST :\n${scriptText}`
+        }
+      ]
+    })
+  });
+
+  const verificationData = await verificationResponse.json();
+  const verificationText = verificationData.content
+    .filter(b => b.type === "text")
+    .map(b => b.text)
+    .join("");
+
+  let results = [];
+  try {
+    const clean = verificationText.replace(/```json|```/g, "").trim();
+    results = JSON.parse(clean).results;
+  } catch (e) {
+    throw new Error("Échec parsing vérification : " + e.message);
+  }
+
+  // ─── CALCUL MATHÉMATIQUE DU SCORE (pas par le LLM) ───────────────────────
+  const total = results.length;
+  const validated = results.filter(r => r.status === "present").length;
+  const missing = results.filter(r => r.status === "absent");
+  const fidelityScore = total > 0 ? Math.round((validated / total) * 100) : 0;
+
+  return {
+    fidelityScore,
+    totalConcepts: total,
+    validatedConcepts: validated,
+    missingConcepts: missing.map(r => r.concept),
+    allResults: results
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // NETTOYAGE AUTOMATIQUE DU .DOCX AVANT DÉCOUPAGE
 // ─────────────────────────────────────────────────────────────────────────────
 async function cleanStorylineText(rawText) {
@@ -816,73 +924,31 @@ Génère UNIQUEMENT ce JSON :
 // ─────────────────────────────────────────────────────────────────────────────
 // ROUTE : /verify
 // ─────────────────────────────────────────────────────────────────────────────
-router.post('/verify', authMiddleware, async (req, res) => {
-    try {
-        const { podcastId } = req.body;
+router.post("/verify", async (req, res) => {
+  try {
+    const { segmentContent, scriptText } = req.body;
 
-        const podcastRes = await pool.query('SELECT project_id, order_index FROM podcasts WHERE id = $1', [podcastId]);
-        if (podcastRes.rows.length === 0) return res.status(404).json({ error: 'Podcast non trouvé' });
-
-        const { project_id: projectId, order_index: orderIndex } = podcastRes.rows[0];
-        const projectRes = await pool.query('SELECT cleaned_text FROM projects WHERE id = $1', [projectId]);
-        const fullText = projectRes.rows[0]?.cleaned_text || '';
-        // Comparer uniquement contre la section source du chapitre, pas tout le document
-        const cleanedText = extractSectionByIndex(fullText, orderIndex);
-
-        const dialoguesRes = await pool.query(
-            'SELECT text_studio FROM dialogues WHERE podcast_id = $1 ORDER BY order_index ASC',
-            [podcastId]
-        );
-        const dialogueText = dialoguesRes.rows.map(d => d.text_studio).join('\n');
-
-        if (useMock()) {
-            return res.json({ fidelityScore: 85, missingConcepts: [], addedConcepts: [] });
-        }
-
-        const systemPrompt = `Tu es un expert en vérification pédagogique. Ta mission est d'être EXHAUSTIF et CHIRURGICAL. Tu ne t'arrêtes jamais à 5 éléments. Tu parcours l'intégralité du texte source du début à la fin, concept par concept, chiffre par chiffre, terme technique par terme technique. Un oubli de ta part = une erreur pédagogique pour un étudiant.`;
-
-        const prompt = `Tu dois comparer exhaustivement le cours source et le podcast généré.
-
-MÉTHODE OBLIGATOIRE :
-1. Lis le cours source et dresse mentalement la liste complète de TOUS les concepts, chiffres, termes techniques, définitions, et exemples.
-2. Pour chaque élément de cette liste, vérifie s'il est présent dans le podcast.
-3. Ne t'arrête pas avant d'avoir vérifié le dernier mot du cours source.
-
-COURS SOURCE — SECTION DE CE CHAPITRE UNIQUEMENT (texte de référence) :
-${cleanedText}
-
-PODCAST GÉNÉRÉ (à vérifier) :
-${dialogueText}
-
-Retourne UNIQUEMENT ce JSON valide, sans markdown, sans explication :
-{
-  "fidelityScore": <nombre entre 0 et 100>,
-  "missingConcepts": [
-    "concept manquant 1 (suffisamment précis pour retrouver dans le cours)",
-    ...TOUS les concepts manquants, sans limite de nombre
-  ],
-  "addedConcepts": [
-    "élément inventé ou absent du cours source",
-    ...TOUS les ajouts, sans limite de nombre
-  ],
-  "incorrectFacts": [
-    "fait déformé : podcast dit X, source dit Y",
-    ...TOUS les faits incorrects
-  ]
-}
-
-RÈGLE ABSOLUE : Les listes doivent être COMPLÈTES. S'il y a 20 concepts manquants, tu en listes 20. Ne jamais tronquer.`;
-
-        const rawText = await callGPT(systemPrompt, prompt);
-        const resultJson = parseJSON(rawText);
-
-        await pool.query('UPDATE podcasts SET fidelity_score = $1 WHERE id = $2', [resultJson.fidelityScore || null, podcastId]);
-        res.json(resultJson);
-
-    } catch (error) {
-        console.error('[VERIFY] Erreur:', error);
-        res.status(500).json({ error: 'Erreur lors de la vérification', details: error.message });
+    if (!segmentContent || !scriptText) {
+      return res.status(400).json({
+        error: "Paramètres manquants : segmentContent et scriptText sont requis"
+      });
     }
+
+    const verificationResult = await verifyScriptAgainstSource(segmentContent, scriptText);
+
+    return res.json({
+      success: true,
+      fidelityScore: verificationResult.fidelityScore,
+      totalConcepts: verificationResult.totalConcepts,
+      validatedConcepts: verificationResult.validatedConcepts,
+      missingConcepts: verificationResult.missingConcepts,
+      details: verificationResult.allResults
+    });
+
+  } catch (error) {
+    console.error("Erreur /verify :", error);
+    return res.status(500).json({ error: error.message });
+  }
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -942,210 +1008,118 @@ Renvoie UNIQUEMENT ce JSON :
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Verrou pour éviter les appels concurrents sur le même podcast
-const verifyLocks = new Set();
-
-// ROUTE : /auto-verify-and-fix  — boucle jusqu'à 95% de fidélité (max 4 passes)
+// ROUTE : /auto-verify-and-fix
 // ─────────────────────────────────────────────────────────────────────────────
-router.post('/auto-verify-and-fix', authMiddleware, async (req, res) => {
-    const { podcastId } = req.body;
-    if (!podcastId) return res.status(400).json({ error: 'podcastId requis' });
+router.post("/auto-verify-and-fix", async (req, res) => {
+  try {
+    const { segmentContent, scriptDialogues, targetScore = 95 } = req.body;
 
-    // Bloquer si une correction est déjà en cours sur ce podcast
-    if (verifyLocks.has(podcastId)) {
-        return res.status(409).json({ error: 'Une correction est déjà en cours pour ce podcast. Patientez.' });
+    if (!segmentContent || !scriptDialogues) {
+      return res.status(400).json({
+        error: "Paramètres manquants : segmentContent et scriptDialogues sont requis"
+      });
     }
-    verifyLocks.add(podcastId);
 
-    const MAX_ITERATIONS = 3;
-    const TARGET_SCORE = 95;
-    const history = [];
+    // Convertir les dialogues en texte plat pour la vérification
+    const scriptText = scriptDialogues
+      .map(d => `${d.character}: ${d.text_reading || d.text_studio}`)
+      .join("\n");
 
-    try {
-        // Récupérer le texte source — section du chapitre uniquement
-        const podcastRes = await pool.query('SELECT project_id, order_index FROM podcasts WHERE id = $1', [podcastId]);
-        if (podcastRes.rows.length === 0) return res.status(404).json({ error: 'Podcast non trouvé' });
-        const { project_id: avfProjectId, order_index: avfOrderIndex } = podcastRes.rows[0];
-        const projectRes = await pool.query('SELECT cleaned_text FROM projects WHERE id = $1', [avfProjectId]);
-        const fullText = projectRes.rows[0]?.cleaned_text || '';
-        const cleanedText = extractSectionByIndex(fullText, avfOrderIndex);
+    let currentDialogues = scriptDialogues;
+    let lastScore = 0;
+    let passCount = 0;
+    const maxPasses = 2; // Maximum 2 passes de correction
+    const passHistory = [];
 
-        if (!cleanedText) {
-            return res.status(400).json({ error: 'Texte source introuvable pour ce projet' });
-        }
+    // ─── BOUCLE DE CORRECTION (max 2 passes) ──────────────────────────────
+    while (passCount < maxPasses) {
+      const currentScriptText = currentDialogues
+        .map(d => `${d.character}: ${d.text_reading || d.text_studio}`)
+        .join("\n");
 
-        let currentScore = 0;
-        let bestScore = 0;
-        let iteration = 0;
-        let lastVerifyResult = null; // Garde le résultat de la dernière vérification
-        // Tous les concepts en une seule passe = moins d'appels API
-        const MAX_CONCEPTS_PER_PASS = 20;
+      const verif = await verifyScriptAgainstSource(segmentContent, currentScriptText);
+      lastScore = verif.fidelityScore;
 
-        while (iteration < MAX_ITERATIONS && currentScore < TARGET_SCORE) {
-            iteration++;
-            console.log(`[AUTO-VERIFY] Itération ${iteration}/${MAX_ITERATIONS}...`);
+      passHistory.push({
+        pass: passCount + 1,
+        score: lastScore,
+        missingCount: verif.missingConcepts.length,
+        missing: verif.missingConcepts
+      });
 
-            try {
-                // ── Étape 1 : Vérification ────────────────────────────────────
-                const dialoguesRes = await pool.query(
-                    'SELECT text_studio FROM dialogues WHERE podcast_id = $1 ORDER BY order_index ASC',
-                    [podcastId]
-                );
-                const dialogueText = dialoguesRes.rows.map(d => d.text_studio).join('\n');
+      // Score atteint → on arrête
+      if (lastScore >= targetScore) break;
 
-                // Tronquer à 15000 chars pour couvrir les sources longues sans exploser le contexte
-                const sourceExcerpt = cleanedText.length > 15000
-                    ? cleanedText.substring(0, 15000) + '\n[... texte tronqué pour la vérification ...]'
-                    : cleanedText;
+      // Pas de concepts manquants → on arrête (score plafond atteint)
+      if (verif.missingConcepts.length === 0) break;
 
-                const verifyPrompt = `Tu dois comparer le cours source et le podcast généré.
+      // ─── APPEL DE CORRECTION : ajouter les concepts manquants ─────────
+      const fixResponse = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": process.env.ANTHROPIC_API_KEY,
+          "anthropic-version": "2023-06-01"
+        },
+        body: JSON.stringify({
+          model: "claude-opus-4-5",
+          max_tokens: 4000,
+          system: `Tu es un correcteur de script de podcast pédagogique.
+On te donne un script existant et une liste de concepts manquants tirés du contenu source.
+Ton rôle : intégrer naturellement ces concepts manquants dans le dialogue existant.
+RÈGLES :
+- Intégrer les concepts manquants de façon naturelle dans le dialogue entre Inès et Yannick
+- Ne pas supprimer ni modifier ce qui existe déjà
+- Respecter le style oral du script (tics de langage, balises <break>, hésitations)
+- Ajouter les concepts là où ils s'intègrent logiquement (pas tous à la fin)
+- Réponds UNIQUEMENT en JSON valide avec la même structure que le script reçu`,
+          messages: [
+            {
+              role: "user",
+              content: `CONCEPTS MANQUANTS À INTÉGRER :
+${verif.missingConcepts.map((c, i) => `${i + 1}. ${c}`).join("\n")}
 
-COURS SOURCE :
-${sourceExcerpt}
+SOURCE DE RÉFÉRENCE :
+${segmentContent}
 
-PODCAST GÉNÉRÉ :
-${dialogueText}
-
-Retourne UNIQUEMENT ce JSON valide :
-{
-  "fidelityScore": <0 à 100>,
-  "missingConcepts": ["concept pédagogique manquant 1", "concept 2", ...],
-  "incorrectFacts": ["podcast dit X, source dit Y", ...]
-}
-Note : ne liste que les vrais concepts pédagogiques — ignore les métadonnées techniques (noms de fichiers, versions logicielles, noms de diapositives).`;
-
-                const verifyRaw = await callGPT(
-                    "Tu es un expert en vérification pédagogique. Évalue la fidélité du podcast au cours source.",
-                    verifyPrompt
-                );
-                const verifyResult = parseJSON(verifyRaw);
-                lastVerifyResult = verifyResult;
-                currentScore = verifyResult.fidelityScore || 0;
-
-                await pool.query('UPDATE podcasts SET fidelity_score = $1 WHERE id = $2', [currentScore, podcastId]);
-
-                history.push({
-                    iteration,
-                    score: currentScore,
-                    missingCount: verifyResult.missingConcepts?.length || 0,
-                });
-
-                console.log(`[AUTO-VERIFY] Score itération ${iteration} : ${currentScore}%`);
-
-                // Arrêt si objectif atteint
-                if (currentScore >= TARGET_SCORE) {
-                    console.log(`[AUTO-VERIFY] Objectif atteint : ${currentScore}%`);
-                    bestScore = currentScore;
-                    break;
-                }
-
-                // Arrêt si score stagne ou régresse
-                if (iteration > 1 && currentScore <= bestScore) {
-                    console.log(`[AUTO-VERIFY] Score en régression (${currentScore}% < ${bestScore}%), arrêt.`);
-                    // Restaurer le meilleur score en base
-                    await pool.query('UPDATE podcasts SET fidelity_score = $1 WHERE id = $2', [bestScore, podcastId]);
-                    currentScore = bestScore;
-                    break;
-                }
-
-                bestScore = Math.max(bestScore, currentScore);
-
-                if (verifyResult.missingConcepts?.length === 0 && verifyResult.incorrectFacts?.length === 0) {
-                    console.log(`[AUTO-VERIFY] Aucun concept manquant, arrêt.`);
-                    break;
-                }
-
-                // ── Étape 2 : Correction (max MAX_CONCEPTS_PER_PASS concepts) ─
-                const allDialoguesRes = await pool.query(
-                    'SELECT * FROM dialogues WHERE podcast_id = $1 ORDER BY order_index ASC',
-                    [podcastId]
-                );
-                const allDialogues = allDialoguesRes.rows;
-                const dialogueContext = allDialogues.map((d, i) => `[${i}|${d.character}] ${d.text_studio}`).join('\n');
-
-                // Limiter les concepts pour garder le prompt sous contrôle
-                const conceptsToFix = (verifyResult.missingConcepts || []).slice(0, MAX_CONCEPTS_PER_PASS);
-                const factsToFix = (verifyResult.incorrectFacts || []).slice(0, 3);
-
-                const fixPrompt = `Tu es un expert pédagogique. Enrichis le podcast en intégrant les concepts manquants.
-${NORMALIZATION_INSTRUCTIONS}
-
-DIALOGUE ACTUEL :
-${dialogueContext}
-
-CONCEPTS À INTÉGRER (prioritaires) :
-${conceptsToFix.map(c => '- ' + c).join('\n')}
-${factsToFix.length > 0 ? '\nFAITS À CORRIGER :\n' + factsToFix.map(f => '- ' + f).join('\n') : ''}
-
-Conserve le style Inès/Yannick, le ratio 70/30, la structure existante.
-Réponds UNIQUEMENT avec ce JSON :
-{"dialogues":[{"id":<index_original>,"text_studio":"...","text_reading":"..."},...]}`;
-
-                const fixRaw = await callGPT("Tu es un expert pédagogique.", fixPrompt);
-                const fixResult = parseJSON(fixRaw);
-
-                // Mettre à jour chaque réplique en base
-                const client = await pool.connect();
-                try {
-                    await client.query('BEGIN');
-                    for (const d of (fixResult.dialogues || [])) {
-                        const original = allDialogues[d.id];
-                        if (!original) continue;
-
-                        // Ne jamais modifier l'intro et la conclu obligatoires
-                        if (original.section === 'jingle' || original.section === 'conclusion' || original.text_studio.includes('généré par intelligence artificielle')) {
-                            continue;
-                        }
-
-                        const studioNorm = normalizeText(d.text_studio || '');
-                        await client.query(
-                            'UPDATE dialogues SET text_studio = $1, text_reading = $2 WHERE id = $3',
-                            [studioNorm, d.text_reading || studioNorm, original.id]
-                        );
-                    }
-                    await client.query('COMMIT');
-                } catch (err) {
-                    await client.query('ROLLBACK');
-                    throw err;
-                } finally {
-                    client.release();
-                }
-
-                // Pause pour éviter le rate limit n8n/ChatGPT
-                if (iteration < MAX_ITERATIONS && currentScore < TARGET_SCORE) {
-                    await new Promise(r => setTimeout(r, 2000));
-                }
-
-            } catch (iterErr) {
-                // Une itération échoue → on log et on s'arrête proprement
-                console.error(`[AUTO-VERIFY] Erreur itération ${iteration}:`, iterErr.message);
-                history.push({ iteration, score: currentScore, missingCount: -1, error: iterErr.message });
-                break;
+SCRIPT ACTUEL (JSON) :
+${JSON.stringify(currentDialogues, null, 2)}`
             }
-        }
+          ]
+        })
+      });
 
-        // Retourner le meilleur score atteint + concepts encore manquants pour correction manuelle
-        const finalScore = Math.max(currentScore, bestScore);
-        await pool.query('UPDATE podcasts SET fidelity_score = $1 WHERE id = $2', [finalScore, podcastId]);
+      const fixData = await fixResponse.json();
+      const fixText = fixData.content
+        .filter(b => b.type === "text")
+        .map(b => b.text)
+        .join("");
 
-        const remainingConcepts = lastVerifyResult?.missingConcepts || [];
-        const remainingFacts = lastVerifyResult?.incorrectFacts || [];
+      try {
+        const clean = fixText.replace(/```json|```/g, "").trim();
+        currentDialogues = JSON.parse(clean);
+      } catch (e) {
+        // Si le parsing échoue, on garde le script actuel et on arrête
+        console.error("Échec parsing correction pass", passCount + 1, e.message);
+        break;
+      }
 
-        verifyLocks.delete(podcastId);
-        res.json({
-            finalScore,
-            targetReached: finalScore >= TARGET_SCORE,
-            iterations: iteration,
-            history,
-            remainingConcepts,
-            remainingFacts,
-        });
-
-    } catch (error) {
-        verifyLocks.delete(podcastId);
-        console.error('[AUTO-VERIFY] Erreur:', error);
-        res.status(500).json({ error: 'Erreur vérification automatique', details: error.message });
+      passCount++;
     }
+
+    return res.json({
+      success: true,
+      finalScore: lastScore,
+      passCount: passHistory.length,
+      targetReached: lastScore >= targetScore,
+      passHistory,
+      correctedDialogues: currentDialogues
+    });
+
+  } catch (error) {
+    console.error("Erreur /auto-verify-and-fix :", error);
+    return res.status(500).json({ error: error.message });
+  }
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

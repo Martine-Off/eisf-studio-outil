@@ -1,10 +1,10 @@
 # CAHIER DES CHARGES — STUDIO EISF
 
-**Version :** 1.2  
-**Date :** 21/04/2026  
+**Version :** 1.3  
+**Date :** 22/04/2026  
 **Client :** EISF (École Internationale du Savoir-Faire Français)  
 **Chef de projet :** Martine  
-**Statut :** En production — V1.2
+**Statut :** En production — V1.3
 
 ---
 
@@ -125,17 +125,21 @@ Un bandeau amber apparaît en haut de PodcastEditor si des propositions sont en 
 
 ### 6.1 Vérification par chapitre
 
-La vérification compare le podcast uniquement contre la **section source de son chapitre** (pas tout le document). Cela évite le faux plafond à 85% causé par les concepts des autres chapitres.
+La vérification compare le podcast uniquement contre la **section source de son chapitre** (pas tout le document). Cela évite le faux plafond causé par les concepts des autres chapitres. Les sections sont délimitées par les titres `##` dans le Markdown stocké en BDD.
 
-Extraction : `extractSectionByIndex(cleanedText, orderIndex)` — sections délimitées par les titres `##` dans le Markdown stocké en BDD.
+### 6.2 Vérification binaire et déterministe
 
-### 6.2 Boucle auto-verify-and-fix
+Le système utilise désormais une architecture à 2 appels séquentiels sur l'API Anthropic (Claude Opus 4.5) :
+1. **Extraction pure** : Liste complète et atomique des concepts, faits et chiffres du source.
+2. **Vérification binaire** : Vérifie la présence/absence ("present" / "absent") de chaque concept dans le script généré.
+Le score de fidélité est calculé mathématiquement par l'application : `(concepts validés / total des concepts) * 100`.
+
+### 6.3 Boucle auto-verify-and-fix
 
 - Cible : **95% de fidélité**
-- Maximum : **3 itérations**
-- Arrêt anticipé si le score stagne ou régresse
-- En cas de régression, restaure le meilleur score en BDD
-- Concepts corrigés : max 20 par passe (pour contrôler la taille du prompt)
+- Maximum : **2 itérations** (optimisé grâce au ciblage précis)
+- Arrêt anticipé si plus aucun concept ne manque (score maximum atteint)
+- Les concepts absents sont passés à un LLM correcteur pour être injectés naturellement dans le dialogue existant sans l'altérer.
 
 ### 6.3 Vérification macro
 
@@ -198,7 +202,7 @@ Génération audio via la route `/podcasts/:id/generate-audio`. Modal dédiée `
 | Parsing .docx | mammoth 1.8 |
 | Export Word | docx 9 |
 | Export PDF | PDFKit 0.18 |
-| IA | Webhook n8n → ChatGPT |
+| IA | Webhook n8n → ChatGPT (Génération) / API Anthropic Claude Opus 4.5 (Vérification et Auto-fix) |
 
 ### 8.2 Structure BDD
 
@@ -263,3 +267,4 @@ ALLOWED_ORIGINS     — Origines CORS autorisées
 | 1.0 | 11/02/2026 | Version initiale |
 | 1.1 | 13/04/2026 | Ajout PodcastEditor, dialogues, podcasts routes |
 | 1.2 | 21/04/2026 | Parser Storyline dédié, système PROPOSITION, vérification par chapitre, rééquilibrage segments, personnages Inès/Yannick, IA via n8n |
+| 1.3 | 22/04/2026 | Nouveau système de vérification déterministe binaire via API Anthropic (Claude Opus 4.5) et bouclage auto-fix optimisé |
