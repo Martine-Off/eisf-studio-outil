@@ -295,6 +295,15 @@ router.post('/generate', authMiddleware, async (req, res) => {
         const targetWords = targetDuration * 150;
         const prompt = `
 Tu es un générateur de podcasts pédagogiques EISF (École Internationale du Savoir-Faire Français).
+
+RÈGLE DE FIDÉLITÉ AU SOURCE :
+- Reformuler le contenu source = AUTORISÉ (paraphrase, analogies tirées du domaine)
+- N'INVENTE JAMAIS de faits, chiffres, dates, noms techniques ou informations absents du contenu source
+- En particulier : n'invente JAMAIS de nouveaux types, catégories, ou variantes qui ne figurent pas explicitement dans le source
+- Si tu veux enrichir avec un exemple ou contexte NON PRÉSENT dans le source → marque-le UNIQUEMENT dans text_studio : [PROPOSITION: ton ajout ici]
+- Le text_reading ne contient JAMAIS de balise [PROPOSITION]
+- En cas de doute sur un fait : ne l'inclus pas, ou marque-le [PROPOSITION]
+
 CONTRAINTES STRICTES :
 - Durée : ${targetDuration} minutes (${targetWords} mots)
 - Personnages : Inès (70%) et Yannick (30%)
@@ -305,6 +314,7 @@ CONTRAINTES STRICTES :
 - Quiz : Intégré naturellement dans le dialogue, pas de section séparée
 - Ton conversationnel et naturel (pas "Chers auditeurs", pas "Bienvenue dans ce cours")
 ${NORMALIZATION_INSTRUCTIONS}
+${ORAL_NATURALNESS_INSTRUCTIONS}
 CONTENU SOURCE :
 ${content}
 GÉNÈRE LE DIALOGUE AU FORMAT JSON UNIQUEMENT (pas de texte avant/après) :
@@ -451,6 +461,14 @@ router.post('/generate-from-project', authMiddleware, async (req, res) => {
             const prompt = `Tu es un scénariste de podcast pédagogique pour l'EISF (École Internationale du Savoir-Faire Français).
 Génère un dialogue naturel entre Inès (experte, 70% du temps) et Yannick (apprenant, 30%).
 
+RÈGLE DE FIDÉLITÉ AU SOURCE :
+- Reformuler le contenu source = AUTORISÉ (paraphrase, analogies tirées du domaine)
+- N'INVENTE JAMAIS de faits, chiffres, dates, noms techniques ou informations absents du contenu source
+- En particulier : n'invente JAMAIS de nouveaux types, catégories, ou variantes qui ne figurent pas explicitement dans le source
+- Si tu veux enrichir avec un exemple ou contexte NON PRÉSENT dans le source → marque-le UNIQUEMENT dans text_studio : [PROPOSITION: ton ajout ici]
+- Le text_reading ne contient JAMAIS de balise [PROPOSITION]
+- En cas de doute sur un fait : ne l'inclus pas, ou marque-le [PROPOSITION]
+
 RÈGLES DE TRANSFORMATION AUDIO (obligatoires) :
 - Reformuler tout le jargon technique en langage parlé
   Exemple : "Le taux de cendres, c'est simplement un indicateur pour savoir si ta farine est plutôt blanche ou complète"
@@ -464,6 +482,7 @@ RÈGLES DE TRANSFORMATION AUDIO (obligatoires) :
   2. Contenu : tout le contenu source transformé (rien ne peut être omis)
   3. Conclusion : 1 phrase de résumé + 1 annonce du prochain podcast
 ${NORMALIZATION_INSTRUCTIONS}
+${ORAL_NATURALNESS_INSTRUCTIONS}
 
 TITRE DE L'ÉPISODE : ${segment.title}
 CONTENU SOURCE À TRANSFORMER (tout garder, aucun concept ne doit être omis) :
@@ -610,9 +629,11 @@ Génère un dialogue naturel entre Inès (experte, 70% du temps) et Yannick (app
 
 RÈGLE ABSOLUE — FIDÉLITÉ AU SOURCE :
 - Reformuler le contenu source = AUTORISÉ (paraphrase, analogies tirées du domaine)
-- N'INVENTE JAMAIS de faits, chiffres, dates ou informations absents du contenu source
+- N'INVENTE JAMAIS de faits, chiffres, dates, noms techniques ou informations absents du contenu source
+- En particulier : n'invente JAMAIS de nouveaux types, catégories, ou variantes qui ne figurent pas explicitement dans le source (ex : si le source mentionne "blé tendre" et "blé dur", n'invente pas de troisième type)
 - Si tu veux enrichir avec un exemple ou contexte NON PRÉSENT dans le source → marque-le UNIQUEMENT dans text_studio : [PROPOSITION: ton ajout ici]
 - Le text_reading ne contient JAMAIS de balise [PROPOSITION]
+- En cas de doute sur un fait : ne l'inclus pas, ou marque-le [PROPOSITION]
 
 RÈGLES DE TRANSFORMATION AUDIO (obligatoires) :
 - Reformuler tout le jargon technique en langage parlé et accessible
@@ -625,6 +646,7 @@ RÈGLES DE TRANSFORMATION AUDIO (obligatoires) :
   2. Contenu : tout le contenu source transformé (rien ne peut être omis)
   3. Conclusion : 1 phrase de résumé + 1 annonce du prochain podcast
 ${NORMALIZATION_INSTRUCTIONS}
+${ORAL_NATURALNESS_INSTRUCTIONS}
 
 TITRE DE L'ÉPISODE : ${segment.title}
 CONTENU SOURCE À TRANSFORMER (tout garder, aucun concept ne peut être omis) :
@@ -1222,6 +1244,37 @@ function normalizeText(text) {
     return normalized;
 }
 
+const ORAL_NATURALNESS_INSTRUCTIONS = `
+RÈGLES DE NATUREL ORAL (s'applique UNIQUEMENT à text_studio) :
+
+TICS DE LANGAGE :
+- Inès utilise : "Alors...", "C'est-à-dire que", "Et en fait,", "Tu vois ?", "Exactement, et—", "Tout à fait.", "Oui, et c'est là où c'est intéressant—", "C'est ça,", "En plein dans le mille !"
+- Yannick utilise : "Euh...", "Ah ouais !", "Attends—", "Donc si je comprends bien...", "Hm...", "D'accord, et du coup—", "Ah ! Et du coup,"
+- Chaque réplique de Yannick commence TOUJOURS par une réaction sonore avant sa question ("Ah ! Et du coup...", "Euh... attends,", "Hm… et donc,")
+- Inès NE RÉPÈTE JAMAIS le même mot d'amorce deux fois dans le même épisode : si elle a dit "Exactement !" une fois, ce mot est interdit pour le reste de l'épisode — varier systématiquement parmi la liste ci-dessus
+
+BALISES DE PAUSE :
+- Marquer les pauses longues (après une question forte, après une idée importante) avec : <break time="1.5s" />
+- Marquer les pauses courtes (entre deux idées dans la même réplique) avec : <break time="0.8s" />
+- CRITIQUE ABSOLUE : les valeurs de durée dans <break> sont TOUJOURS écrites en chiffres : 0.8s, 1.5s — JAMAIS en lettres ("zéro", "un", "deux" sont strictement interdits dans une balise <break>)
+
+PONCTUATION ORALE :
+- Utiliser "..." intégré dans la phrase pour les hésitations légères (ex : "C'est... c'est exactement ça.")
+- Utiliser le tiret cadratin — pour les coupures nettes ou changements de rythme dans une phrase
+- Alterner les longueurs de répliques : certaines très courtes (1 phrase), d'autres plus longues (3-4 phrases)
+
+DISTINCTION text_studio / text_reading :
+- text_studio = version ORALE complète avec toutes les marques ci-dessus → sera envoyée à ElevenLabs
+- text_reading = version PROPRE, sans aucune marque orale, sans balises <break>, sans "Euh", sans "...", sans tirets cadratins → affichée à l'écran uniquement
+
+EXEMPLE OBLIGATOIRE À RESPECTER :
+❌ MAUVAIS text_studio : "Le taux de cendres indique la teneur en minéraux de la farine."
+✅ BON text_studio    : "Alors... le taux de cendres, c'est — en gros — un indicateur pour savoir si ta farine est blanche ou complète. <break time="1.0s" /> Tu vois le principe ?"
+
+❌ MAUVAIS balise : <break time="zéro.8s" /> ou <break time="un.5s" />
+✅ BON balise      : <break time="0.8s" /> ou <break time="1.5s" />
+`;
+
 // Instructions de normalisation à injecter dans chaque prompt IA
 const NORMALIZATION_INSTRUCTIONS = `
 NORMALISATION OBLIGATOIRE DU TEXTE (applique à chaque réplique) :
@@ -1231,4 +1284,4 @@ NORMALISATION OBLIGATOIRE DU TEXTE (applique à chaque réplique) :
 - text_studio = version avec phonétique pour la voix TTS (ex: "l'EISF (E.I.S.F.) forme cent cinquante apprentis")
 - text_reading = version lisible sans parenthèses (ex: "l'EISF forme 150 apprentis")`;
 
-module.exports = { router, normalizeText, NORMALIZATION_INSTRUCTIONS };
+module.exports = { router, normalizeText, NORMALIZATION_INSTRUCTIONS, ORAL_NATURALNESS_INSTRUCTIONS };
