@@ -127,11 +127,32 @@ function parseStorylineHtml(html) {
         };
     });
 
-    const markdown = chapterObjects
+    // ── Fusion des chapitres < 350 mots avec le(s) suivant(s) jusqu'au seuil ──
+    const balanced = [];
+    let i = 0;
+    while (i < chapterObjects.length) {
+        const ch = { ...chapterObjects[i] };
+        // Continuer à fusionner tant que trop court ET qu'il reste un chapitre suivant
+        while (ch.wordCount < 350 && i + 1 < chapterObjects.length) {
+            i++;
+            const next = chapterObjects[i];
+            const mergedContent = ch.content + '\n\n' + next.content;
+            const mergedWc = mergedContent.split(/\s+/).filter(w => w).length;
+            ch.title = ch.title + ' / ' + next.title;
+            ch.content = mergedContent;
+            ch.wordCount = mergedWc;
+            ch.estimatedMinutes = Math.round(mergedWc / 150);
+            ch.thematic_note = `Chapitre : ${ch.title}`;
+        }
+        balanced.push(ch);
+        i++;
+    }
+
+    const markdown = balanced
         .map(ch => `## ${ch.title}\n\n${ch.content}`)
         .join('\n\n---\n\n');
 
-    return { chapters: chapterObjects, markdown };
+    return { chapters: balanced, markdown };
 }
 
 // ─── Point d'entrée principal ─────────────────────────────────────────────────

@@ -529,6 +529,31 @@ Réponds UNIQUEMENT en JSON valide :
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Helper : génère un slug pour le nommage des podcasts
+// ─────────────────────────────────────────────────────────────────────────────
+function slugify(str) {
+    return (str || '')
+        .toLowerCase()
+        .normalize('NFD').replace(/[̀-ͯ]/g, '')
+        .replace(/[^a-z0-9\s]/g, '')
+        .trim()
+        .replace(/\s+/g, '_')
+        .substring(0, 30)
+        .replace(/_+$/, '');
+}
+
+function buildPodcastTitle(orderIndex, projectTitle, chapterTitle) {
+    const num = String((orderIndex || 0) + 1).padStart(2, '0');
+    const now = new Date();
+    const dd = String(now.getDate()).padStart(2, '0');
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const yy = String(now.getFullYear()).slice(-2);
+    const hh = String(now.getHours()).padStart(2, '0');
+    const min = String(now.getMinutes()).padStart(2, '0');
+    return `${num}_${slugify(projectTitle)}_${slugify(chapterTitle)}_${dd}${mm}${yy}${hh}${min}`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // ROUTE : /generate-single-chapter
 // ─────────────────────────────────────────────────────────────────────────────
 router.post('/generate-single-chapter', authMiddleware, async (req, res) => {
@@ -540,6 +565,10 @@ router.post('/generate-single-chapter', authMiddleware, async (req, res) => {
             return res.status(400).json({ error: 'Segment content is required' });
         }
 
+        // Récupérer le titre du projet pour le nommage slug
+        const projTitleRes = await pool.query('SELECT title FROM projects WHERE id = $1', [projectId]);
+        const projectTitle = projTitleRes.rows[0]?.title || '';
+
         if (useMock()) {
             console.log('[GENERATE-SINGLE] ⚠️ Mock AI');
             await new Promise(r => setTimeout(r, 1000));
@@ -549,12 +578,13 @@ router.post('/generate-single-chapter', authMiddleware, async (req, res) => {
                 { character: "yannick", text_studio: "Allons-y !", text_reading: "Allons-y !", section: "content" },
                 { character: "ines", text_studio: "Voilà l'essentiel.", text_reading: "Voilà l'essentiel.", section: "conclusion" }
             ];
-            
+
             const actualWordCount = 60;
             const durationSecs = 120;
+            const mockTitle = buildPodcastTitle(orderIndex, projectTitle, segment.title);
             const podcastResult = await pool.query(
                 'INSERT INTO podcasts (project_id, title, order_index, word_count, duration_seconds) VALUES ($1, $2, $3, $4, $5) RETURNING id',
-                [projectId, segment.title, orderIndex || 0, actualWordCount, durationSecs]
+                [projectId, mockTitle, orderIndex || 0, actualWordCount, durationSecs]
             );
             const podcastId = podcastResult.rows[0].id;
             
@@ -630,9 +660,10 @@ Réponds UNIQUEMENT en JSON valide :
         const actualWordCount = dialoguesNormalized.reduce((sum, d) => sum + (d.text_studio ? d.text_studio.split(/\s+/).length : 0), 0);
         const durationSecs = Math.round((actualWordCount / 130) * 60); // Roughly 130 words per min
 
+        const finalTitle = buildPodcastTitle(orderIndex, projectTitle, segment.title);
         const podcastResult = await pool.query(
             'INSERT INTO podcasts (project_id, title, order_index, word_count, duration_seconds) VALUES ($1, $2, $3, $4, $5) RETURNING id',
-            [projectId, dialogue.title || segment.title, orderIndex || 0, actualWordCount, durationSecs]
+            [projectId, finalTitle, orderIndex || 0, actualWordCount, durationSecs]
         );
         const podcastId = podcastResult.rows[0].id;
 
@@ -646,10 +677,10 @@ Réponds UNIQUEMENT en JSON valide :
             );
         }
 
-        console.log('[GENERATE-SINGLE] ✅ Podcast créé:', podcastId);
+        console.log('[GENERATE-SINGLE] ✅ Podcast créé:', podcastId, '→', finalTitle);
         res.json({
             podcastId,
-            title: dialogue.title || segment.title,
+            title: finalTitle,
             wordCount: actualWordCount,
             durationSeconds: durationSecs,
             dialogueCount: dialoguesNormalized.length

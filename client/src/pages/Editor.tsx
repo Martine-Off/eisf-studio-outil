@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
     DndContext,
     closestCenter,
@@ -207,6 +207,9 @@ function SortableDialogue({
 export default function Editor() {
     const { projectId } = useParams();
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
+    const focusChapterIndex = searchParams.get('chapter') !== null ? Number(searchParams.get('chapter')) : null;
+    const focusChapterRef = useRef<HTMLDivElement | null>(null);
     const [project, setProject] = useState<Project | null>(null);
     const [dialogues, setDialogues] = useState<Dialogue[]>([]);
     const [loading, setLoading] = useState(true);
@@ -276,6 +279,20 @@ export default function Editor() {
         return () => clearInterval(timer);
     }, []);
 
+    // Quand ?chapter=N : dès que les chapitres sont chargés, passer à l'étape 'chapters'
+    useEffect(() => {
+        if (focusChapterIndex !== null && editableChapters.length > 0 && step === 'preview') {
+            setStep('chapters');
+        }
+    }, [editableChapters.length]);
+
+    // Scroll vers le chapitre ciblé une fois l'étape 'chapters' affichée
+    useEffect(() => {
+        if (step === 'chapters' && focusChapterIndex !== null && focusChapterRef.current) {
+            setTimeout(() => focusChapterRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 150);
+        }
+    }, [step]);
+
     useKeyboardNav({
         onSave: () => handleSaveAction(dialogues),
     });
@@ -321,7 +338,8 @@ export default function Editor() {
             }
 
             setDialogues(allDialogues);
-            setStep(allDialogues.length > 0 ? 'editor' : 'preview');
+            // Si ?chapter=N est présent, forcer preview pour charger les chapitres et cibler le bon
+            setStep(focusChapterIndex !== null ? 'preview' : (allDialogues.length > 0 ? 'editor' : 'preview'));
         } catch (error) {
             console.error('Erreur chargement projet:', error);
         } finally {
@@ -799,8 +817,10 @@ export default function Editor() {
                                     const isGenerating = generatingChapters.has(i);
                                     const isGenerated = generatedChapters.has(i);
                                     
+                                    const isFocused = focusChapterIndex === i;
                                     return (
-                                        <div key={i} 
+                                        <div key={i}
+                                             ref={isFocused ? focusChapterRef : null}
                                              onClick={() => {
                                                  if (isGenerated) {
                                                      const podcastId = generatedIdMap[i];
@@ -811,7 +831,9 @@ export default function Editor() {
                                                      }
                                                  }
                                              }}
-                                             className={`flex items-center gap-4 bg-secondary rounded-xl px-5 py-4 transition-all ${isGenerated ? 'opacity-90 border border-green-500/30 cursor-pointer hover:bg-green-50/50 hover:border-green-500/50 group' : ''}`}>
+                                             className={`flex items-center gap-4 bg-secondary rounded-xl px-5 py-4 transition-all
+                                                ${isGenerated ? 'opacity-90 border border-green-500/30 cursor-pointer hover:bg-green-50/50 hover:border-green-500/50 group' : ''}
+                                                ${isFocused && !isGenerated ? 'ring-2 ring-primary ring-offset-2 border border-primary/30' : ''}`}>
                                             <div className="flex-shrink-0 w-10 h-10 bg-background rounded-lg flex items-center justify-center text-xl shadow-sm">
                                                 {isGenerated ? '✅' : '📻'}
                                             </div>

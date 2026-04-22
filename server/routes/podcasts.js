@@ -10,6 +10,34 @@ const { assertPodcastOwner } = require('../utils/ownershipChecks');
 
 const router = express.Router();
 
+// ─── Helper : extrait une section du cleaned_text par index de chapitre ───────
+function extractSourceSection(cleanedText, orderIndex) {
+    if (!cleanedText) return '';
+    // Priorité : découpage par titres markdown ## / # / ###
+    const sections = [];
+    let current = null;
+    for (const line of cleanedText.split('\n')) {
+        if (/^#{1,3}\s+/.test(line)) {
+            if (current !== null) sections.push(current.join('\n'));
+            current = [line];
+        } else if (current !== null) {
+            current.push(line);
+        }
+    }
+    if (current !== null) sections.push(current.join('\n'));
+    if (sections.length > 0) {
+        const idx = Math.max(0, Math.min(orderIndex, sections.length - 1));
+        return sections[idx].trim();
+    }
+    // Fallback : découpage par séparateur ---
+    const parts = cleanedText.split(/\n\n---\n\n|\n---\n/).map(s => s.trim());
+    if (parts.length > 1) {
+        const idx = Math.max(0, Math.min(orderIndex, parts.length - 1));
+        return parts[idx];
+    }
+    return cleanedText;
+}
+
 // Récupérer tous les podcasts d'un projet
 router.get('/', authMiddleware, async (req, res) => {
     try {
@@ -19,7 +47,7 @@ router.get('/', authMiddleware, async (req, res) => {
         }
 
         const result = await pool.query(
-            'SELECT id, title, word_count, duration_seconds, fidelity_score, audio_url, created_at FROM podcasts WHERE project_id = $1 ORDER BY order_index ASC NULLS LAST, id ASC',
+            'SELECT id, title, word_count, duration_seconds, fidelity_score, audio_url, created_at, updated_at FROM podcasts WHERE project_id = $1 ORDER BY order_index ASC NULLS LAST, id ASC',
             [projectId]
         );
 
@@ -86,6 +114,28 @@ router.put('/:podcastId/reorder', authMiddleware, async (req, res) => {
     }
 });
 
+// Texte source du chapitre correspondant au podcast
+router.get('/:id/source-section', authMiddleware, async (req, res) => {
+    try {
+        const pod = await pool.query(
+            `SELECT p.order_index, p.title, proj.cleaned_text
+             FROM podcasts p
+             JOIN projects proj ON p.project_id = proj.id
+             WHERE p.id = $1 AND proj.user_id = $2`,
+            [req.params.id, req.userId]
+        );
+        if (pod.rows.length === 0) {
+            return res.status(404).json({ error: 'Podcast non trouvé' });
+        }
+        const { order_index, cleaned_text, title } = pod.rows[0];
+        const section = extractSourceSection(cleaned_text, order_index ?? 0);
+        res.json({ source_text: section, order_index: order_index ?? 0, podcast_title: title });
+    } catch (error) {
+        console.error('Erreur récupération texte source:', error);
+        res.status(500).json({ error: 'Erreur serveur' });
+    }
+});
+
 // Récupérer infos d'un podcast
 router.get('/:podcastId', authMiddleware, async (req, res) => {
     try {
@@ -128,21 +178,23 @@ router.post('/:id/verify', authMiddleware, async (req, res) => {
     try {
         const { id } = req.params;
 
-        // Récupérer le projet lié au podcast pour avoir le texte source
+        // Récupérer le projet lié au podcast + order_index pour extraire la bonne section
         const podcastResult = await pool.query(
-          'SELECT project_id FROM podcasts WHERE id = $1',
+          'SELECT project_id, order_index FROM podcasts WHERE id = $1',
           [id]
         );
         if (podcastResult.rows.length === 0) {
           return res.status(404).json({ error: 'Podcast non trouvé' });
         }
         const projectId = podcastResult.rows[0].project_id;
+        const orderIndex = podcastResult.rows[0].order_index ?? 0;
 
         const projectResult = await pool.query(
           'SELECT cleaned_text FROM projects WHERE id = $1',
           [projectId]
         );
-        const cleanedText = projectResult.rows[0]?.cleaned_text || '';
+        const fullText = projectResult.rows[0]?.cleaned_text || '';
+        const cleanedText = extractSourceSection(fullText, orderIndex);
 
         // 1. Récupérer les dialogues
         const dialoguesResult = await pool.query(
@@ -230,9 +282,9 @@ router.post('/:id/auto-correct', authMiddleware, async (req, res) => {
     try {
         const { id } = req.params;
 
-        // 1. Récupérer ia_feedback
+        // 1. Récupérer ia_feedback + order_index + project_id
         const podcastResult = await pool.query(
-            'SELECT ia_feedback FROM podcasts WHERE id = $1',
+            'SELECT ia_feedback, order_index, project_id FROM podcasts WHERE id = $1',
             [id]
         );
 
@@ -247,6 +299,11 @@ router.post('/:id/auto-correct', authMiddleware, async (req, res) => {
 
         const conceptsManquants = iaFeedback.concepts_manquants;
 
+        // Récupérer la section source pour contexte
+        const orderIndex = podcastResult.rows[0].order_index ?? 0;
+        const projRes = await pool.query('SELECT cleaned_text FROM projects WHERE id = $1', [podcastResult.rows[0].project_id]);
+        const sourceSection = extractSourceSection(projRes.rows[0]?.cleaned_text || '', orderIndex);
+
         // 2. Récupérer tous les dialogues du podcast
         const dialoguesResult = await pool.query(
             'SELECT * FROM dialogues WHERE podcast_id = $1 ORDER BY order_index ASC',
@@ -260,6 +317,9 @@ router.post('/:id/auto-correct', authMiddleware, async (req, res) => {
         const dialogues = dialoguesResult.rows;
 
         const prompt = `Tu es un expert pédagogique. CONSIGNE STRICTE : réponds UNIQUEMENT avec le JSON brut, sans texte avant, sans texte après, sans balises markdown, sans explication.
+
+TEXTE SOURCE DU CHAPITRE (référence pédagogique — utilise-le pour vérifier et enrichir) :
+${sourceSection}
 
 Voici les dialogues actuels du podcast :
 ${JSON.stringify(dialogues)}

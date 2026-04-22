@@ -25,6 +25,27 @@ async function run() {
         console.log("Adding macro_feedback to projects...");
         await pool.query('ALTER TABLE projects ADD COLUMN IF NOT EXISTS macro_feedback JSONB;');
 
+        console.log("Adding updated_at to podcasts...");
+        await pool.query('ALTER TABLE podcasts ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW();');
+
+        console.log("Creating updated_at trigger for podcasts...");
+        await pool.query(`
+            CREATE OR REPLACE FUNCTION update_updated_at_column()
+            RETURNS TRIGGER AS $$
+            BEGIN
+              NEW.updated_at = NOW();
+              RETURN NEW;
+            END;
+            $$ language 'plpgsql';
+        `);
+        await pool.query(`
+            DROP TRIGGER IF EXISTS update_podcasts_updated_at ON podcasts;
+            CREATE TRIGGER update_podcasts_updated_at
+              BEFORE UPDATE ON podcasts
+              FOR EACH ROW
+              EXECUTE FUNCTION update_updated_at_column();
+        `);
+
         console.log("All migrations OK!");
     } catch (e) {
         console.error("Error:", e);

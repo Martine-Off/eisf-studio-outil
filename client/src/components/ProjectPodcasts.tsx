@@ -1,6 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Loader2, ChevronLeft, Mic } from 'lucide-react';
+
+function formatUpdatedAt(dateStr: string): string {
+    const d = new Date(dateStr);
+    const date = d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    const h = String(d.getHours()).padStart(2, '0');
+    const m = String(d.getMinutes()).padStart(2, '0');
+    return `Modifié le ${date} à ${h}h${m}`;
+}
 import api from '../utils/api';
 import AppLayout from '../components/AppLayout';
 import ProjectMacroAnalysis from '../components/ProjectMacroAnalysis';
@@ -98,20 +106,32 @@ export default function ProjectPodcasts() {
                                         </span>
                                     )}
                                 </div>
-                                <div className="text-sm text-muted-foreground mb-6 flex gap-2 font-medium flex-wrap">
+                                <div className="text-sm text-muted-foreground mb-2 flex gap-2 font-medium flex-wrap">
                                     <span className="bg-secondary px-2.5 py-1 rounded-md">{podcast.word_count ? podcast.word_count.toLocaleString() : 0} mots</span>
                                     <span className="bg-secondary px-2.5 py-1 rounded-md">~{Math.ceil((podcast.duration_seconds || 0) / 60)} min</span>
                                     {podcast.audio_url && (
                                         <span className="bg-green-100 text-green-700 px-2.5 py-1 rounded-md text-xs font-bold">Audio ✓</span>
                                     )}
                                 </div>
+                                {podcast.updated_at && (
+                                    <p className="text-xs text-muted-foreground mb-4">{formatUpdatedAt(podcast.updated_at)}</p>
+                                )}
                                 <div className="mt-auto w-full pt-4 border-t border-border">
-                                    <button
-                                        onClick={() => navigate(`/project/${projectId}/podcast/${podcast.id}/edit`)}
-                                        className="w-full text-center bg-accent/10 hover:bg-accent/20 text-accent font-bold py-3 rounded-xl transition-colors flex items-center justify-center gap-2"
-                                    >
-                                        Voir / Modifier le script
-                                    </button>
+                                    {(podcast.word_count ?? 0) > 0 ? (
+                                        <button
+                                            onClick={() => navigate(`/project/${projectId}/podcast/${podcast.id}/edit`)}
+                                            className="w-full text-center bg-accent/10 hover:bg-accent/20 text-accent font-bold py-3 rounded-xl transition-colors flex items-center justify-center gap-2"
+                                        >
+                                            Voir / Modifier le script
+                                        </button>
+                                    ) : (
+                                        <button
+                                            onClick={() => navigate(`/editor/${projectId}?chapter=${podcast.order_index ?? 0}`)}
+                                            className="w-full text-center bg-primary/10 hover:bg-primary/20 text-primary font-bold py-3 rounded-xl transition-colors flex items-center justify-center gap-2"
+                                        >
+                                            🎙️ Générer ce podcast
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                         ))}

@@ -224,6 +224,9 @@ export default function PodcastEditor() {
     const [podcastInfo, setPodcastInfo] = useState<{ title: string }>({ title: 'Chargement...' });
     const [showVerificationPanel, setShowVerificationPanel] = useState(false);
     const [isAudioModalOpen, setIsAudioModalOpen] = useState(false);
+    const [showSourceModal, setShowSourceModal] = useState(false);
+    const [sourceText, setSourceText] = useState<string | null>(null);
+    const [loadingSource, setLoadingSource] = useState(false);
     const [audioUrl, setAudioUrl] = useState<string | null>(null);
     const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
 
@@ -247,6 +250,21 @@ export default function PodcastEditor() {
     }, []);
 
     useKeyboardNav({ onSave: () => handleSaveAction(dialogues) });
+
+    const handleShowSource = async () => {
+        setShowSourceModal(true);
+        if (sourceText !== null) return;
+        setLoadingSource(true);
+        try {
+            const res = await api.get(`/podcasts/${podcastId}/source-section`);
+            setSourceText(res.data.source_text || '');
+        } catch (err) {
+            setSourceText('Impossible de charger le texte source.');
+            console.error(err);
+        } finally {
+            setLoadingSource(false);
+        }
+    };
 
     const loadData = async () => {
         try {
@@ -478,6 +496,12 @@ export default function PodcastEditor() {
                             📄 Export Lecture
                         </button>
                         <button
+                            onClick={handleShowSource}
+                            className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold transition-all shadow-sm bg-secondary border border-border text-muted-foreground hover:text-foreground hover:bg-secondary/80"
+                        >
+                            📄 Texte source
+                        </button>
+                        <button
                             onClick={() => setShowVerificationPanel(true)}
                             className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold transition-all shadow-sm bg-accent/10 border border-accent/20 text-accent hover:bg-accent/20"
                         >
@@ -576,6 +600,41 @@ export default function PodcastEditor() {
                 onCancel={() => setIsAudioModalOpen(false)}
                 onConfirm={handleGenerateAudio}
             />
+
+            {/* Modale texte source */}
+            {showSourceModal && (
+                <>
+                    <div
+                        onClick={() => setShowSourceModal(false)}
+                        className="fixed inset-0 bg-black/50 z-40"
+                    />
+                    <div className="fixed inset-x-4 top-[10%] bottom-[10%] max-w-3xl mx-auto bg-card border border-border shadow-2xl rounded-2xl z-50 flex flex-col">
+                        <div className="p-6 border-b border-border flex items-center justify-between flex-shrink-0">
+                            <div>
+                                <h2 className="font-bold text-lg">Texte source — {podcastInfo.title}</h2>
+                                <p className="text-sm text-muted-foreground mt-0.5">Contenu du cours correspondant à ce chapitre</p>
+                            </div>
+                            <button
+                                onClick={() => setShowSourceModal(false)}
+                                className="p-2 hover:bg-secondary rounded-full text-muted-foreground hover:text-foreground transition-colors"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-6">
+                            {loadingSource ? (
+                                <div className="flex items-center justify-center py-16">
+                                    <Loader2 className="animate-spin text-primary" size={32} />
+                                </div>
+                            ) : (
+                                <pre className="whitespace-pre-wrap text-sm text-foreground font-sans leading-relaxed">
+                                    {sourceText || 'Aucun texte source disponible.'}
+                                </pre>
+                            )}
+                        </div>
+                    </div>
+                </>
+            )}
 
             {audioUrl && (
                 <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-white p-2 rounded-full shadow-2xl border flex items-center gap-4 px-6">

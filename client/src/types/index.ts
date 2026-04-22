@@ -15,6 +15,7 @@ export interface Podcast {
   ia_feedback?: IAFeedback | null;
   audio_url?: string | null;
   created_at?: string;
+  updated_at?: string;
 }
 
 export interface Project {

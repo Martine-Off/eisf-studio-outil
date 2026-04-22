@@ -39,8 +39,23 @@ CREATE TABLE IF NOT EXISTS podcasts (
   fidelity_score DECIMAL(5,2),
   ia_feedback JSONB,
   audio_url VARCHAR(500),
-  created_at TIMESTAMP DEFAULT NOW()
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
 );
+
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = NOW();
+  RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+DROP TRIGGER IF EXISTS update_podcasts_updated_at ON podcasts;
+CREATE TRIGGER update_podcasts_updated_at
+  BEFORE UPDATE ON podcasts
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at_column();
 
 -- Table chapters
 CREATE TABLE IF NOT EXISTS chapters (
