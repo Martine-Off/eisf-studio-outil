@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
     DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent
 } from '@dnd-kit/core';
@@ -477,36 +477,44 @@ export default function PodcastEditor() {
                 )}
             </AnimatePresence>
 
-            <div className={`max-w-5xl mx-auto pb-20 ${hasPendingPropositions ? 'mt-20' : 'mt-8'}`}>
-                <div className="flex flex-col md:flex-row justify-between gap-6 mb-8 mt-4">
-                    <div className="flex items-center gap-4">
+            <div className={`max-w-5xl mx-auto pb-20 ${hasPendingPropositions ? 'mt-20' : 'mt-6'}`}>
+                <div className="flex flex-col md:flex-row justify-between gap-4 mb-6 mt-2">
+                    <div className="flex items-center gap-3">
                         <button
                             onClick={() => { handleSaveAction(dialogues); navigate(`/project/${projectId}/podcasts`); }}
-                            className="p-2.5 bg-card border border-border rounded-xl hover:bg-secondary text-muted-foreground hover:text-foreground transition-all shadow-sm"
+                            className="p-2 bg-card border border-border rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-all shadow-sm"
                         >
-                            <ChevronLeft size={20} />
+                            <ChevronLeft size={16} />
                         </button>
                         <div>
-                            {podcastInfo.project_title && (
-                                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-0.5">
-                                    {podcastInfo.project_title}
-                                </p>
-                            )}
-                            <h1 className="text-2xl font-extrabold text-foreground tracking-tight font-display">
+                            <nav className="flex items-center gap-1 text-xs text-muted-foreground mb-0.5">
+                                <Link to="/dashboard" className="hover:text-foreground transition-colors">Projets</Link>
+                                <span>/</span>
+                                {podcastInfo.project_title && (
+                                    <>
+                                        <Link to={`/project/${projectId}/podcasts`} className="hover:text-foreground transition-colors">
+                                            {podcastInfo.project_title}
+                                        </Link>
+                                        <span>/</span>
+                                    </>
+                                )}
+                                <span className="text-foreground font-medium truncate max-w-[180px]">{podcastInfo.title || 'Podcast'}</span>
+                            </nav>
+                            <h1 className="text-lg font-extrabold text-foreground tracking-tight font-display leading-tight">
                                 {podcastInfo.title || 'Éditeur de podcast'}
                             </h1>
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-3 flex-wrap">
+                    <div className="flex items-center gap-2 flex-wrap">
                         {/* Dropdown Exporter */}
                         <div className="relative group/export z-50">
-                            <button className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold transition-all shadow-sm bg-card border border-border text-foreground hover:bg-secondary">
-                                <FileDown size={16} />
+                            <button className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-all shadow-sm bg-card border border-border text-foreground hover:bg-secondary">
+                                <FileDown size={14} />
                                 Exporter
-                                <ChevronDown size={14} />
+                                <ChevronDown size={12} />
                             </button>
-                            <div className="absolute right-0 top-full mt-2 w-52 bg-card border border-border shadow-2xl rounded-xl p-2 opacity-0 pointer-events-none group-hover/export:opacity-100 group-hover/export:pointer-events-auto transition-all flex flex-col origin-top-right">
+                            <div className="absolute right-0 top-full mt-2 w-48 bg-card border border-border shadow-2xl rounded-xl p-2 opacity-0 pointer-events-none group-hover/export:opacity-100 group-hover/export:pointer-events-auto transition-all flex flex-col origin-top-right">
                                 <div className="text-[10px] font-bold text-muted-foreground px-2 py-1 uppercase tracking-wider">Word (.docx)</div>
                                 <button onClick={() => window.open(`/api/podcasts/${podcastId}/export-word/studio`)} className="text-left px-3 py-2 hover:bg-secondary rounded-lg text-sm transition-colors text-foreground font-medium">Version Studio</button>
                                 <button onClick={() => window.open(`/api/podcasts/${podcastId}/export-word/lecture`)} className="text-left px-3 py-2 hover:bg-secondary rounded-lg text-sm transition-colors text-foreground font-medium">Version Lecture</button>
@@ -517,24 +525,24 @@ export default function PodcastEditor() {
                         </div>
                         <button
                             onClick={() => setShowVerificationPanel(true)}
-                            className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold transition-all shadow-sm bg-accent/10 border border-accent/20 text-accent hover:bg-accent/20"
+                            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-all shadow-sm bg-accent/10 border border-accent/20 text-accent hover:bg-accent/20"
                         >
                             ✨ Vérifier (IA)
                         </button>
                         <button
                             onClick={() => handleSaveAction(dialogues)}
                             disabled={saveStatus === 'saving'}
-                            className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold transition-all shadow-sm bg-card border border-border text-foreground hover:bg-secondary"
+                            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-all shadow-sm bg-card border border-border text-foreground hover:bg-secondary"
                         >
-                            {saveStatus === 'saving' && <Loader2 size={16} className="animate-spin" />}
-                            {saveStatus === 'saved' && <CheckCircle size={16} className="text-green-500" />}
+                            {saveStatus === 'saving' && <Loader2 size={14} className="animate-spin" />}
+                            {saveStatus === 'saved' && <CheckCircle size={14} className="text-green-500" />}
                             Sauvegarder
                         </button>
                         <button
                             onClick={() => !audioUrl && !isGeneratingAudio && !hasPendingPropositions && setIsAudioModalOpen(true)}
                             disabled={isGeneratingAudio || hasPendingPropositions}
                             title={hasPendingPropositions ? 'Validez toutes les propositions avant de générer l\'audio' : ''}
-                            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold transition-all shadow-sm ${
+                            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-all shadow-sm ${
                                 audioUrl
                                     ? 'bg-green-100 text-green-700 cursor-default'
                                     : hasPendingPropositions
@@ -547,9 +555,9 @@ export default function PodcastEditor() {
                             {audioUrl
                                 ? '✅ Audio prêt'
                                 : hasPendingPropositions
-                                ? `⚠ ${allPropositions.length} proposition${allPropositions.length > 1 ? 's' : ''} en attente`
+                                ? `⚠ ${allPropositions.length} proposition${allPropositions.length > 1 ? 's' : ''}`
                                 : isGeneratingAudio
-                                ? <><Loader2 size={16} className="animate-spin" /> Génération en cours...</>
+                                ? <><Loader2 size={14} className="animate-spin" /> En cours...</>
                                 : '🎙️ Générer le podcast'
                             }
                         </button>

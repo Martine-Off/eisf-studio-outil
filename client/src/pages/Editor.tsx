@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import {
     DndContext,
     closestCenter,
@@ -678,16 +678,21 @@ export default function Editor() {
                     })}
                 </div>
 
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 mt-2">
-                    <div className="flex items-center gap-4">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 mt-2">
+                    <div className="flex items-center gap-3">
                         <button
                             onClick={() => navigate('/dashboard')}
-                            className="p-2.5 bg-card border border-border rounded-xl hover:bg-secondary text-muted-foreground hover:text-foreground transition-all shadow-sm"
+                            className="p-2 bg-card border border-border rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-all shadow-sm"
                         >
-                            <ChevronLeft size={20} />
+                            <ChevronLeft size={16} />
                         </button>
                         <div>
-                            <h1 className="text-3xl font-extrabold text-foreground tracking-tight font-display">
+                            <nav className="flex items-center gap-1 text-xs text-muted-foreground mb-0.5">
+                                <Link to="/dashboard" className="hover:text-foreground transition-colors">Projets</Link>
+                                <span>/</span>
+                                <span className="text-foreground font-medium">{project?.title || 'Éditeur'}</span>
+                            </nav>
+                            <h1 className="text-xl font-extrabold text-foreground tracking-tight font-display">
                                 {project?.title || "Éditeur"}
                             </h1>
                         </div>
@@ -815,7 +820,14 @@ export default function Editor() {
                 {/* ============================================================ */}
                 {/* ÉTAPE 2 — DÉCOUPAGE EN CHAPITRES                            */}
                 {/* ============================================================ */}
-                {step === 'chapters' && previewData && (
+                {step === 'chapters' && (!previewData || previewing) && (
+                    <div className="flex flex-col items-center justify-center py-20 gap-3">
+                        <Loader2 className="animate-spin text-primary" size={28} />
+                        <p className="text-sm text-muted-foreground">Chargement du découpage...</p>
+                    </div>
+                )}
+
+                {step === 'chapters' && previewData && !previewing && (
                     <div className="space-y-6">
                         <div className="bg-card border border-border rounded-2xl p-6">
                             <h3 className="font-bold text-foreground mb-1">🗂️ Découpage proposé</h3>
@@ -912,36 +924,13 @@ export default function Editor() {
                             </div>
                         )}
 
-                        <div className="flex items-center justify-between">
+                        <div className="flex items-center justify-start">
                             <button
                                 onClick={() => saveAndGoTo('preview')}
                                 className="text-muted-foreground hover:text-foreground text-sm font-medium transition-colors"
                             >
                                 ← Retour à l'aperçu
                             </button>
-                            <div className="flex items-center gap-3">
-                                <div className="flex items-center gap-2">
-                                    <label className="text-sm text-muted-foreground font-medium whitespace-nowrap">Durée cible :</label>
-                                    <select
-                                        value={targetDuration}
-                                        onChange={(e) => setTargetDuration(Number(e.target.value))}
-                                        className="px-3 py-2 rounded-xl border border-border bg-secondary text-foreground font-medium text-sm"
-                                    >
-                                        <option value={4}>4 min</option>
-                                        <option value={5}>5 min</option>
-                                        <option value={6}>6 min</option>
-                                        <option value={7}>7 min</option>
-                                    </select>
-                                </div>
-                                <button
-                                    onClick={handleGenerate}
-                                    disabled={generating}
-                                    className="flex items-center gap-2 eisf-gradient text-primary-foreground px-8 py-3 rounded-xl font-bold shadow-eisf hover:opacity-90 active:scale-95 transition-all disabled:opacity-60"
-                                >
-                                    {generating ? <Loader2 size={18} className="animate-spin" /> : '🎙️'}
-                                    {generating ? 'Génération IA en cours...' : 'Tout générer'}
-                                </button>
-                            </div>
                         </div>
                     </div>
                 )}
