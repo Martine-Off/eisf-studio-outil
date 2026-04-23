@@ -31,6 +31,13 @@ function useMock() {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
+function anthropicText(data) {
+  if (!data || data.type === "error") {
+    throw new Error("Erreur API Anthropic : " + (data?.error?.message || JSON.stringify(data)));
+  }
+  return (data.content || []).filter(b => b.type === "text").map(b => b.text).join("");
+}
+
 async function verifyScriptAgainstSource(segmentContent, scriptText) {
   // ─── APPEL 1 : Extraction exhaustive des concepts du source ───────────────
   const extractionResponse = await fetch("https://api.anthropic.com/v1/messages", {
@@ -41,7 +48,7 @@ async function verifyScriptAgainstSource(segmentContent, scriptText) {
       "anthropic-version": "2023-06-01"
     },
     body: JSON.stringify({
-      model: "claude-opus-4-5",
+      model: "claude-opus-4-7",
       max_tokens: 2000,
       system: `Tu es un extracteur de concepts pédagogiques.
 Ton unique rôle : lire un contenu source et lister TOUS ses concepts, faits, chiffres, termes techniques et informations factuelles.
@@ -63,10 +70,7 @@ RÈGLES ABSOLUES :
   });
 
   const extractionData = await extractionResponse.json();
-  const extractionText = extractionData.content
-    .filter(b => b.type === "text")
-    .map(b => b.text)
-    .join("");
+  const extractionText = anthropicText(extractionData);
 
   let concepts = [];
   try {
@@ -89,7 +93,7 @@ RÈGLES ABSOLUES :
       "anthropic-version": "2023-06-01"
     },
     body: JSON.stringify({
-      model: "claude-opus-4-5",
+      model: "claude-opus-4-7",
       max_tokens: 3000,
       system: `Tu es un vérificateur de contenu pédagogique.
 Pour chaque concept de la liste, réponds UNIQUEMENT "present" ou "absent" selon qu'il est abordé dans le script (même reformulé).
@@ -109,10 +113,7 @@ RÈGLES :
   });
 
   const verificationData = await verificationResponse.json();
-  const verificationText = verificationData.content
-    .filter(b => b.type === "text")
-    .map(b => b.text)
-    .join("");
+  const verificationText = anthropicText(verificationData);
 
   let results = [];
   try {
@@ -1062,7 +1063,7 @@ router.post("/auto-verify-and-fix", async (req, res) => {
           "anthropic-version": "2023-06-01"
         },
         body: JSON.stringify({
-          model: "claude-opus-4-5",
+          model: "claude-opus-4-7",
           max_tokens: 4000,
           system: `Tu es un correcteur de script de podcast pédagogique.
 On te donne un script existant et une liste de concepts manquants tirés du contenu source.
@@ -1090,10 +1091,7 @@ ${JSON.stringify(currentDialogues, null, 2)}`
       });
 
       const fixData = await fixResponse.json();
-      const fixText = fixData.content
-        .filter(b => b.type === "text")
-        .map(b => b.text)
-        .join("");
+      const fixText = anthropicText(fixData);
 
       try {
         const clean = fixText.replace(/```json|```/g, "").trim();
