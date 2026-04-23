@@ -38,6 +38,29 @@ function anthropicText(data) {
   return (data.content || []).filter(b => b.type === "text").map(b => b.text).join("");
 }
 
+function extractSourceSectionLocal(cleanedText, orderIndex) {
+  if (!cleanedText) return '';
+  const sections = [];
+  let current = null;
+  for (const line of cleanedText.split('\n')) {
+    if (/^#{1,3}\s+/.test(line)) {
+      if (current !== null) sections.push(current.join('\n'));
+      current = [line];
+    } else if (current !== null) {
+      current.push(line);
+    }
+  }
+  if (current !== null) sections.push(current.join('\n'));
+  if (sections.length > 0) {
+    return sections[Math.max(0, Math.min(orderIndex, sections.length - 1))].trim();
+  }
+  const parts = cleanedText.split(/\n\n---\n\n|\n---\n/).map(s => s.trim());
+  if (parts.length > 1) {
+    return parts[Math.max(0, Math.min(orderIndex, parts.length - 1))];
+  }
+  return cleanedText;
+}
+
 async function verifyScriptAgainstSource(segmentContent, scriptText) {
   // ─── APPEL 1 : Extraction exhaustive des concepts du source ───────────────
   const extractionResponse = await fetch("https://api.anthropic.com/v1/messages", {
@@ -1013,23 +1036,35 @@ Renvoie UNIQUEMENT ce JSON :
 // ─────────────────────────────────────────────────────────────────────────────
 router.post("/auto-verify-and-fix", async (req, res) => {
   try {
-    const { segmentContent, scriptDialogues, targetScore = 95 } = req.body;
+    const { podcastId, targetScore = 95 } = req.body;
 
-    if (!segmentContent || !scriptDialogues) {
-      return res.status(400).json({
-        error: "Paramètres manquants : segmentContent et scriptDialogues sont requis"
-      });
+    if (!podcastId) {
+      return res.status(400).json({ error: "podcastId requis" });
     }
 
-    // Convertir les dialogues en texte plat pour la vérification
-    const scriptText = scriptDialogues
-      .map(d => `${d.character}: ${d.text_reading || d.text_studio}`)
-      .join("\n");
+    // ─── Récupérer le contenu source depuis la BDD ─────────────────────────
+    const podcastRow = await pool.query(
+      'SELECT project_id, order_index FROM podcasts WHERE id = $1',
+      [podcastId]
+    );
+    if (podcastRow.rows.length === 0) {
+      return res.status(404).json({ error: 'Podcast non trouvé' });
+    }
+    const { project_id: projectId, order_index: orderIndex } = podcastRow.rows[0];
 
-    let currentDialogues = scriptDialogues;
+    const projRow = await pool.query('SELECT cleaned_text FROM projects WHERE id = $1', [projectId]);
+    const segmentContent = extractSourceSectionLocal(projRow.rows[0]?.cleaned_text || '', orderIndex ?? 0);
+
+    // ─── Récupérer les dialogues actuels ──────────────────────────────────
+    const dlgRow = await pool.query(
+      'SELECT * FROM dialogues WHERE podcast_id = $1 ORDER BY order_index ASC',
+      [podcastId]
+    );
+    let currentDialogues = dlgRow.rows;
+
     let lastScore = 0;
     let passCount = 0;
-    const maxPasses = 2; // Maximum 2 passes de correction
+    const maxPasses = 2;
     const passHistory = [];
 
     // ─── BOUCLE DE CORRECTION (max 2 passes) ──────────────────────────────
@@ -1048,13 +1083,10 @@ router.post("/auto-verify-and-fix", async (req, res) => {
         missing: verif.missingConcepts
       });
 
-      // Score atteint → on arrête
       if (lastScore >= targetScore) break;
-
-      // Pas de concepts manquants → on arrête (score plafond atteint)
       if (verif.missingConcepts.length === 0) break;
 
-      // ─── APPEL DE CORRECTION : ajouter les concepts manquants ─────────
+      // ─── APPEL DE CORRECTION ──────────────────────────────────────────
       const fixResponse = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: {
@@ -1064,29 +1096,18 @@ router.post("/auto-verify-and-fix", async (req, res) => {
         },
         body: JSON.stringify({
           model: "claude-opus-4-7",
-          max_tokens: 4000,
+          max_tokens: 6000,
           system: `Tu es un correcteur de script de podcast pédagogique.
-On te donne un script existant et une liste de concepts manquants tirés du contenu source.
-Ton rôle : intégrer naturellement ces concepts manquants dans le dialogue existant.
-RÈGLES :
-- Intégrer les concepts manquants de façon naturelle dans le dialogue entre Inès et Yannick
-- Ne pas supprimer ni modifier ce qui existe déjà
-- Respecter le style oral du script (tics de langage, balises <break>, hésitations)
-- Ajouter les concepts là où ils s'intègrent logiquement (pas tous à la fin)
-- Réponds UNIQUEMENT en JSON valide avec la même structure que le script reçu`,
-          messages: [
-            {
-              role: "user",
-              content: `CONCEPTS MANQUANTS À INTÉGRER :
-${verif.missingConcepts.map((c, i) => `${i + 1}. ${c}`).join("\n")}
-
-SOURCE DE RÉFÉRENCE :
-${segmentContent}
-
-SCRIPT ACTUEL (JSON) :
-${JSON.stringify(currentDialogues, null, 2)}`
-            }
-          ]
+On te donne un script existant (JSON) et une liste de concepts manquants tirés du contenu source.
+RÈGLES STRICTES :
+- Intégrer les concepts manquants naturellement dans le dialogue entre Inès et Yannick
+- Ne jamais supprimer ni modifier les répliques existantes — seulement en ajouter ou les enrichir
+- Respecter le style oral (tics de langage, balises <break>, hésitations)
+- Réponds UNIQUEMENT avec le tableau JSON complet des dialogues corrigés, sans markdown`,
+          messages: [{
+            role: "user",
+            content: `CONCEPTS MANQUANTS À INTÉGRER :\n${verif.missingConcepts.map((c, i) => `${i + 1}. ${c}`).join("\n")}\n\nSOURCE :\n${segmentContent}\n\nSCRIPT ACTUEL (JSON) :\n${JSON.stringify(currentDialogues, null, 2)}`
+          }]
         })
       });
 
@@ -1095,9 +1116,20 @@ ${JSON.stringify(currentDialogues, null, 2)}`
 
       try {
         const clean = fixText.replace(/```json|```/g, "").trim();
-        currentDialogues = JSON.parse(clean);
+        const parsed = JSON.parse(clean);
+        const corrected = Array.isArray(parsed) ? parsed : (parsed.dialogues || []);
+
+        // ─── SAUVEGARDER EN BDD ─────────────────────────────────────────
+        for (const d of corrected) {
+          if (d.id) {
+            await pool.query(
+              'UPDATE dialogues SET text_studio = $1, text_reading = $2 WHERE id = $3 AND podcast_id = $4',
+              [d.text_studio || '', d.text_reading || d.text_studio || '', d.id, podcastId]
+            );
+          }
+        }
+        currentDialogues = corrected;
       } catch (e) {
-        // Si le parsing échoue, on garde le script actuel et on arrête
         console.error("Échec parsing correction pass", passCount + 1, e.message);
         break;
       }
@@ -1105,13 +1137,15 @@ ${JSON.stringify(currentDialogues, null, 2)}`
       passCount++;
     }
 
+    // Mettre à jour le score du podcast en BDD
+    await pool.query('UPDATE podcasts SET fidelity_score = $1 WHERE id = $2', [lastScore, podcastId]);
+
     return res.json({
       success: true,
       finalScore: lastScore,
       passCount: passHistory.length,
       targetReached: lastScore >= targetScore,
-      passHistory,
-      correctedDialogues: currentDialogues
+      passHistory
     });
 
   } catch (error) {
@@ -1271,4 +1305,4 @@ NORMALISATION OBLIGATOIRE DU TEXTE (applique à chaque réplique) :
 - text_studio = version avec phonétique pour la voix TTS (ex: "l'EISF (E.I.S.F.) forme cent cinquante apprentis")
 - text_reading = version lisible sans parenthèses (ex: "l'EISF forme 150 apprentis")`;
 
-module.exports = { router, normalizeText, NORMALIZATION_INSTRUCTIONS, ORAL_NATURALNESS_INSTRUCTIONS };
+module.exports = { router, normalizeText, NORMALIZATION_INSTRUCTIONS, ORAL_NATURALNESS_INSTRUCTIONS, verifyScriptAgainstSource };

@@ -5,7 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, HeadingLevel, WidthType } = require('docx');
 const callGPT = require('../utils/callGPT');
-const { normalizeText } = require('./ai');
+const { normalizeText, verifyScriptAgainstSource } = require('./ai');
 const { assertPodcastOwner } = require('../utils/ownershipChecks');
 
 const router = express.Router();
@@ -206,63 +206,27 @@ router.post('/:id/verify', authMiddleware, async (req, res) => {
             return res.status(404).json({ error: 'Podcast ou dialogues non trouvés' });
         }
 
-        const script = dialoguesResult.rows
+        const scriptText = dialoguesResult.rows
             .map(item => `${item.character || 'Intervenant'}: ${item.text_studio || ''}`)
             .join('\n');
 
-        // 2. Appel GPT via n8n
-        const gptPrompt = `Tu dois comparer exhaustivement le cours source et le podcast généré.
+        // 2. Vérification déterministe via Anthropic (extraction + vérification binaire)
+        console.log('[VERIFY] Lancement verifyScriptAgainstSource...');
+        const result = await verifyScriptAgainstSource(cleanedText, scriptText);
+        console.log(`[VERIFY] Score : ${result.fidelityScore}% (${result.validatedConcepts}/${result.totalConcepts})`);
 
-MÉTHODE OBLIGATOIRE :
-1. Lis le cours source et dresse la liste complète de TOUS les concepts, chiffres, termes techniques, définitions et exemples.
-2. Pour chaque élément de cette liste, vérifie s'il est présent dans le podcast.
-3. Ne t'arrête pas avant d'avoir vérifié le dernier mot du cours source.
-
-COURS SOURCE (texte de référence) :
-${cleanedText}
-
-PODCAST GÉNÉRÉ (à vérifier) :
-${script}
-
-Retourne UNIQUEMENT ce JSON valide, sans markdown, sans explication :
-{
-  "concepts_manquants": ["concept manquant 1 (suffisamment précis pour retrouver dans le cours)", "...TOUS les concepts manquants, sans limite de nombre"],
-  "informations_erronees": ["fait déformé : podcast dit X, source dit Y", "...TOUS les faits incorrects"],
-  "suggestions": ["suggestion concrète 1", "..."]
-}
-
-RÈGLE ABSOLUE : Les listes doivent être COMPLÈTES. S'il y a 20 concepts manquants, tu en listes 20. Ne jamais tronquer.`;
-
-        console.log('[VERIFY] Envoi à n8n...');
-        const rawText = await callGPT(
-            "Tu es un expert en vérification pédagogique. Ta mission est d'être EXHAUSTIF et CHIRURGICAL. Tu ne t'arrêtes jamais à 5 éléments. Tu parcours l'intégralité du texte source du début à la fin, concept par concept, chiffre par chiffre, terme technique par terme technique. Un oubli de ta part = une erreur pédagogique pour un étudiant.",
-            gptPrompt
-        );
-        console.log('[VERIFY] Réponse reçue:', rawText?.substring(0, 200));
-
-        // 3. Parser la réponse
-        let iaFeedback;
-        try {
-            iaFeedback = JSON.parse(rawText);
-        } catch {
-            iaFeedback = {
-                concepts_manquants: [],
-                informations_erronees: [],
-                suggestions: [rawText]
-            };
-        }
-
-        // 4. Calculer un score de fidélité estimé et sauvegarder
-        const missing = iaFeedback.concepts_manquants?.length || 0;
-        const errors = iaFeedback.informations_erronees?.length || 0;
-        const fidelityScore = Math.max(0, 100 - missing * 4 - errors * 8);
+        const iaFeedback = {
+            concepts_manquants: result.missingConcepts,
+            informations_erronees: [],
+            suggestions: [`${result.validatedConcepts} / ${result.totalConcepts} concepts du cours sont présents dans le podcast.`]
+        };
 
         await pool.query(
             'UPDATE podcasts SET ia_feedback = $1, fidelity_score = $2 WHERE id = $3',
-            [JSON.stringify(iaFeedback), fidelityScore, id]
+            [JSON.stringify(iaFeedback), result.fidelityScore, id]
         );
 
-        res.json({ success: true, ia_feedback: iaFeedback, fidelity_score: fidelityScore });
+        res.json({ success: true, ia_feedback: iaFeedback, fidelity_score: result.fidelityScore });
     } catch (error) {
         console.error('Erreur vérification GPT:', error);
         res.status(500).json({ error: 'Erreur serveur lors de la vérification IA' });

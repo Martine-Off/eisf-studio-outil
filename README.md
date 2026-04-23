@@ -2,7 +2,7 @@
 
 Transforme les exports Articulate Storyline (.docx) en podcasts pédagogiques audio via IA.
 
-**Version :** 1.2 — Avril 2026  
+**Version :** 1.3 — Avril 2026  
 **Chef de projet :** Martine  
 **Organisation :** EISF (École Internationale du Savoir-Faire Français)
 
@@ -65,7 +65,9 @@ Studio EISF prend un cours Articulate Storyline exporté en `.docx` et génère 
 
 ### IA
 
-Tous les appels IA transitent par un **webhook n8n** (variable `N8N_WEBHOOK_URL`) qui relaie vers ChatGPT. Aucun SDK OpenAI appelé directement en production.
+Tous les appels de génération transitent par un **webhook n8n** (variable `N8N_WEBHOOK_URL`) qui relaie vers ChatGPT.
+
+La **vérification et correction de fidélité** utilisent directement l'API Anthropic (`ANTHROPIC_API_KEY`) — modèle **claude-opus-4-7** — via un pipeline déterministe en deux étapes (extraction de concepts + vérification binaire).
 
 Un mode mock (`USE_MOCK_AI=true`) court-circuite tous les appels IA avec des réponses prédéfinies, pour développer sans coût.
 
@@ -392,10 +394,33 @@ Dans **PodcastEditor**, un bandeau amber s'affiche si des propositions sont en a
 
 ---
 
+## Format du script généré (text_studio)
+
+Chaque réplique dans `text_studio` commence par un **tag expressif** ElevenLabs suivi du texte oral :
+
+```
+Speaker 1: [vocal smile] Bonjour et bienvenue dans ce podcast de l'EISF (E.I.S.F.) !
+Speaker 2: [empathetic] Euh... j'avais pas pensé à ça, c'est logique !
+Speaker 1: [newscaster] La culture du blé remonte au néolithique. <break time="1.5s" />
+Speaker 2: [laughs] Ah ouais ! Les boulangers ont eu le temps de peaufiner !
+```
+
+| Tag | Locuteur | Contexte |
+|---|---|---|
+| `[vocal smile]` | Inès | Accueil, ouverture chaleureuse |
+| `[newscaster]` | Inès | Explication théorique, définition |
+| `[empathetic]` | Inès / Yannick | Encouragement, découverte sincère |
+| `[laughs]` | Yannick | Humour, complicité |
+
+Les balises de pause `<break time="0.8s" />` / `<break time="1.5s" />` sont toujours en chiffres (jamais en lettres).
+
+`text_reading` ne contient jamais de tags ni de balises — c'est la version affichée à l'écran.
+
 ## Exports disponibles
 
 | Format | Mode | Contenu |
 |---|---|---|
+| TXT Script API | Speaker 1/2 | Format `Speaker 1: [tag] texte` pour envoi à Google AI Studio |
 | Word (.docx) | Studio | Dialogue avec indications de jeu, sections colorées |
 | Word (.docx) | Lecture | Texte seul, sans instructions studio |
 | PDF | Studio | Version studio en PDF |
@@ -406,7 +431,17 @@ Dans **PodcastEditor**, un bandeau amber s'affiche si des propositions sont en a
 
 ## Roadmap
 
-### V1.2 (actuel)
+### V1.3 (actuel — Avril 2026)
+
+- [x] Tags expressifs ElevenLabs dans le prompt (`[vocal smile]`, `[newscaster]`, `[empathetic]`, `[laughs]`)
+- [x] Export TXT Speaker 1/2 (format Google AI Studio)
+- [x] Vérification IA réécrite : pipeline déterministe Anthropic claude-opus-4-7 (extraction + binaire)
+- [x] Score de fidélité corrigé : `concepts présents / total` en % (plus de formule arbitraire)
+- [x] `auto-verify-and-fix` accepte `{ podcastId }` et sauvegarde les corrections en BDD
+- [x] Bouton "Corriger" masqué tant que l'analyse n'est pas faite
+- [x] Helper `anthropicText()` : gestion propre des erreurs API Anthropic
+
+### V1.2
 
 - [x] Parser Storyline dédié (`storylineParser.js`)
 - [x] Rééquilibrage segments (fusion < 350 mots, split > 1200 mots)
@@ -414,7 +449,7 @@ Dans **PodcastEditor**, un bandeau amber s'affiche si des propositions sont en a
 - [x] Système PROPOSITION avec navigation et validation utilisateur
 - [x] Durée cible configurable (4 / 5 / 6 / 7 min)
 - [x] Génération audio TTS
-- [x] Boucle auto-verify-and-fix (cible 95%, max 3 passes)
+- [x] Boucle auto-verify-and-fix (cible 95%, max 2 passes)
 
 ### V2
 
