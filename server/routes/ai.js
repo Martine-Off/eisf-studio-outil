@@ -1227,6 +1227,18 @@ TICS DE LANGAGE :
 - Chaque réplique de Yannick commence TOUJOURS par une réaction sonore avant sa question ("Ah ! Et du coup...", "Euh... attends,", "Hm… et donc,")
 - Inès NE RÉPÈTE JAMAIS le même mot d'amorce deux fois dans le même épisode : si elle a dit "Exactement !" une fois, ce mot est interdit pour le reste de l'épisode — varier systématiquement parmi la liste ci-dessus
 
+TAGS EXPRESSIFS (s'applique UNIQUEMENT à text_studio) :
+- Placer UN seul tag entre crochets au DÉBUT de text_studio, immédiatement avant le premier mot parlé.
+- NE PAS mettre de tag dans text_reading.
+- NE PAS mettre de tag en milieu ou en fin de réplique.
+- Tags autorisés et règles d'attribution :
+  * [vocal smile]  → Inès : accueil, ouverture chaleureuse, intro d'épisode
+  * [newscaster]   → Inès : explication théorique, définition, concept clé, segment factuel
+  * [empathetic]   → Inès : encouragement, validation, moment de complicité
+  * [empathetic]   → Yannick : question sincère, reformulation, moment de découverte
+  * [laughs]       → Yannick : réaction amusée, humour léger, complicité
+- Répliques neutres de transition (ex : enchaînement logique sans émotion marquée) : aucun tag.
+
 BALISES DE PAUSE :
 - Marquer les pauses longues (après une question forte, après une idée importante) avec : <break time="1.5s" />
 - Marquer les pauses courtes (entre deux idées dans la même réplique) avec : <break time="0.8s" />
@@ -1238,12 +1250,15 @@ PONCTUATION ORALE :
 - Alterner les longueurs de répliques : certaines très courtes (1 phrase), d'autres plus longues (3-4 phrases)
 
 DISTINCTION text_studio / text_reading :
-- text_studio = version ORALE complète avec toutes les marques ci-dessus → sera envoyée à ElevenLabs
-- text_reading = version PROPRE, sans aucune marque orale, sans balises <break>, sans "Euh", sans "...", sans tirets cadratins → affichée à l'écran uniquement
+- text_studio = version ORALE complète avec toutes les marques ci-dessus → sera envoyée à l'API
+- text_reading = version PROPRE, sans aucune marque orale, sans balises <break>, sans tags expressifs, sans "Euh", sans "...", sans tirets cadratins → affichée à l'écran uniquement
 
 EXEMPLE OBLIGATOIRE À RESPECTER :
 ❌ MAUVAIS text_studio : "Le taux de cendres indique la teneur en minéraux de la farine."
-✅ BON text_studio    : "Alors... le taux de cendres, c'est — en gros — un indicateur pour savoir si ta farine est blanche ou complète. <break time="1.0s" /> Tu vois le principe ?"
+✅ BON text_studio    : "[newscaster] Alors... le taux de cendres, c'est — en gros — un indicateur pour savoir si ta farine est blanche ou complète. <break time="1.0s" /> Tu vois le principe ?"
+
+❌ MAUVAIS text_studio : "Euh... j'avais pas pensé à ça."
+✅ BON text_studio    : "[empathetic] Euh... j'avais pas pensé à ça, c'est pourtant logique !"
 
 ❌ MAUVAIS balise : <break time="zéro.8s" /> ou <break time="un.5s" />
 ✅ BON balise      : <break time="0.8s" /> ou <break time="1.5s" />

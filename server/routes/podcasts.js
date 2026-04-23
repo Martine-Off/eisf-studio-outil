@@ -476,4 +476,38 @@ router.get('/:id/export-word/:mode', async (req, res) => {
     }
 });
 
+// Export TXT - format Speaker 1/2 pour API Google AI Studio
+router.get('/:id/export-txt', async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const podcastRes = await pool.query('SELECT title FROM podcasts WHERE id = $1', [id]);
+        if (podcastRes.rows.length === 0) return res.status(404).json({ error: 'Podcast non trouvé' });
+        const podcastTitle = podcastRes.rows[0].title;
+
+        const dialoguesRes = await pool.query(
+            'SELECT character, text_studio FROM dialogues WHERE podcast_id = $1 ORDER BY order_index ASC',
+            [id]
+        );
+
+        const lines = dialoguesRes.rows.map(d => {
+            const speaker = d.character === 'ines' ? 'Speaker 1' : 'Speaker 2';
+            // Retirer les guillemets droits et typographiques
+            const text = (d.text_studio || '').replace(/[""“”"]/g, '');
+            return `${speaker}: ${text}`;
+        });
+
+        const content = lines.join('\n\n');
+        const filename = `${podcastTitle.replace(/[^a-z0-9_]/gi, '_')}_speaker.txt`;
+
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+        res.send(content);
+
+    } catch (error) {
+        console.error('Erreur export TXT:', error);
+        res.status(500).json({ error: 'Erreur lors de la génération du TXT' });
+    }
+});
+
 module.exports = router;

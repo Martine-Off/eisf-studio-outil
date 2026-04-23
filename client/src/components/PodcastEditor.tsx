@@ -514,7 +514,10 @@ export default function PodcastEditor() {
                                 Exporter
                                 <ChevronDown size={12} />
                             </button>
-                            <div className="absolute right-0 top-full mt-2 w-48 bg-card border border-border shadow-2xl rounded-xl p-2 opacity-0 pointer-events-none group-hover/export:opacity-100 group-hover/export:pointer-events-auto transition-all flex flex-col origin-top-right">
+                            <div className="absolute right-0 top-full mt-2 w-52 bg-card border border-border shadow-2xl rounded-xl p-2 opacity-0 pointer-events-none group-hover/export:opacity-100 group-hover/export:pointer-events-auto transition-all flex flex-col origin-top-right">
+                                <div className="text-[10px] font-bold text-muted-foreground px-2 py-1 uppercase tracking-wider">Texte (.txt)</div>
+                                <button onClick={() => window.open(`/api/podcasts/${podcastId}/export-txt`)} className="text-left px-3 py-2 hover:bg-secondary rounded-lg text-sm transition-colors text-foreground font-medium">Script API (Speaker 1/2)</button>
+                                <div className="h-[1px] bg-border my-1" />
                                 <div className="text-[10px] font-bold text-muted-foreground px-2 py-1 uppercase tracking-wider">Word (.docx)</div>
                                 <button onClick={() => window.open(`/api/podcasts/${podcastId}/export-word/studio`)} className="text-left px-3 py-2 hover:bg-secondary rounded-lg text-sm transition-colors text-foreground font-medium">Version Studio</button>
                                 <button onClick={() => window.open(`/api/podcasts/${podcastId}/export-word/lecture`)} className="text-left px-3 py-2 hover:bg-secondary rounded-lg text-sm transition-colors text-foreground font-medium">Version Lecture</button>
