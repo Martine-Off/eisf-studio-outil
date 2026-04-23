@@ -143,7 +143,7 @@ router.get('/:podcastId', authMiddleware, async (req, res) => {
 
         // Ownership check : retourne directement les infos via la jointure
         const result = await pool.query(
-            `SELECT podcasts.*
+            `SELECT podcasts.*, projects.title as project_title
              FROM podcasts
              JOIN projects ON podcasts.project_id = projects.id
              WHERE podcasts.id = $1 AND projects.user_id = $2`,

@@ -40,24 +40,16 @@ export default function ProjectPodcasts() {
     return (
         <AppLayout>
             <div className="max-w-5xl mx-auto pb-20 mt-8">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 mt-4">
-                    <div className="flex items-center gap-4">
-                        <button
-                            onClick={() => navigate(`/editor/${projectId}`)}
-                            className="p-2.5 bg-card border border-border rounded-xl hover:bg-secondary text-muted-foreground hover:text-foreground transition-all shadow-sm"
-                        >
-                            <ChevronLeft size={20} />
-                        </button>
-                        <h1 className="text-3xl font-extrabold text-foreground tracking-tight font-display">
-                            Liste des Podcasts
-                        </h1>
-                    </div>
+                <div className="flex items-center gap-4 mb-8 mt-4">
                     <button
                         onClick={() => navigate(`/editor/${projectId}`)}
-                        className="bg-primary text-primary-foreground px-6 py-2.5 rounded-xl font-bold hover:opacity-90 transition-all font-sans"
+                        className="p-2.5 bg-card border border-border rounded-xl hover:bg-secondary text-muted-foreground hover:text-foreground transition-all shadow-sm"
                     >
-                        Nouveau Podcast (Éditeur de projet)
+                        <ChevronLeft size={20} />
                     </button>
+                    <h1 className="text-3xl font-extrabold text-foreground tracking-tight font-display">
+                        {projectData?.title || 'Liste des Podcasts'}
+                    </h1>
                 </div>
 
                 {/* Encart de Synthèse Globale IA */}
@@ -84,19 +76,31 @@ export default function ProjectPodcasts() {
                             onClick={() => navigate(`/editor/${projectId}`)}
                             className="mt-6 text-primary font-bold underline cursor-pointer"
                         >
-                            Aller à l'éditeur générer un podcast
+                            Générer un podcast dans l'éditeur
                         </button>
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {podcasts.map((podcast) => (
-                            <div key={podcast.id} className="bg-card border border-border rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow flex flex-col items-start">
-                                <div className="w-12 h-12 bg-primary/10 text-primary rounded-xl flex items-center justify-center mb-4">
+                            <div key={podcast.id} className={`rounded-2xl p-6 shadow-sm transition-shadow flex flex-col items-start border ${
+                                    (podcast.word_count ?? 0) > 0
+                                        ? 'bg-card border-border hover:shadow-md'
+                                        : 'bg-secondary/40 border-dashed border-border opacity-80'
+                                }`}>
+                                <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-4 ${
+                                    (podcast.word_count ?? 0) > 0 ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
+                                }`}>
                                     <Mic size={24} />
                                 </div>
                                 <div className="w-full flex items-start justify-between gap-2 mb-1">
-                                    <h3 className="font-bold text-lg text-foreground line-clamp-2">{podcast.title || `Podcast #${podcast.id}`}</h3>
-                                    {podcast.fidelity_score != null && (
+                                    <h3 className={`font-bold text-lg line-clamp-2 ${(podcast.word_count ?? 0) > 0 ? 'text-foreground' : 'text-muted-foreground'}`}>
+                                        {podcast.title || `Podcast #${podcast.id}`}
+                                    </h3>
+                                    {(podcast.word_count ?? 0) === 0 ? (
+                                        <span className="flex-shrink-0 text-xs font-bold px-2 py-0.5 rounded-full border bg-secondary text-muted-foreground border-border">
+                                            À générer
+                                        </span>
+                                    ) : podcast.fidelity_score != null ? (
                                         <span className={`flex-shrink-0 text-xs font-bold px-2 py-0.5 rounded-full border ${
                                             podcast.fidelity_score >= 95 ? 'bg-green-100 text-green-800 border-green-200' :
                                             podcast.fidelity_score >= 70 ? 'bg-orange-100 text-orange-800 border-orange-200' :
@@ -104,16 +108,18 @@ export default function ProjectPodcasts() {
                                         }`}>
                                             {Math.round(podcast.fidelity_score)}%
                                         </span>
-                                    )}
+                                    ) : null}
                                 </div>
-                                <div className="text-sm text-muted-foreground mb-2 flex gap-2 font-medium flex-wrap">
-                                    <span className="bg-secondary px-2.5 py-1 rounded-md">{podcast.word_count ? podcast.word_count.toLocaleString() : 0} mots</span>
-                                    <span className="bg-secondary px-2.5 py-1 rounded-md">~{Math.ceil((podcast.duration_seconds || 0) / 60)} min</span>
-                                    {podcast.audio_url && (
-                                        <span className="bg-green-100 text-green-700 px-2.5 py-1 rounded-md text-xs font-bold">Audio ✓</span>
-                                    )}
-                                </div>
-                                {podcast.updated_at && (
+                                {(podcast.word_count ?? 0) > 0 && (
+                                    <div className="text-sm text-muted-foreground mb-2 flex gap-2 font-medium flex-wrap">
+                                        <span className="bg-secondary px-2.5 py-1 rounded-md">{podcast.word_count!.toLocaleString()} mots</span>
+                                        <span className="bg-secondary px-2.5 py-1 rounded-md">~{Math.ceil((podcast.duration_seconds || 0) / 60)} min</span>
+                                        {podcast.audio_url && (
+                                            <span className="bg-green-100 text-green-700 px-2.5 py-1 rounded-md text-xs font-bold">Audio ✓</span>
+                                        )}
+                                    </div>
+                                )}
+                                {podcast.updated_at && (podcast.word_count ?? 0) > 0 && (
                                     <p className="text-xs text-muted-foreground mb-4">{formatUpdatedAt(podcast.updated_at)}</p>
                                 )}
                                 <div className="mt-auto w-full pt-4 border-t border-border">

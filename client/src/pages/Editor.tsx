@@ -256,9 +256,9 @@ export default function Editor() {
         if (projectId) loadData();
     }, [projectId]);
 
-    // Auto-lancer le preview quand on arrive sur l'étape 'preview' sans données
+    // Auto-lancer le preview quand on arrive sur 'preview' ou 'chapters' sans données
     useEffect(() => {
-        if (step === 'preview' && !previewData && !previewing && projectId) {
+        if ((step === 'preview' || step === 'chapters') && !previewData && !previewing && projectId) {
             handlePreview();
         }
     }, [step]);
@@ -311,11 +311,24 @@ export default function Editor() {
 
     const loadData = async () => {
         try {
-            // Charger le projet d'abord
             const projRes = await api.get(`/projects/${projectId}`);
             setProject(projRes.data.project);
 
-            // Charger les dialogues séparément (peut retourner [] si aucun podcast)
+            // Reconstruire l'état des chapitres déjà générés depuis les podcasts existants
+            const existingPodcasts: any[] = projRes.data.podcasts || [];
+            if (existingPodcasts.length > 0) {
+                const genChapters = new Set<number>();
+                const genIdMap: Record<number, number> = {};
+                existingPodcasts.forEach((p: any) => {
+                    if ((p.word_count ?? 0) > 0 && p.order_index != null) {
+                        genChapters.add(p.order_index);
+                        genIdMap[p.order_index] = p.id;
+                    }
+                });
+                setGeneratedChapters(genChapters);
+                setGeneratedIdMap(genIdMap);
+            }
+
             let allDialogues: Dialogue[] = [];
             try {
                 const dlgsRes = await api.get(`/projects/${projectId}/dialogues`);
@@ -338,7 +351,6 @@ export default function Editor() {
             }
 
             setDialogues(allDialogues);
-            // Si ?chapter=N est présent, forcer preview pour charger les chapitres et cibler le bon
             setStep(focusChapterIndex !== null ? 'preview' : (allDialogues.length > 0 ? 'editor' : 'preview'));
         } catch (error) {
             console.error('Erreur chargement projet:', error);
