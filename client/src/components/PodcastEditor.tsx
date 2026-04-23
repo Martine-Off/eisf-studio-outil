@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
     DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent
 } from '@dnd-kit/core';
@@ -7,7 +7,7 @@ import {
     arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Loader2, CheckCircle, ChevronLeft, ChevronRight, GripVertical, Pencil, X } from 'lucide-react';
+import { Loader2, CheckCircle, ChevronLeft, ChevronRight, GripVertical, Pencil, X, FileDown, ChevronDown } from 'lucide-react';
 import api from '../utils/api';
 import { useKeyboardNav } from '../hooks/useKeyboardNav';
 import AppLayout from '../components/AppLayout';
@@ -73,6 +73,7 @@ function SortableDialogue({
     elementRef: (el: HTMLDivElement | null) => void;
 }) {
     const [editingField, setEditingField] = useState<'studio' | 'reading' | null>(null);
+    const [showReading, setShowReading] = useState(false);
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: dialogue.id });
 
     const style = {
@@ -182,31 +183,41 @@ function SortableDialogue({
                     )}
                 </div>
 
-                {/* Texte Lecture */}
-                <div>
-                    <div className="flex items-center gap-2 mb-1">
-                        <span className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground/60">Texte Export (Lecture)</span>
-                        <button
-                            onClick={() => setEditingField(editingField === 'reading' ? null : 'reading')}
-                            className="text-[10px] px-2 py-0.5 rounded border border-border text-muted-foreground hover:text-foreground transition-all flex items-center gap-1"
-                        >
-                            {editingField === 'reading' ? <><X size={10} /> Fermer</> : <><Pencil size={10} /> Éditer</>}
-                        </button>
-                    </div>
-                    {editingField === 'reading' ? (
-                        <textarea
-                            data-no-dnd="true"
-                            onPointerDown={(e) => e.stopPropagation()}
-                            className="w-full bg-transparent border border-border rounded-lg p-2 text-sm text-muted-foreground leading-relaxed resize-none focus:ring-1 focus:ring-primary outline-none font-sans"
-                            value={dialogue.text_reading ?? dialogue.text_studio}
-                            onChange={(e) => onUpdate(dialogue.id, 'reading', e.target.value)}
-                            rows={Math.max(2, Math.ceil((dialogue.text_reading ?? dialogue.text_studio).length / 90))}
-                            spellCheck={false}
-                        />
-                    ) : (
-                        <p className="text-sm text-muted-foreground leading-relaxed">
-                            {dialogue.text_reading ?? dialogue.text_studio}
-                        </p>
+                {/* Texte Lecture — collapsé par défaut */}
+                <div className="mt-2">
+                    <button
+                        onClick={() => { setShowReading(v => !v); if (editingField === 'reading') setEditingField(null); }}
+                        className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-bold text-muted-foreground/60 hover:text-muted-foreground transition-colors"
+                    >
+                        <ChevronRight size={10} className={`transition-transform ${showReading ? 'rotate-90' : ''}`} />
+                        Version lecture (export)
+                    </button>
+                    {showReading && (
+                        <div className="mt-1.5">
+                            <div className="flex items-center gap-2 mb-1">
+                                <button
+                                    onClick={() => setEditingField(editingField === 'reading' ? null : 'reading')}
+                                    className="text-[10px] px-2 py-0.5 rounded border border-border text-muted-foreground hover:text-foreground transition-all flex items-center gap-1"
+                                >
+                                    {editingField === 'reading' ? <><X size={10} /> Fermer</> : <><Pencil size={10} /> Éditer</>}
+                                </button>
+                            </div>
+                            {editingField === 'reading' ? (
+                                <textarea
+                                    data-no-dnd="true"
+                                    onPointerDown={(e) => e.stopPropagation()}
+                                    className="w-full bg-transparent border border-border rounded-lg p-2 text-sm text-muted-foreground leading-relaxed resize-none focus:ring-1 focus:ring-primary outline-none font-sans"
+                                    value={dialogue.text_reading ?? dialogue.text_studio}
+                                    onChange={(e) => onUpdate(dialogue.id, 'reading', e.target.value)}
+                                    rows={Math.max(2, Math.ceil((dialogue.text_reading ?? dialogue.text_studio).length / 90))}
+                                    spellCheck={false}
+                                />
+                            ) : (
+                                <p className="text-sm text-muted-foreground leading-relaxed">
+                                    {dialogue.text_reading ?? dialogue.text_studio}
+                                </p>
+                            )}
+                        </div>
                     )}
                 </div>
             </div>
@@ -221,7 +232,7 @@ export default function PodcastEditor() {
     const [dialogues, setDialogues] = useState<Dialogue[]>([]);
     const [loading, setLoading] = useState(true);
     const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved');
-    const [podcastInfo, setPodcastInfo] = useState<{ title: string }>({ title: 'Chargement...' });
+    const [podcastInfo, setPodcastInfo] = useState<{ title: string; project_title?: string }>({ title: 'Chargement...' });
     const [showVerificationPanel, setShowVerificationPanel] = useState(false);
     const [isAudioModalOpen, setIsAudioModalOpen] = useState(false);
     const [showSourceModal, setShowSourceModal] = useState(false);
@@ -466,61 +477,75 @@ export default function PodcastEditor() {
                 )}
             </AnimatePresence>
 
-            <div className={`max-w-5xl mx-auto pb-20 ${hasPendingPropositions ? 'mt-20' : 'mt-8'}`}>
-                <div className="flex flex-col md:flex-row justify-between gap-6 mb-8 mt-4">
-                    <div className="flex items-center gap-4">
+            <div className={`max-w-5xl mx-auto pb-20 ${hasPendingPropositions ? 'mt-20' : 'mt-6'}`}>
+                <div className="flex flex-col md:flex-row justify-between gap-4 mb-6 mt-2">
+                    <div className="flex items-center gap-3">
                         <button
                             onClick={() => { handleSaveAction(dialogues); navigate(`/project/${projectId}/podcasts`); }}
-                            className="p-2.5 bg-card border border-border rounded-xl hover:bg-secondary text-muted-foreground hover:text-foreground transition-all shadow-sm"
+                            className="p-2 bg-card border border-border rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-all shadow-sm"
                         >
-                            <ChevronLeft size={20} />
+                            <ChevronLeft size={16} />
                         </button>
                         <div>
-                            <h1 className="text-3xl font-extrabold text-foreground tracking-tight font-display">
+                            <nav className="flex items-center gap-1 text-xs text-muted-foreground mb-0.5">
+                                <Link to="/dashboard" className="hover:text-foreground transition-colors">Projets</Link>
+                                <span>/</span>
+                                {podcastInfo.project_title && (
+                                    <>
+                                        <Link to={`/project/${projectId}/podcasts`} className="hover:text-foreground transition-colors">
+                                            {podcastInfo.project_title}
+                                        </Link>
+                                        <span>/</span>
+                                    </>
+                                )}
+                                <span className="text-foreground font-medium truncate max-w-[180px]">{podcastInfo.title || 'Podcast'}</span>
+                            </nav>
+                            <h1 className="text-lg font-extrabold text-foreground tracking-tight font-display leading-tight">
                                 {podcastInfo.title || 'Éditeur de podcast'}
                             </h1>
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-4 flex-wrap">
-                        <button
-                            onClick={() => window.open(`/api/podcasts/${podcastId}/export-word/studio`)}
-                            className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold transition-all shadow-sm bg-blue-50 border border-blue-200 text-blue-700 hover:bg-blue-100"
-                        >
-                            📄 Export Studio
-                        </button>
-                        <button
-                            onClick={() => window.open(`/api/podcasts/${podcastId}/export-word/lecture`)}
-                            className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold transition-all shadow-sm bg-green-50 border border-green-200 text-green-700 hover:bg-green-100"
-                        >
-                            📄 Export Lecture
-                        </button>
-                        <button
-                            onClick={handleShowSource}
-                            className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold transition-all shadow-sm bg-secondary border border-border text-muted-foreground hover:text-foreground hover:bg-secondary/80"
-                        >
-                            📄 Texte source
-                        </button>
+                    <div className="flex items-center gap-2 flex-wrap">
+                        {/* Dropdown Exporter */}
+                        <div className="relative group/export z-50">
+                            <button className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-all shadow-sm bg-card border border-border text-foreground hover:bg-secondary">
+                                <FileDown size={14} />
+                                Exporter
+                                <ChevronDown size={12} />
+                            </button>
+                            <div className="absolute right-0 top-full mt-2 w-52 bg-card border border-border shadow-2xl rounded-xl p-2 opacity-0 pointer-events-none group-hover/export:opacity-100 group-hover/export:pointer-events-auto transition-all flex flex-col origin-top-right">
+                                <div className="text-[10px] font-bold text-muted-foreground px-2 py-1 uppercase tracking-wider">Texte (.txt)</div>
+                                <button onClick={() => window.open(`/api/podcasts/${podcastId}/export-txt`)} className="text-left px-3 py-2 hover:bg-secondary rounded-lg text-sm transition-colors text-foreground font-medium">Script API (Speaker 1/2)</button>
+                                <div className="h-[1px] bg-border my-1" />
+                                <div className="text-[10px] font-bold text-muted-foreground px-2 py-1 uppercase tracking-wider">Word (.docx)</div>
+                                <button onClick={() => window.open(`/api/podcasts/${podcastId}/export-word/studio`)} className="text-left px-3 py-2 hover:bg-secondary rounded-lg text-sm transition-colors text-foreground font-medium">Version Studio</button>
+                                <button onClick={() => window.open(`/api/podcasts/${podcastId}/export-word/lecture`)} className="text-left px-3 py-2 hover:bg-secondary rounded-lg text-sm transition-colors text-foreground font-medium">Version Lecture</button>
+                                <div className="h-[1px] bg-border my-1" />
+                                <div className="text-[10px] font-bold text-muted-foreground px-2 py-1 uppercase tracking-wider">Référence</div>
+                                <button onClick={handleShowSource} className="text-left px-3 py-2 hover:bg-secondary rounded-lg text-sm transition-colors text-foreground font-medium">Texte source</button>
+                            </div>
+                        </div>
                         <button
                             onClick={() => setShowVerificationPanel(true)}
-                            className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold transition-all shadow-sm bg-accent/10 border border-accent/20 text-accent hover:bg-accent/20"
+                            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-all shadow-sm bg-accent/10 border border-accent/20 text-accent hover:bg-accent/20"
                         >
                             ✨ Vérifier (IA)
                         </button>
                         <button
                             onClick={() => handleSaveAction(dialogues)}
                             disabled={saveStatus === 'saving'}
-                            className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold transition-all shadow-sm bg-card border border-border text-foreground hover:bg-secondary"
+                            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-all shadow-sm bg-card border border-border text-foreground hover:bg-secondary"
                         >
-                            {saveStatus === 'saving' && <Loader2 size={16} className="animate-spin" />}
-                            {saveStatus === 'saved' && <CheckCircle size={16} className="text-green-500" />}
+                            {saveStatus === 'saving' && <Loader2 size={14} className="animate-spin" />}
+                            {saveStatus === 'saved' && <CheckCircle size={14} className="text-green-500" />}
                             Sauvegarder
                         </button>
                         <button
                             onClick={() => !audioUrl && !isGeneratingAudio && !hasPendingPropositions && setIsAudioModalOpen(true)}
                             disabled={isGeneratingAudio || hasPendingPropositions}
                             title={hasPendingPropositions ? 'Validez toutes les propositions avant de générer l\'audio' : ''}
-                            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold transition-all shadow-sm ${
+                            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-all shadow-sm ${
                                 audioUrl
                                     ? 'bg-green-100 text-green-700 cursor-default'
                                     : hasPendingPropositions
@@ -533,9 +558,9 @@ export default function PodcastEditor() {
                             {audioUrl
                                 ? '✅ Audio prêt'
                                 : hasPendingPropositions
-                                ? `⚠ ${allPropositions.length} proposition${allPropositions.length > 1 ? 's' : ''} en attente`
+                                ? `⚠ ${allPropositions.length} proposition${allPropositions.length > 1 ? 's' : ''}`
                                 : isGeneratingAudio
-                                ? <><Loader2 size={16} className="animate-spin" /> Génération en cours...</>
+                                ? <><Loader2 size={14} className="animate-spin" /> En cours...</>
                                 : '🎙️ Générer le podcast'
                             }
                         </button>
