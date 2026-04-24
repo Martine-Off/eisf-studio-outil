@@ -4,7 +4,8 @@ const authMiddleware = require('../middleware/auth');
 const fs = require('fs');
 const path = require('path');
 const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, HeadingLevel, WidthType } = require('docx');
-const callGPT = require('../utils/callGPT');
+const { callWebhook } = require('../utils/callWebhook');
+const { generateAudio } = require('../utils/callGeminiTTS');
 const { normalizeText, verifyScriptAgainstSource } = require('./ai');
 const { assertPodcastOwner } = require('../utils/ownershipChecks');
 
@@ -235,10 +236,47 @@ router.post('/:id/verify', authMiddleware, async (req, res) => {
 
 // Génération audio TTS — en attente de configuration n8n
 router.post('/:id/generate-audio', authMiddleware, async (req, res) => {
-    return res.status(503).json({
-        error: 'tts_not_configured',
-        message: 'La génération audio est en cours de configuration. Elle sera disponible prochainement.'
-    });
+    try {
+        const podcastId = req.params.id;
+
+        await assertPodcastOwner(podcastId, req.userId);
+
+        const dialoguesRes = await pool.query(
+            'SELECT * FROM dialogues WHERE podcast_id = $1 ORDER BY order_index ASC',
+            [podcastId]
+        );
+
+        const hasUnresolved = dialoguesRes.rows.some(d =>
+            d.text_studio && d.text_studio.includes('[PROPOSITION:')
+        );
+        if (hasUnresolved) {
+            return res.status(400).json({ error: 'propositions_unresolved' });
+        }
+
+        const audioDir = path.join(__dirname, '../audio');
+        if (!fs.existsSync(audioDir)) fs.mkdirSync(audioDir, { recursive: true });
+        const outputPath = path.join(audioDir, `podcast_${podcastId}.wav`);
+
+        await generateAudio(dialoguesRes.rows, outputPath);
+
+        const totalWords = dialoguesRes.rows.reduce((sum, d) =>
+            sum + (d.text_reading || d.text_studio || '').split(' ').length, 0);
+        const durationSeconds = Math.round((totalWords / 150) * 60);
+
+        await pool.query(
+            'UPDATE podcasts SET duration_seconds = $1, audio_url = $2 WHERE id = $3',
+            [durationSeconds, `/audio/podcast_${podcastId}.wav`, podcastId]
+        );
+
+        res.json({
+            success: true,
+            audioPath: `/audio/podcast_${podcastId}.wav`,
+            durationSeconds
+        });
+    } catch (error) {
+        console.error('[GENERATE-AUDIO] Erreur:', error);
+        res.status(500).json({ error: 'Erreur génération audio', details: error.message });
+    }
 });
 
 // Auto-correction des dialogues
@@ -300,10 +338,11 @@ ATTENTION : Ne modifie JAMAIS le premier et le dernier dialogue s'il s'agit des 
 Réponds UNIQUEMENT avec ce JSON brut (aucun autre texte) :
 {"dialogues":[{"id":1,"text_studio":"...","text_reading":"..."}]}`;
 
-        // 3. Appel n8n
-        console.log('[AUTO-CORRECT] Envoi à n8n, nb dialogues:', dialogues.length, '| nb concepts:', conceptsManquants.length);
-        const rawResponse = await callGPT(null, prompt);
-        console.log('[AUTO-CORRECT] Réponse n8n reçue:', rawResponse?.substring(0, 300));
+        // 3. Appel Make webhook
+        console.log('[AUTO-CORRECT] Envoi à Make, nb dialogues:', dialogues.length, '| nb concepts:', conceptsManquants.length);
+        const rawResponse = await callWebhook({ type: 'auto-correct', prompt });
+        if (!rawResponse) throw new Error('MAKE_WEBHOOK_URL non configurée — correction impossible');
+        console.log('[AUTO-CORRECT] Réponse Make reçue:', rawResponse?.substring(0, 300));
         const cleaned = rawResponse.replace(/```json/g, '').replace(/```/g, '').trim();
         const jsonStart = cleaned.indexOf('{');
         const jsonEnd = cleaned.lastIndexOf('}');
