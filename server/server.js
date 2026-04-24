@@ -42,6 +42,9 @@ app.use((req, res, next) => {
 // Servir les fichiers statiques du dossier uploads
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
+// Servir les fichiers audio générés par Gemini TTS
+app.use('/audio', express.static(path.join(__dirname, 'audio')));
+
 // Routes
 app.use('/api', apiRoutes);
 

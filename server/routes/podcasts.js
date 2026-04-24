@@ -4,8 +4,9 @@ const authMiddleware = require('../middleware/auth');
 const fs = require('fs');
 const path = require('path');
 const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, HeadingLevel, WidthType } = require('docx');
-const callGPT = require('../utils/callGPT');
-const { normalizeText } = require('./ai');
+const { callWebhook } = require('../utils/callWebhook');
+const { generateAudio } = require('../utils/callGeminiTTS');
+const { normalizeText, verifyScriptAgainstSource } = require('./ai');
 const { assertPodcastOwner } = require('../utils/ownershipChecks');
 
 const router = express.Router();
@@ -143,7 +144,7 @@ router.get('/:podcastId', authMiddleware, async (req, res) => {
 
         // Ownership check : retourne directement les infos via la jointure
         const result = await pool.query(
-            `SELECT podcasts.*
+            `SELECT podcasts.*, projects.title as project_title
              FROM podcasts
              JOIN projects ON podcasts.project_id = projects.id
              WHERE podcasts.id = $1 AND projects.user_id = $2`,
@@ -206,63 +207,27 @@ router.post('/:id/verify', authMiddleware, async (req, res) => {
             return res.status(404).json({ error: 'Podcast ou dialogues non trouvés' });
         }
 
-        const script = dialoguesResult.rows
+        const scriptText = dialoguesResult.rows
             .map(item => `${item.character || 'Intervenant'}: ${item.text_studio || ''}`)
             .join('\n');
 
-        // 2. Appel GPT via n8n
-        const gptPrompt = `Tu dois comparer exhaustivement le cours source et le podcast généré.
+        // 2. Vérification déterministe via Anthropic (extraction + vérification binaire)
+        console.log('[VERIFY] Lancement verifyScriptAgainstSource...');
+        const result = await verifyScriptAgainstSource(cleanedText, scriptText);
+        console.log(`[VERIFY] Score : ${result.fidelityScore}% (${result.validatedConcepts}/${result.totalConcepts})`);
 
-MÉTHODE OBLIGATOIRE :
-1. Lis le cours source et dresse la liste complète de TOUS les concepts, chiffres, termes techniques, définitions et exemples.
-2. Pour chaque élément de cette liste, vérifie s'il est présent dans le podcast.
-3. Ne t'arrête pas avant d'avoir vérifié le dernier mot du cours source.
-
-COURS SOURCE (texte de référence) :
-${cleanedText}
-
-PODCAST GÉNÉRÉ (à vérifier) :
-${script}
-
-Retourne UNIQUEMENT ce JSON valide, sans markdown, sans explication :
-{
-  "concepts_manquants": ["concept manquant 1 (suffisamment précis pour retrouver dans le cours)", "...TOUS les concepts manquants, sans limite de nombre"],
-  "informations_erronees": ["fait déformé : podcast dit X, source dit Y", "...TOUS les faits incorrects"],
-  "suggestions": ["suggestion concrète 1", "..."]
-}
-
-RÈGLE ABSOLUE : Les listes doivent être COMPLÈTES. S'il y a 20 concepts manquants, tu en listes 20. Ne jamais tronquer.`;
-
-        console.log('[VERIFY] Envoi à n8n...');
-        const rawText = await callGPT(
-            "Tu es un expert en vérification pédagogique. Ta mission est d'être EXHAUSTIF et CHIRURGICAL. Tu ne t'arrêtes jamais à 5 éléments. Tu parcours l'intégralité du texte source du début à la fin, concept par concept, chiffre par chiffre, terme technique par terme technique. Un oubli de ta part = une erreur pédagogique pour un étudiant.",
-            gptPrompt
-        );
-        console.log('[VERIFY] Réponse reçue:', rawText?.substring(0, 200));
-
-        // 3. Parser la réponse
-        let iaFeedback;
-        try {
-            iaFeedback = JSON.parse(rawText);
-        } catch {
-            iaFeedback = {
-                concepts_manquants: [],
-                informations_erronees: [],
-                suggestions: [rawText]
-            };
-        }
-
-        // 4. Calculer un score de fidélité estimé et sauvegarder
-        const missing = iaFeedback.concepts_manquants?.length || 0;
-        const errors = iaFeedback.informations_erronees?.length || 0;
-        const fidelityScore = Math.max(0, 100 - missing * 4 - errors * 8);
+        const iaFeedback = {
+            concepts_manquants: result.missingConcepts,
+            informations_erronees: [],
+            suggestions: [`${result.validatedConcepts} / ${result.totalConcepts} concepts du cours sont présents dans le podcast.`]
+        };
 
         await pool.query(
             'UPDATE podcasts SET ia_feedback = $1, fidelity_score = $2 WHERE id = $3',
-            [JSON.stringify(iaFeedback), fidelityScore, id]
+            [JSON.stringify(iaFeedback), result.fidelityScore, id]
         );
 
-        res.json({ success: true, ia_feedback: iaFeedback, fidelity_score: fidelityScore });
+        res.json({ success: true, ia_feedback: iaFeedback, fidelity_score: result.fidelityScore });
     } catch (error) {
         console.error('Erreur vérification GPT:', error);
         res.status(500).json({ error: 'Erreur serveur lors de la vérification IA' });
@@ -271,10 +236,47 @@ RÈGLE ABSOLUE : Les listes doivent être COMPLÈTES. S'il y a 20 concepts manqu
 
 // Génération audio TTS — en attente de configuration n8n
 router.post('/:id/generate-audio', authMiddleware, async (req, res) => {
-    return res.status(503).json({
-        error: 'tts_not_configured',
-        message: 'La génération audio est en cours de configuration. Elle sera disponible prochainement.'
-    });
+    try {
+        const podcastId = req.params.id;
+
+        await assertPodcastOwner(podcastId, req.userId);
+
+        const dialoguesRes = await pool.query(
+            'SELECT * FROM dialogues WHERE podcast_id = $1 ORDER BY order_index ASC',
+            [podcastId]
+        );
+
+        const hasUnresolved = dialoguesRes.rows.some(d =>
+            d.text_studio && d.text_studio.includes('[PROPOSITION:')
+        );
+        if (hasUnresolved) {
+            return res.status(400).json({ error: 'propositions_unresolved' });
+        }
+
+        const audioDir = path.join(__dirname, '../audio');
+        if (!fs.existsSync(audioDir)) fs.mkdirSync(audioDir, { recursive: true });
+        const outputPath = path.join(audioDir, `podcast_${podcastId}.wav`);
+
+        await generateAudio(dialoguesRes.rows, outputPath);
+
+        const totalWords = dialoguesRes.rows.reduce((sum, d) =>
+            sum + (d.text_reading || d.text_studio || '').split(' ').length, 0);
+        const durationSeconds = Math.round((totalWords / 150) * 60);
+
+        await pool.query(
+            'UPDATE podcasts SET duration_seconds = $1, audio_url = $2 WHERE id = $3',
+            [durationSeconds, `/audio/podcast_${podcastId}.wav`, podcastId]
+        );
+
+        res.json({
+            success: true,
+            audioPath: `/audio/podcast_${podcastId}.wav`,
+            durationSeconds
+        });
+    } catch (error) {
+        console.error('[GENERATE-AUDIO] Erreur:', error);
+        res.status(500).json({ error: 'Erreur génération audio', details: error.message });
+    }
 });
 
 // Auto-correction des dialogues
@@ -336,10 +338,11 @@ ATTENTION : Ne modifie JAMAIS le premier et le dernier dialogue s'il s'agit des 
 Réponds UNIQUEMENT avec ce JSON brut (aucun autre texte) :
 {"dialogues":[{"id":1,"text_studio":"...","text_reading":"..."}]}`;
 
-        // 3. Appel n8n
-        console.log('[AUTO-CORRECT] Envoi à n8n, nb dialogues:', dialogues.length, '| nb concepts:', conceptsManquants.length);
-        const rawResponse = await callGPT(null, prompt);
-        console.log('[AUTO-CORRECT] Réponse n8n reçue:', rawResponse?.substring(0, 300));
+        // 3. Appel Make webhook
+        console.log('[AUTO-CORRECT] Envoi à Make, nb dialogues:', dialogues.length, '| nb concepts:', conceptsManquants.length);
+        const rawResponse = await callWebhook({ type: 'auto-correct', prompt });
+        if (!rawResponse) throw new Error('MAKE_WEBHOOK_URL non configurée — correction impossible');
+        console.log('[AUTO-CORRECT] Réponse Make reçue:', rawResponse?.substring(0, 300));
         const cleaned = rawResponse.replace(/```json/g, '').replace(/```/g, '').trim();
         const jsonStart = cleaned.indexOf('{');
         const jsonEnd = cleaned.lastIndexOf('}');
@@ -473,6 +476,40 @@ router.get('/:id/export-word/:mode', async (req, res) => {
     } catch (error) {
         console.error('Erreur lors de la génération Word:', error);
         res.status(500).json({ error: 'Erreur lors de la génération du document Word' });
+    }
+});
+
+// Export TXT - format Speaker 1/2 pour API Google AI Studio
+router.get('/:id/export-txt', async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const podcastRes = await pool.query('SELECT title FROM podcasts WHERE id = $1', [id]);
+        if (podcastRes.rows.length === 0) return res.status(404).json({ error: 'Podcast non trouvé' });
+        const podcastTitle = podcastRes.rows[0].title;
+
+        const dialoguesRes = await pool.query(
+            'SELECT character, text_studio FROM dialogues WHERE podcast_id = $1 ORDER BY order_index ASC',
+            [id]
+        );
+
+        const lines = dialoguesRes.rows.map(d => {
+            const speaker = d.character === 'ines' ? 'Speaker 1' : 'Speaker 2';
+            // Retirer les guillemets droits et typographiques
+            const text = (d.text_studio || '').replace(/[""“”"]/g, '');
+            return `${speaker}: ${text}`;
+        });
+
+        const content = lines.join('\n\n');
+        const filename = `${podcastTitle.replace(/[^a-z0-9_]/gi, '_')}_speaker.txt`;
+
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+        res.send(content);
+
+    } catch (error) {
+        console.error('Erreur export TXT:', error);
+        res.status(500).json({ error: 'Erreur lors de la génération du TXT' });
     }
 });
 

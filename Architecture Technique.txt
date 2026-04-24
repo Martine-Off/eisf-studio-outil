@@ -1,0 +1,452 @@
+# 🏗️ Architecture Technique — Studio EISF
+
+**Version :** 1.3  
+**Date :** 23/04/2026
+
+---
+
+## 🧱 Structure du projet
+
+**Type : Monorepo avec 2 applications séparées** (client + server), chacune avec son propre `package.json` et `node_modules`.
+
+```
+4 Antigravity EISF Studio/
+├── client/                    # 🎨 Frontend React + TypeScript + Vite
+│   ├── src/
+│   │   ├── components/        # Composants réutilisables
+│   │   ├── context/           # React Context (Auth)
+│   │   ├── hooks/             # Custom hooks
+│   │   ├── pages/             # Pages principales (routes)
+│   │   ├── types/             # Définitions TypeScript
+│   │   ├── utils/             # Utilitaires (client API Axios)
+│   │   ├── assets/            # Ressources statiques
+│   │   ├── App.tsx            # Routeur principal
+│   │   ├── main.tsx           # Point d'entrée React
+│   │   ├── index.css          # Styles globaux
+│   │   └── App.css            # Styles du composant App
+│   ├── public/                # Fichiers statiques servis tels quels
+│   ├── dist/                  # 📦 Build de production (généré par `npm run build`)
+│   ├── .env                   # Variables d'environnement frontend
+│   ├── vite.config.ts         # Config Vite (proxy, port…)
+│   ├── tsconfig.json          # Config TypeScript
+│   ├── package.json
+│   └── index.html             # HTML racine (point d'entrée Vite)
+│
+├── server/                    # ⚙️ Backend Node.js + Express
+│   ├── routes/                # Routes API Express
+│   │   ├── index.js           # Routeur principal (/api/*)
+│   │   ├── auth.js            # /api/auth — login, register
+│   │   ├── projects.js        # /api/projects — CRUD projets
+│   │   ├── podcasts.js        # /api/podcasts — gestion podcasts
+│   │   ├── dialogues.js       # /api/dialogues — lignes de dialogue
+│   │   ├── ai.js              # /api/ai — génération IA (OpenAI/Gemini)
+│   │   └── export.js          # /api/export — export PDF/audio
+│   ├── models/
+│   │   ├── db.js              # Connexion PostgreSQL (ou mock)
+│   │   ├── db_mock.js         # Base in-memory pour dev sans DB
+│   │   └── schema.sql         # Schéma complet de la DB
+│   ├── middleware/
+│   │   └── auth.js            # Middleware JWT
+│   ├── utils/
+│   │   ├── callGPT.js         # Wrapper appels OpenAI
+│   │   ├── storylineParser.js # Parser des exports Storyline .docx
+│   │   └── ownershipChecks.js # Vérification de propriété des ressources
+│   ├── cron/
+│   │   └── cleanup.js         # Nettoyage automatique des fichiers
+│   ├── uploads/               # Stockage des fichiers uploadés (.docx)
+│   ├── server.js              # 🚀 Point d'entrée du serveur
+│   ├── initDB.js              # Script d'initialisation de la DB
+│   ├── initUser.js            # Script de création de l'utilisateur admin
+│   ├── migrate.js             # Script de migration de la DB
+│   ├── .env                   # Variables d'environnement backend
+│   └── package.json
+│
+├── docker-compose.yml         # 🐳 Docker : PostgreSQL uniquement
+├── .gitignore
+├── cahier-des-charges.md      # Spécifications fonctionnelles
+└── README.md
+```
+
+---
+
+## ⚙️ Backend
+
+| Élément | Valeur |
+|---|---|
+| **Fichier d'entrée** | `server/server.js` |
+| **Framework** | Express.js (v4.21) |
+| **Langage** | JavaScript (CommonJS / `require`) |
+| **Port** | `3001` (configurable via `PORT` dans `.env`) |
+| **Commande dev** | `npm run dev` (nodemon avec auto-reload) |
+| **Commande prod** | `npm start` → `node server.js` |
+| **Sert le frontend ?** | ❌ **Non** — API uniquement (`/api/*`) |
+
+### Routes API
+
+Toutes les routes sont préfixées par `/api` :
+
+| Route | Fichier | Description |
+|---|---|---|
+| `/api/auth` | `routes/auth.js` | Inscription, connexion (JWT) |
+| `/api/projects` | `routes/projects.js` | CRUD projets, upload .docx |
+| `/api/podcasts` | `routes/podcasts.js` | Gestion des podcasts |
+| `/api/dialogues` | `routes/dialogues.js` | Édition des lignes de dialogue |
+| `/api/ai` | `routes/ai.js` | Génération IA (script, vérification, audio) |
+| `/api/export` | `routes/export.js` | Export PDF et fichiers |
+| `/health` | `server.js` | Health check (hors préfixe `/api`) |
+
+### Authentification
+
+- **JWT** (JSON Web Token) via `jsonwebtoken`
+- Token stocké côté client dans `localStorage`
+- Middleware `middleware/auth.js` vérifie le Bearer token sur chaque requête protégée
+- Secret défini par `JWT_SECRET` dans `.env`
+
+---
+
+## 🎨 Frontend
+
+| Élément | Valeur |
+|---|---|
+| **Framework** | React 19 + TypeScript |
+| **Bundler** | Vite 7.3 |
+| **CSS** | TailwindCSS v4 (plugin Vite) |
+| **Routing** | `react-router-dom` v7 + **HashRouter** |
+| **Client HTTP** | Axios (avec intercepteurs JWT) |
+| **Port dev** | `5173` |
+| **Build command** | `npm run build` → `tsc -b && vite build` |
+| **Dossier de sortie** | `client/dist/` |
+
+### Pages
+
+| Route | Composant | Description |
+|---|---|---|
+| `/` | `Landing.tsx` | Page d'accueil |
+| `/login` | `Login.tsx` | Connexion |
+| `/register` | `Register.tsx` | Inscription |
+| `/dashboard` | `Dashboard.tsx` | Liste des projets (🔒 protégée) |
+| `/new-project` | `Create.tsx` | Création de projet (🔒) |
+| `/editor/:projectId` | `Editor.tsx` | Éditeur de chapitres (🔒) |
+| `/project/:projectId/podcasts` | `ProjectPodcasts.tsx` | Liste des podcasts d'un projet (🔒) |
+| `/project/:projectId/podcast/:podcastId/edit` | `PodcastEditor.tsx` | Éditeur de podcast (🔒) |
+
+### Composants principaux
+
+| Composant | Rôle |
+|---|---|
+| `ProtectedRoute.tsx` | Guard d'authentification |
+| `AppLayout.tsx` | Layout avec navigation |
+| `AIVerificationPanel.tsx` | Panel de vérification fidélité IA |
+| `PodcastEditor.tsx` | Éditeur de dialogue podcast |
+| `ProjectMacroAnalysis.tsx` | Analyse macro d'un projet |
+| `WordImport.tsx` | Import de fichiers .docx |
+| `GenerateAudioModal.tsx` | Modale de génération audio |
+
+---
+
+## 🔗 Connexions Frontend ↔ Backend
+
+### En développement
+
+Le frontend utilise un **proxy Vite** pour rediriger les appels API :
+
+```typescript
+// vite.config.ts
+server: {
+  port: 5173,
+  proxy: {
+    '/api': {
+      target: 'http://localhost:3001',
+      changeOrigin: true,
+    },
+  },
+}
+```
+
+Le client Axios appelle simplement `/api/*` (URL relative) :
+
+```typescript
+// src/utils/api.ts
+const api = axios.create({
+    baseURL: '/api',   // Proxy Vite redirige vers localhost:3001
+    timeout: 300000,   // 5 minutes (pour les appels IA longs)
+});
+```
+
+### En production
+
+> [!IMPORTANT]
+> En production, il n'y a **pas de proxy Vite**. Il faut soit :
+> 1. **Configurer un reverse proxy** (Nginx, Apache, Caddy) pour router `/api/*` vers le backend
+> 2. **Ou modifier `baseURL`** dans `api.ts` pour pointer vers l'URL absolue du backend
+> 3. **Et configurer `ALLOWED_ORIGINS`** dans le `.env` serveur avec le domaine du frontend
+
+---
+
+## 🔐 Variables d'environnement
+
+### Backend (`server/.env`)
+
+| Variable | Description | Exemple |
+|---|---|---|
+| `PORT` | Port du serveur Express | `3001` |
+| `DATABASE_URL` | Connection string PostgreSQL | `postgresql://postgres:PASSWORD@localhost:5433/studio_eisf` |
+| `JWT_SECRET` | Secret pour signer les JWT | *(chaîne secrète)* |
+| `OPENAI_API_KEY` | Clé API OpenAI | `sk-proj-...` |
+| `GEMINI_API_KEY` | Clé API Google Gemini | `AIza...` |
+| `N8N_WEBHOOK_URL` | URL webhook n8n (optionnel) | `http://localhost:5678/webhook/...` |
+| `USE_MOCK_DB` | Utiliser la DB en mémoire | `false` |
+| `USE_MOCK_AI` | Simuler les appels IA | `false` |
+| `ALLOWED_ORIGINS` | Origines CORS autorisées (prod) | `https://studio.eisf.fr` |
+| `NODE_ENV` | Environnement | `production` ou absent |
+
+### Frontend (`client/.env`)
+
+| Variable | Description | Exemple |
+|---|---|---|
+| `VITE_API_URL` | URL de base du backend | `http://localhost:3001` |
+| `VITE_API_BASE_URL` | URL de l'API avec préfixe | `http://localhost:3001/api` |
+
+> [!WARNING]
+> Les `.env` sont dans le `.gitignore` et ne sont **pas commités**. Il faut les recréer manuellement sur le serveur de production.
+
+---
+
+## 🗄️ Base de données
+
+| Élément | Valeur |
+|---|---|
+| **Type** | PostgreSQL 15 |
+| **Conteneur Docker** | `studio_eisf_db` via `docker-compose.yml` |
+| **Port exposé** | `5433` (mappé vers le 5432 interne) |
+| **Nom de la DB** | `studio_eisf` |
+| **ORM** | ❌ **Pas d'ORM** — requêtes SQL directes via `pg` (node-postgres) |
+| **Fichier de config** | `server/models/db.js` |
+| **Schéma** | `server/models/schema.sql` |
+| **Migrations** | `server/migrate.js` (script manuel) |
+
+### Schéma (6 tables)
+
+```mermaid
+erDiagram
+    users {
+        SERIAL id PK
+        VARCHAR email UK
+        VARCHAR password_hash
+        VARCHAR first_name
+        VARCHAR last_name
+        TIMESTAMP created_at
+        TIMESTAMP last_login
+    }
+    
+    projects {
+        SERIAL id PK
+        INTEGER user_id FK
+        VARCHAR title
+        VARCHAR status
+        VARCHAR source_file_path
+        TEXT cleaned_text
+        INTEGER macro_score
+        JSONB macro_feedback
+        TIMESTAMP created_at
+        TIMESTAMP updated_at
+    }
+    
+    chapters {
+        SERIAL id PK
+        INTEGER project_id FK
+        INTEGER order_index
+        VARCHAR title
+        TEXT content
+        INTEGER word_count
+        INTEGER podcast_id FK
+    }
+    
+    podcasts {
+        SERIAL id PK
+        INTEGER project_id FK
+        VARCHAR title
+        INTEGER order_index
+        INTEGER word_count
+        INTEGER duration_seconds
+        DECIMAL fidelity_score
+        JSONB ia_feedback
+        VARCHAR audio_url
+        TIMESTAMP updated_at
+    }
+    
+    dialogues {
+        SERIAL id PK
+        INTEGER podcast_id FK
+        INTEGER order_index
+        VARCHAR character
+        TEXT text_studio
+        TEXT text_reading
+        INTEGER duration_seconds
+        VARCHAR section
+    }
+    
+    project_shares {
+        SERIAL id PK
+        INTEGER project_id FK
+        INTEGER shared_with_user_id FK
+        VARCHAR permission
+        TIMESTAMP created_at
+    }
+
+    users ||--o{ projects : "possède"
+    projects ||--o{ chapters : "contient"
+    projects ||--o{ podcasts : "génère"
+    podcasts ||--o{ dialogues : "contient"
+    chapters }o--o| podcasts : "assigné à"
+    projects ||--o{ project_shares : "partagé via"
+    users ||--o{ project_shares : "accès à"
+```
+
+### Scripts DB
+
+| Script | Commande | Usage |
+|---|---|---|
+| Initialiser le schéma | `node initDB.js` | Crée toutes les tables (1ère fois) |
+| Créer l'admin | `node initUser.js` | Crée l'utilisateur `admin@eisf.fr` / `admin` |
+| Migrer | `node migrate.js` | Ajoute les colonnes manquantes (évolutif) |
+
+---
+
+## 📦 Dépendances critiques
+
+### Backend
+
+| Package | Version | Rôle |
+|---|---|---|
+| `express` | ^4.21 | Serveur HTTP & routing |
+| `pg` | ^8.13 | Client PostgreSQL |
+| `openai` | ^6.21 | SDK OpenAI (GPT-4, TTS) |
+| `@google/generative-ai` | ^0.21 | SDK Google Gemini |
+| `jsonwebtoken` | ^9.0 | Authentification JWT |
+| `bcrypt` | ^5.1 | Hashage des mots de passe |
+| `cors` | ^2.8 | Gestion CORS |
+| `multer` | ^1.4 | Upload de fichiers |
+| `mammoth` | ^1.8 | Conversion .docx → HTML |
+| `docx` | ^9.2 | Génération de fichiers .docx |
+| `turndown` | ^7.2 | Conversion HTML → Markdown |
+| `pdfkit` | ^0.18 | Génération de PDF |
+| `dotenv` | ^16.4 | Variables d'environnement |
+| `date-fns` | ^4.1 | Manipulation de dates |
+| `nodemon` | ^3.1 | *(dev)* Auto-reload |
+
+### Frontend
+
+| Package | Version | Rôle |
+|---|---|---|
+| `react` | ^19.2 | Framework UI |
+| `react-dom` | ^19.2 | Rendu DOM |
+| `react-router-dom` | ^7.13 | Routing SPA |
+| `axios` | ^1.13 | Client HTTP |
+| `framer-motion` | ^12.34 | Animations |
+| `lucide-react` | ^0.563 | Icônes |
+| `@dnd-kit/core` | ^6.3 | Drag & Drop |
+| `@dnd-kit/sortable` | ^10.0 | Tri par glisser-déposer |
+| `mammoth` | ^1.12 | Preview .docx côté client |
+| `tailwindcss` | ^4.1 | *(dev)* Framework CSS |
+| `vite` | ^7.3 | *(dev)* Bundler |
+| `typescript` | ~5.9 | *(dev)* Typage statique |
+
+---
+
+## 🚀 Lancement complet (développement)
+
+### Prérequis
+
+- **Node.js** ≥ 18
+- **Docker** (pour PostgreSQL)
+- Fichiers `.env` configurés dans `client/` et `server/`
+
+### Étape par étape
+
+```bash
+# 1️⃣ Lancer PostgreSQL via Docker
+docker-compose up -d
+
+# 2️⃣ Installer les dépendances
+cd server && npm install
+cd ../client && npm install
+
+# 3️⃣ Initialiser la base de données (1ère fois uniquement)
+cd ../server
+node initDB.js          # Crée les tables
+node initUser.js        # Crée l'admin (admin@eisf.fr / admin)
+node migrate.js         # Applique les migrations
+
+# 4️⃣ Lancer le backend (terminal 1)
+cd server
+npm run dev             # → http://localhost:3001
+
+# 5️⃣ Lancer le frontend (terminal 2)
+cd client
+npm run dev             # → http://localhost:5173
+```
+
+### Vérification
+
+- **Health check** : `GET http://localhost:3001/health`
+- **Frontend** : Ouvrir `http://localhost:5173` dans le navigateur
+- **Connexion** : `admin@eisf.fr` / `admin`
+
+---
+
+## 🚀 Déploiement en production
+
+### Option recommandée : VPS avec Nginx
+
+```bash
+# 1️⃣ Build du frontend
+cd client
+npm run build           # Génère client/dist/
+
+# 2️⃣ Lancer le backend
+cd server
+NODE_ENV=production npm start    # → port 3001
+```
+
+### Configuration Nginx (exemple)
+
+```nginx
+server {
+    listen 80;
+    server_name studio.eisf.fr;
+
+    # Frontend (fichiers statiques)
+    location / {
+        root /chemin/vers/client/dist;
+        try_files $uri $uri/ /index.html;
+    }
+
+    # API → Proxy vers Express
+    location /api/ {
+        proxy_pass http://localhost:3001;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_http_version 1.1;
+        proxy_read_timeout 300s;    # Important pour les appels IA longs
+    }
+
+    # Uploads statiques
+    location /uploads/ {
+        proxy_pass http://localhost:3001;
+    }
+
+    # Health check
+    location /health {
+        proxy_pass http://localhost:3001;
+    }
+}
+```
+
+> [!IMPORTANT]
+> **En production, pensez à :**
+> - Mettre un vrai `JWT_SECRET` (pas "martine" !)
+> - Configurer `ALLOWED_ORIGINS` avec votre domaine
+> - Utiliser un process manager comme **PM2** pour le backend : `pm2 start server.js --name studio-eisf`
+> - Configurer SSL avec Let's Encrypt
+> - Sécuriser/renouveler les clés API (OpenAI, Gemini)

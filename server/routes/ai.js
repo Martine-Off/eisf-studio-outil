@@ -2,10 +2,11 @@ const express = require('express');
 const pool = require('../models/db');
 const authMiddleware = require('../middleware/auth');
 const mammoth = require('mammoth');
-const callGPT = require('../utils/callGPT');
+const { callWebhook } = require('../utils/callWebhook');
+const { callMistral } = require('../utils/callMistral');
 
-const INTRO_TEXT = "Bonjour et bienvenue dans ce podcast de formation EISF — votre capsule audio pour comprendre, apprendre et progresser à votre rythme. Cet épisode, généré par intelligence artificielle à partir de contenus rédigés et validés par nos formateurs, vous accompagne dans vos apprentissages théoriques.";
-const OUTRO_TEXT = "Ce podcast est une création EISF. Il a été généré par intelligence artificielle à partir de contenus pédagogiques rédigés et validés par nos formateurs. Toute reproduction ou diffusion est interdite sans autorisation.";
+const INTRO_TEXT = "<break time=\"2s\" /> Bonjour et bienvenue dans ce podcast de formation EISF — votre capsule audio pour comprendre, apprendre et progresser à votre rythme. Cet épisode, généré par intelligence artificielle à partir de contenus rédigés et validés par nos formateurs, vous accompagne dans vos apprentissages théoriques.";
+const OUTRO_TEXT = "Ce podcast est une création EISF. Il a été généré par intelligence artificielle à partir de contenus pédagogiques rédigés et validés par nos formateurs. Toute reproduction ou diffusion est interdite sans autorisation. <break time=\"2s\" />";
 
 const INTRO_READING = "Bonjour et bienvenue dans ce podcast de formation E.I.S.F. — votre capsule audio pour comprendre, apprendre et progresser à votre rythme. Cet épisode, généré par intelligence artificielle à partir de contenus rédigés et validés par nos formateurs, vous accompagne dans vos apprentissages théoriques.";
 const OUTRO_READING = "Ce podcast est une création E.I.S.F.. Il a été généré par intelligence artificielle à partir de contenus pédagogiques rédigés et validés par nos formateurs. Toute reproduction ou diffusion est interdite sans autorisation.";
@@ -31,109 +32,75 @@ function useMock() {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
+function extractSourceSectionLocal(cleanedText, orderIndex) {
+  if (!cleanedText) return '';
+  const sections = [];
+  let current = null;
+  for (const line of cleanedText.split('\n')) {
+    if (/^#{1,3}\s+/.test(line)) {
+      if (current !== null) sections.push(current.join('\n'));
+      current = [line];
+    } else if (current !== null) {
+      current.push(line);
+    }
+  }
+  if (current !== null) sections.push(current.join('\n'));
+  if (sections.length > 0) {
+    return sections[Math.max(0, Math.min(orderIndex, sections.length - 1))].trim();
+  }
+  const parts = cleanedText.split(/\n\n---\n\n|\n---\n/).map(s => s.trim());
+  if (parts.length > 1) {
+    return parts[Math.max(0, Math.min(orderIndex, parts.length - 1))];
+  }
+  return cleanedText;
+}
+
 async function verifyScriptAgainstSource(segmentContent, scriptText) {
-  // ─── APPEL 1 : Extraction exhaustive des concepts du source ───────────────
-  const extractionResponse = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": process.env.ANTHROPIC_API_KEY,
-      "anthropic-version": "2023-06-01"
-    },
-    body: JSON.stringify({
-      model: "claude-opus-4-5",
-      max_tokens: 2000,
-      system: `Tu es un extracteur de concepts pédagogiques.
-Ton unique rôle : lire un contenu source et lister TOUS ses concepts, faits, chiffres, termes techniques et informations factuelles.
-RÈGLES ABSOLUES :
-- Chaque entrée = 1 seul concept atomique (pas de fusion)
-- Inclure TOUS les chiffres et pourcentages exacts (ex: "Taux d'eau dans la farine : 16% maximum")
-- Inclure TOUS les termes techniques nommés (ex: "plansichter", "indice de Hagberg")
-- Inclure TOUTES les listes et énumérations item par item
-- NE PAS inventer, NE PAS résumer, NE PAS reformuler
-- Réponds UNIQUEMENT en JSON valide, sans texte avant ni après :
-{"concepts": ["concept 1", "concept 2", ...]}`,
-      messages: [
-        {
-          role: "user",
-          content: `Extrais TOUS les concepts de ce contenu source :\n\n${segmentContent}`
-        }
-      ]
-    })
-  });
+  // ─── APPEL 1 : Extraction des concepts (Mistral, format liste texte) ──────
+  const conceptsText = await callMistral(
+    `Tu es un extracteur de concepts pédagogiques.
+Liste UNIQUEMENT les concepts, faits, chiffres présents dans ce texte.
+Format : une ligne par concept, commençant par "- ". Sois atomique et exhaustif.`,
+    `Extrais TOUS les concepts de ce contenu source :\n\n${segmentContent}`
+  );
 
-  const extractionData = await extractionResponse.json();
-  const extractionText = extractionData.content
-    .filter(b => b.type === "text")
-    .map(b => b.text)
-    .join("");
-
-  let concepts = [];
-  try {
-    const clean = extractionText.replace(/```json|```/g, "").trim();
-    concepts = JSON.parse(clean).concepts;
-  } catch (e) {
-    throw new Error("Échec parsing extraction concepts : " + e.message);
+  if (conceptsText.startsWith('[MOCK]')) {
+    return { fidelityScore: 0, totalConcepts: 0, validatedConcepts: 0, missingConcepts: [], allResults: [] };
   }
 
-  if (!concepts || concepts.length === 0) {
-    throw new Error("Aucun concept extrait du source");
-  }
+  const concepts = conceptsText.split('\n').filter(l => l.startsWith('- ')).map(l => l.slice(2).trim()).filter(Boolean);
+  if (concepts.length === 0) throw new Error("Aucun concept extrait du source");
 
-  // ─── APPEL 2 : Vérification binaire concept par concept ───────────────────
-  const verificationResponse = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": process.env.ANTHROPIC_API_KEY,
-      "anthropic-version": "2023-06-01"
-    },
-    body: JSON.stringify({
-      model: "claude-opus-4-5",
-      max_tokens: 3000,
-      system: `Tu es un vérificateur de contenu pédagogique.
-Pour chaque concept de la liste, réponds UNIQUEMENT "present" ou "absent" selon qu'il est abordé dans le script (même reformulé).
-RÈGLES :
-- "present" = le concept est abordé dans le script, même avec d'autres mots
-- "absent" = le concept n'est pas du tout mentionné dans le script
-- Ne juge PAS la qualité, seulement la présence/absence
-- Réponds UNIQUEMENT en JSON valide :
-{"results": [{"concept": "...", "status": "present|absent"}]}`,
-      messages: [
-        {
-          role: "user",
-          content: `CONCEPTS À VÉRIFIER :\n${JSON.stringify(concepts)}\n\nSCRIPT DU PODCAST :\n${scriptText}`
-        }
-      ]
-    })
-  });
+  // ─── APPEL 2 : Vérification binaire (Mistral, format "concept | present/absent") ──
+  const verificationText = await callMistral(
+    `Pour chaque concept, réponds UNIQUEMENT "present" ou "absent"
+selon qu'il est couvert (même reformulé) dans le script.
+Format strict : concept | present   ou   concept | absent`,
+    `CONCEPTS:\n${concepts.map(c => `- ${c}`).join('\n')}\n\nSCRIPT:\n${scriptText}`
+  );
 
-  const verificationData = await verificationResponse.json();
-  const verificationText = verificationData.content
-    .filter(b => b.type === "text")
-    .map(b => b.text)
-    .join("");
-
-  let results = [];
-  try {
-    const clean = verificationText.replace(/```json|```/g, "").trim();
-    results = JSON.parse(clean).results;
-  } catch (e) {
-    throw new Error("Échec parsing vérification : " + e.message);
+  if (verificationText.startsWith('[MOCK]')) {
+    return { fidelityScore: 0, totalConcepts: concepts.length, validatedConcepts: 0, missingConcepts: concepts, allResults: [] };
   }
 
   // ─── CALCUL MATHÉMATIQUE DU SCORE (pas par le LLM) ───────────────────────
-  const total = results.length;
-  const validated = results.filter(r => r.status === "present").length;
-  const missing = results.filter(r => r.status === "absent");
+  const lines = verificationText.split('\n').filter(l => l.includes('|'));
+  const total = lines.length;
+  const validated = lines.filter(l => l.toLowerCase().includes('present')).length;
+  const missing = lines.filter(l => !l.toLowerCase().includes('present'));
   const fidelityScore = total > 0 ? Math.round((validated / total) * 100) : 0;
+
+  const allResults = lines.map(l => {
+    const parts = l.split('|');
+    return { concept: parts[0].trim(), status: l.toLowerCase().includes('present') ? 'present' : 'absent' };
+  });
 
   return {
     fidelityScore,
     totalConcepts: total,
     validatedConcepts: validated,
-    missingConcepts: missing.map(r => r.concept),
-    allResults: results
+    missingConcepts: missing.map(l => l.split('|')[0].trim()),
+    allResults
   };
 }
 
@@ -369,7 +336,8 @@ Réponds UNIQUEMENT en JSON valide, sans texte avant ni après :
   ]
 }`;
 
-    const aiResult = await callGPT("Tu es un expert en pédagogie audio.", prompt);
+    const aiResult = await callWebhook({ type: 'extract-chapters', cleanedText });
+    if (!aiResult) throw new Error('MAKE_WEBHOOK_URL non configurée — découpage impossible');
     const parsed = parseJSON(aiResult);
     
     let segments = parsed.segments || [];
@@ -457,12 +425,16 @@ VÉRIFIE AVANT D'ENVOYER :
                 ]
             });
         } else {
-            console.log('🤖 [AI] Appel GPT...');
-            generatedText = await callGPT(
-                "Tu es un assistant pédagogique expert qui génère des dialogues JSON.",
-                prompt
-            );
-            console.log('[AI] Réponse GPT reçue, longueur:', generatedText.length);
+            console.log('🤖 [AI] Appel Make webhook...');
+            generatedText = await callWebhook({
+                sourceText: content,
+                targetDuration,
+                targetWords: targetWords,
+                previousChapter: null,
+                nextChapter: null
+            });
+            if (!generatedText) throw new Error('Génération impossible : Make n\'a pas renvoyé de contenu valide (réponse vide, non-JSON, ou JSON invalide). Consulte les logs [callWebhook] pour le détail.');
+            console.log('[AI] Réponse Make reçue, longueur:', generatedText.length);
         }
 
         const dialogue = parseJSON(generatedText);
@@ -487,7 +459,7 @@ VÉRIFIE AVANT D'ENVOYER :
             section: 'conclusion'
         });
 
-        const actualWordCount = normalized.reduce((sum, d) => sum + d.text_studio.split(/\s+/).length, 0);
+        const actualWordCount = normalized.reduce((sum, d) => sum + d.text_reading.split(/\s+/).length, 0);
 
         const podcastResult = await pool.query(
             'INSERT INTO podcasts (project_id, title, word_count, duration_seconds) VALUES ($1, $2, $3, $4) RETURNING id',
@@ -497,7 +469,7 @@ VÉRIFIE AVANT D'ENVOYER :
 
         for (let i = 0; i < normalized.length; i++) {
             const d = normalized[i];
-            const wordCount = d.text_studio.split(/\s+/).length;
+            const wordCount = d.text_reading.split(/\s+/).length;
             const estimatedDuration = Math.round((wordCount / 150) * 60);
             await pool.query(
                 'INSERT INTO dialogues (podcast_id, order_index, character, text_studio, text_reading, duration_seconds, section) VALUES ($1, $2, $3, $4, $5, $6, $7)',
@@ -607,8 +579,16 @@ Réponds UNIQUEMENT en JSON valide :
   ]
 }`;
 
-            const rawText = await callGPT("Tu es un assistant pédagogique expert.", prompt);
-            console.log(`[GENERATE-PROJECT] GPT répondu pour segment ${idx + 1}`);
+            const rawText = await callWebhook({
+                sourceText: segment.content,
+                chapterTitle: segment.title,
+                targetDuration: 7,
+                targetWords: Math.round(7 * 130),
+                previousChapter: null,
+                nextChapter: null
+            });
+            if (!rawText) throw new Error('Génération impossible : Make n\'a pas renvoyé de contenu valide (réponse vide, non-JSON, ou JSON invalide). Consulte les logs [callWebhook] pour le détail.');
+            console.log(`[GENERATE-PROJECT] Make répondu pour segment ${idx + 1}`);
 
             const dialogue = parseJSON(rawText);
             const dialoguesNorm = (dialogue.dialogues || []).map(line => ({
@@ -621,7 +601,7 @@ Réponds UNIQUEMENT en JSON valide :
             dialoguesNorm.unshift({ character: 'ines', text_studio: INTRO_TEXT, text_reading: INTRO_READING, section: 'jingle' });
             dialoguesNorm.push({ character: 'ines', text_studio: OUTRO_TEXT, text_reading: OUTRO_READING, section: 'conclusion' });
 
-            const actualWordCount = dialoguesNorm.reduce((sum, d) => sum + (d.text_studio ? d.text_studio.split(/\s+/).length : 0), 0);
+            const actualWordCount = dialoguesNorm.reduce((sum, d) => sum + (d.text_reading ? d.text_reading.split(/\s+/).length : 0), 0);
             const durationSecs = Math.round((actualWordCount / 130) * 60);
 
             const podcastResult = await pool.query(
@@ -633,7 +613,7 @@ Réponds UNIQUEMENT en JSON valide :
 
             for (let i = 0; i < dialoguesNorm.length; i++) {
                 const d = dialoguesNorm[i];
-                const wCount = d.text_studio ? d.text_studio.split(/\s+/).length : 0;
+                const wCount = d.text_reading ? d.text_reading.split(/\s+/).length : 0;
                 const eDuration = Math.round((wCount / 130) * 60);
                 await pool.query(
                     'INSERT INTO dialogues (podcast_id, order_index, character, text_studio, text_reading, duration_seconds, section) VALUES ($1, $2, $3, $4, $5, $6, $7)',
@@ -686,7 +666,7 @@ function buildPodcastTitle(orderIndex, projectTitle, chapterTitle) {
 router.post('/generate-single-chapter', authMiddleware, async (req, res) => {
     try {
         console.log('[GENERATE-SINGLE] Début');
-        const { projectId, segment, orderIndex, targetDuration = 7 } = req.body;
+        const { projectId, segment, orderIndex, previousChapter, nextChapter, targetDuration = 7 } = req.body;
 
         if (!segment || !segment.content) {
             return res.status(400).json({ error: 'Segment content is required' });
@@ -772,8 +752,16 @@ Réponds UNIQUEMENT en JSON valide :
   ]
 }`;
 
-        console.log(`[GENERATE-SINGLE] Appel GPT pour ${segment.title}...`);
-        const rawText = await callGPT("Tu es un scénariste de podcast pédagogique expert.", prompt);
+        console.log(`[GENERATE-SINGLE] Appel Make pour ${segment.title}...`);
+        const rawText = await callWebhook({
+            sourceText: segment.content,
+            chapterTitle: segment.title,
+            targetDuration,
+            targetWords: Math.round(targetDuration * 130),
+            previousChapter: previousChapter || null,
+            nextChapter: nextChapter || null
+        });
+        if (!rawText) throw new Error('Génération impossible : Make n\'a pas renvoyé de contenu valide (réponse vide, non-JSON, ou JSON invalide). Consulte les logs [callWebhook] pour le détail.');
         
         const dialogue = parseJSON(rawText);
         
@@ -787,7 +775,7 @@ Réponds UNIQUEMENT en JSON valide :
         dialoguesNormalized.unshift({ character: 'ines', text_studio: INTRO_TEXT, text_reading: INTRO_READING, section: 'jingle' });
         dialoguesNormalized.push({ character: 'ines', text_studio: OUTRO_TEXT, text_reading: OUTRO_READING, section: 'conclusion' });
 
-        const actualWordCount = dialoguesNormalized.reduce((sum, d) => sum + (d.text_studio ? d.text_studio.split(/\s+/).length : 0), 0);
+        const actualWordCount = dialoguesNormalized.reduce((sum, d) => sum + (d.text_reading ? d.text_reading.split(/\s+/).length : 0), 0);
         const durationSecs = Math.round((actualWordCount / 130) * 60); // Roughly 130 words per min
 
         const finalTitle = buildPodcastTitle(orderIndex, projectTitle, segment.title);
@@ -799,7 +787,7 @@ Réponds UNIQUEMENT en JSON valide :
 
         for (let i = 0; i < dialoguesNormalized.length; i++) {
             const d = dialoguesNormalized[i];
-            const wCount = d.text_studio ? d.text_studio.split(/\s+/).length : 0;
+            const wCount = d.text_reading ? d.text_reading.split(/\s+/).length : 0;
             const eDuration = Math.round((wCount / 130) * 60);
             await pool.query(
                 'INSERT INTO dialogues (podcast_id, order_index, character, text_studio, text_reading, duration_seconds, section) VALUES ($1, $2, $3, $4, $5, $6, $7)',
@@ -905,7 +893,8 @@ Génère UNIQUEMENT ce JSON :
   "text_reading": "La nouvelle réplique"
 }`;
 
-        const rawText = await callGPT("Tu es un expert pédagogique.", prompt);
+        const rawText = await callWebhook({ type: 'regenerate-line', currentText, style, contextBefore, contextAfter });
+        if (!rawText) throw new Error('MAKE_WEBHOOK_URL non configurée');
         const dialogue = parseJSON(rawText);
 
         await pool.query(
@@ -966,40 +955,45 @@ router.post('/fix-missing-concepts', authMiddleware, async (req, res) => {
         const dialogueText = dialogues.map((d, i) => `[ID:${i} - ${d.character}] ${d.text_studio}`).join('\n');
 
         if (useMock()) {
-            return res.json({ newDialogues: [] });
+            return res.json({ updatedDialogues: [] });
         }
 
-        const prompt = `Voici un dialogue de podcast existant :
-${dialogueText}
-Concepts manquants à injecter :
-- ${missingConcepts.join('\n- ')}
-Génère une suite naturelle pour aborder ces concepts. Utilise 'ines' pour l'experte et 'yannick' pour l'apprenant.
-Renvoie UNIQUEMENT ce JSON :
-{
-  "newDialogues": [
-    {"character": "ines", "text_studio": "...", "text_reading": "...", "section": "content"},
-    {"character": "yannick", "text_studio": "...", "text_reading": "...", "section": "content"}
-  ]
-}`;
+        const correctedScript = await callMistral(
+            `Tu reçois un script de podcast et une liste de concepts absents.
+Injecte chaque concept naturellement dans une réplique existante.
+Ne change pas le ton. Ne crée pas de nouvelles répliques.
+Retourne le script complet modifié en JSON avec la même structure (tableau de dialogues avec id, character, text_studio, text_reading, section).`,
+            `CONCEPTS MANQUANTS:\n${missingConcepts.map((c, i) => `${i + 1}. ${c}`).join('\n')}\n\nSCRIPT:\n${dialogueText}`
+        );
 
-        const rawText = await callGPT(null, prompt);
-        const resultJson = parseJSON(rawText);
-
-        const addedDialogues = [];
-        let lastIndex = dialogues.length > 0 ? Math.max(...dialogues.map(d => d.order_index)) : 0;
-
-        for (const line of resultJson.newDialogues) {
-            lastIndex++;
-            const wordCount = line.text_studio.split(/\s+/).length;
-            const duration = Math.round((wordCount / 150) * 60);
-            const inserted = await pool.query(
-                'INSERT INTO dialogues (podcast_id, order_index, character, text_studio, text_reading, duration_seconds, section) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
-                [podcastId, lastIndex, line.character || 'ines', line.text_studio, line.text_reading || line.text_studio, duration, line.section || 'content']
-            );
-            addedDialogues.push(inserted.rows[0]);
+        if (correctedScript.startsWith('[MOCK]')) {
+            return res.json({ updatedDialogues: [] });
         }
 
-        res.json({ newDialogues: addedDialogues });
+        const resultJson = parseJSON(correctedScript.replace(/```json|```/g, '').trim());
+        const corrected = Array.isArray(resultJson) ? resultJson : (resultJson.dialogues || []);
+
+        const client = await pool.connect();
+        const updatedDialogues = [];
+        try {
+            await client.query('BEGIN');
+            for (const d of corrected) {
+                if (!d.id) continue;
+                await client.query(
+                    'UPDATE dialogues SET text_studio = $1, text_reading = $2 WHERE id = $3 AND podcast_id = $4',
+                    [d.text_studio || '', d.text_reading || d.text_studio || '', d.id, podcastId]
+                );
+                updatedDialogues.push(d);
+            }
+            await client.query('COMMIT');
+        } catch (e) {
+            await client.query('ROLLBACK');
+            throw e;
+        } finally {
+            client.release();
+        }
+
+        res.json({ updatedDialogues });
 
     } catch (error) {
         console.error('[FIX] Erreur:', error);
@@ -1012,23 +1006,35 @@ Renvoie UNIQUEMENT ce JSON :
 // ─────────────────────────────────────────────────────────────────────────────
 router.post("/auto-verify-and-fix", async (req, res) => {
   try {
-    const { segmentContent, scriptDialogues, targetScore = 95 } = req.body;
+    const { podcastId, targetScore = 95 } = req.body;
 
-    if (!segmentContent || !scriptDialogues) {
-      return res.status(400).json({
-        error: "Paramètres manquants : segmentContent et scriptDialogues sont requis"
-      });
+    if (!podcastId) {
+      return res.status(400).json({ error: "podcastId requis" });
     }
 
-    // Convertir les dialogues en texte plat pour la vérification
-    const scriptText = scriptDialogues
-      .map(d => `${d.character}: ${d.text_reading || d.text_studio}`)
-      .join("\n");
+    // ─── Récupérer le contenu source depuis la BDD ─────────────────────────
+    const podcastRow = await pool.query(
+      'SELECT project_id, order_index FROM podcasts WHERE id = $1',
+      [podcastId]
+    );
+    if (podcastRow.rows.length === 0) {
+      return res.status(404).json({ error: 'Podcast non trouvé' });
+    }
+    const { project_id: projectId, order_index: orderIndex } = podcastRow.rows[0];
 
-    let currentDialogues = scriptDialogues;
+    const projRow = await pool.query('SELECT cleaned_text FROM projects WHERE id = $1', [projectId]);
+    const segmentContent = extractSourceSectionLocal(projRow.rows[0]?.cleaned_text || '', orderIndex ?? 0);
+
+    // ─── Récupérer les dialogues actuels ──────────────────────────────────
+    const dlgRow = await pool.query(
+      'SELECT * FROM dialogues WHERE podcast_id = $1 ORDER BY order_index ASC',
+      [podcastId]
+    );
+    let currentDialogues = dlgRow.rows;
+
     let lastScore = 0;
     let passCount = 0;
-    const maxPasses = 2; // Maximum 2 passes de correction
+    const maxPasses = 2;
     const passHistory = [];
 
     // ─── BOUCLE DE CORRECTION (max 2 passes) ──────────────────────────────
@@ -1047,59 +1053,37 @@ router.post("/auto-verify-and-fix", async (req, res) => {
         missing: verif.missingConcepts
       });
 
-      // Score atteint → on arrête
       if (lastScore >= targetScore) break;
-
-      // Pas de concepts manquants → on arrête (score plafond atteint)
       if (verif.missingConcepts.length === 0) break;
 
-      // ─── APPEL DE CORRECTION : ajouter les concepts manquants ─────────
-      const fixResponse = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": process.env.ANTHROPIC_API_KEY,
-          "anthropic-version": "2023-06-01"
-        },
-        body: JSON.stringify({
-          model: "claude-opus-4-5",
-          max_tokens: 4000,
-          system: `Tu es un correcteur de script de podcast pédagogique.
-On te donne un script existant et une liste de concepts manquants tirés du contenu source.
-Ton rôle : intégrer naturellement ces concepts manquants dans le dialogue existant.
-RÈGLES :
-- Intégrer les concepts manquants de façon naturelle dans le dialogue entre Inès et Yannick
-- Ne pas supprimer ni modifier ce qui existe déjà
-- Respecter le style oral du script (tics de langage, balises <break>, hésitations)
-- Ajouter les concepts là où ils s'intègrent logiquement (pas tous à la fin)
-- Réponds UNIQUEMENT en JSON valide avec la même structure que le script reçu`,
-          messages: [
-            {
-              role: "user",
-              content: `CONCEPTS MANQUANTS À INTÉGRER :
-${verif.missingConcepts.map((c, i) => `${i + 1}. ${c}`).join("\n")}
-
-SOURCE DE RÉFÉRENCE :
-${segmentContent}
-
-SCRIPT ACTUEL (JSON) :
-${JSON.stringify(currentDialogues, null, 2)}`
-            }
-          ]
-        })
-      });
-
-      const fixData = await fixResponse.json();
-      const fixText = fixData.content
-        .filter(b => b.type === "text")
-        .map(b => b.text)
-        .join("");
+      // ─── APPEL DE CORRECTION (Mistral) ──────────────────────────────────
+      const fixText = await callMistral(
+        `Tu es un correcteur de script de podcast pédagogique.
+On te donne un script existant (JSON) et une liste de concepts manquants tirés du contenu source.
+RÈGLES STRICTES :
+- Intégrer les concepts manquants naturellement dans le dialogue entre Inès et Yannick
+- Ne jamais supprimer ni modifier les répliques existantes — seulement en ajouter ou les enrichir
+- Respecter le style oral (tics de langage, balises <break>, hésitations)
+- Réponds UNIQUEMENT avec le tableau JSON complet des dialogues corrigés, sans markdown`,
+        `CONCEPTS MANQUANTS À INTÉGRER :\n${verif.missingConcepts.map((c, i) => `${i + 1}. ${c}`).join("\n")}\n\nSOURCE :\n${segmentContent}\n\nSCRIPT ACTUEL (JSON) :\n${JSON.stringify(currentDialogues, null, 2)}`
+      );
 
       try {
         const clean = fixText.replace(/```json|```/g, "").trim();
-        currentDialogues = JSON.parse(clean);
+        const parsed = JSON.parse(clean);
+        const corrected = Array.isArray(parsed) ? parsed : (parsed.dialogues || []);
+
+        // ─── SAUVEGARDER EN BDD ─────────────────────────────────────────
+        for (const d of corrected) {
+          if (d.id) {
+            await pool.query(
+              'UPDATE dialogues SET text_studio = $1, text_reading = $2 WHERE id = $3 AND podcast_id = $4',
+              [d.text_studio || '', d.text_reading || d.text_studio || '', d.id, podcastId]
+            );
+          }
+        }
+        currentDialogues = corrected;
       } catch (e) {
-        // Si le parsing échoue, on garde le script actuel et on arrête
         console.error("Échec parsing correction pass", passCount + 1, e.message);
         break;
       }
@@ -1107,13 +1091,15 @@ ${JSON.stringify(currentDialogues, null, 2)}`
       passCount++;
     }
 
+    // Mettre à jour le score du podcast en BDD
+    await pool.query('UPDATE podcasts SET fidelity_score = $1 WHERE id = $2', [lastScore, podcastId]);
+
     return res.json({
       success: true,
       finalScore: lastScore,
       passCount: passHistory.length,
       targetReached: lastScore >= targetScore,
-      passHistory,
-      correctedDialogues: currentDialogues
+      passHistory
     });
 
   } catch (error) {
@@ -1227,6 +1213,18 @@ TICS DE LANGAGE :
 - Chaque réplique de Yannick commence TOUJOURS par une réaction sonore avant sa question ("Ah ! Et du coup...", "Euh... attends,", "Hm… et donc,")
 - Inès NE RÉPÈTE JAMAIS le même mot d'amorce deux fois dans le même épisode : si elle a dit "Exactement !" une fois, ce mot est interdit pour le reste de l'épisode — varier systématiquement parmi la liste ci-dessus
 
+TAGS EXPRESSIFS (s'applique UNIQUEMENT à text_studio) :
+- Placer UN seul tag entre crochets au DÉBUT de text_studio, immédiatement avant le premier mot parlé.
+- NE PAS mettre de tag dans text_reading.
+- NE PAS mettre de tag en milieu ou en fin de réplique.
+- Tags autorisés et règles d'attribution :
+  * [vocal smile]  → Inès : accueil, ouverture chaleureuse, intro d'épisode
+  * [newscaster]   → Inès : explication théorique, définition, concept clé, segment factuel
+  * [empathetic]   → Inès : encouragement, validation, moment de complicité
+  * [empathetic]   → Yannick : question sincère, reformulation, moment de découverte
+  * [laughs]       → Yannick : réaction amusée, humour léger, complicité
+- Répliques neutres de transition (ex : enchaînement logique sans émotion marquée) : aucun tag.
+
 BALISES DE PAUSE :
 - Marquer les pauses longues (après une question forte, après une idée importante) avec : <break time="1.5s" />
 - Marquer les pauses courtes (entre deux idées dans la même réplique) avec : <break time="0.8s" />
@@ -1238,12 +1236,15 @@ PONCTUATION ORALE :
 - Alterner les longueurs de répliques : certaines très courtes (1 phrase), d'autres plus longues (3-4 phrases)
 
 DISTINCTION text_studio / text_reading :
-- text_studio = version ORALE complète avec toutes les marques ci-dessus → sera envoyée à ElevenLabs
-- text_reading = version PROPRE, sans aucune marque orale, sans balises <break>, sans "Euh", sans "...", sans tirets cadratins → affichée à l'écran uniquement
+- text_studio = version ORALE complète avec toutes les marques ci-dessus → sera envoyée à l'API
+- text_reading = version PROPRE, sans aucune marque orale, sans balises <break>, sans tags expressifs, sans "Euh", sans "...", sans tirets cadratins → affichée à l'écran uniquement
 
 EXEMPLE OBLIGATOIRE À RESPECTER :
 ❌ MAUVAIS text_studio : "Le taux de cendres indique la teneur en minéraux de la farine."
-✅ BON text_studio    : "Alors... le taux de cendres, c'est — en gros — un indicateur pour savoir si ta farine est blanche ou complète. <break time="1.0s" /> Tu vois le principe ?"
+✅ BON text_studio    : "[newscaster] Alors... le taux de cendres, c'est — en gros — un indicateur pour savoir si ta farine est blanche ou complète. <break time="1.0s" /> Tu vois le principe ?"
+
+❌ MAUVAIS text_studio : "Euh... j'avais pas pensé à ça."
+✅ BON text_studio    : "[empathetic] Euh... j'avais pas pensé à ça, c'est pourtant logique !"
 
 ❌ MAUVAIS balise : <break time="zéro.8s" /> ou <break time="un.5s" />
 ✅ BON balise      : <break time="0.8s" /> ou <break time="1.5s" />
@@ -1258,4 +1259,4 @@ NORMALISATION OBLIGATOIRE DU TEXTE (applique à chaque réplique) :
 - text_studio = version avec phonétique pour la voix TTS (ex: "l'EISF (E.I.S.F.) forme cent cinquante apprentis")
 - text_reading = version lisible sans parenthèses (ex: "l'EISF forme 150 apprentis")`;
 
-module.exports = { router, normalizeText, NORMALIZATION_INSTRUCTIONS, ORAL_NATURALNESS_INSTRUCTIONS };
+module.exports = { router, normalizeText, NORMALIZATION_INSTRUCTIONS, ORAL_NATURALNESS_INSTRUCTIONS, verifyScriptAgainstSource };

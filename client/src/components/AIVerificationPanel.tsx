@@ -7,13 +7,18 @@ interface VerificationResult {
     suggestions?: string[];
 }
 
+interface PassInfo {
+    pass: number;
+    score: number;
+    missingCount: number;
+    missing: string[];
+}
+
 interface AutoFixResult {
     finalScore: number;
     targetReached: boolean;
-    iterations: number;
-    history: { iteration: number; score: number; missingCount: number }[];
-    remainingConcepts: string[];
-    remainingFacts: string[];
+    passCount: number;
+    passHistory: PassInfo[];
 }
 
 interface AIVerificationPanelProps {
@@ -28,7 +33,7 @@ function ScoreBadge({ score }: { score: number }) {
                       'bg-red-100 text-red-800 border-red-200';
     const label =
         score >= 95 ? 'Excellent' :
-        score >= 70 ? 'Acceptable' : 'A corriger';
+        score >= 70 ? 'Acceptable' : 'À corriger';
     return (
         <div className={`flex items-center gap-2 px-4 py-2 rounded-xl border font-bold text-2xl ${color}`}>
             {score}%
@@ -49,12 +54,12 @@ export const AIVerificationPanel: React.FC<AIVerificationPanelProps> = ({
     const [error, setError] = useState<string | null>(null);
     const [progress, setProgress] = useState<string>('');
 
-    // Étape 1 : vérification simple
+    // Étape 1 — analyse de fidélité
     const runAnalysis = async () => {
         setIsAnalyzing(true);
         setError(null);
         setAutoFixResult(null);
-        setProgress('Analyse du script en cours...');
+        setProgress('Extraction et vérification des concepts...');
         try {
             const res = await api.post(`/podcasts/${podcastId}/verify`);
             const data = res.data;
@@ -69,19 +74,19 @@ export const AIVerificationPanel: React.FC<AIVerificationPanelProps> = ({
         }
     };
 
-    // Étape 2 : boucle auto jusqu'à 95%
+    // Étape 2 — correction automatique (seulement si analyse faite)
     const runAutoFix = async () => {
         setIsAutoFixing(true);
         setError(null);
-        setProgress('Lancement de la correction automatique (jusqu\'à 4 passes)...');
+        setProgress('Correction automatique en cours (jusqu\'à 2 passes)...');
         try {
             const res = await api.post('/ai/auto-verify-and-fix', { podcastId: Number(podcastId) }, {
-                timeout: 300000, // 5 min max
+                timeout: 300000,
             });
             const data: AutoFixResult = res.data;
             setAutoFixResult(data);
             setScore(data.finalScore);
-            setFeedback(null); // Rafraîchir l'affichage
+            setFeedback(null);
             if (onCorrectionDone) onCorrectionDone();
         } catch (err) {
             setError("Erreur lors de la correction automatique.");
@@ -93,6 +98,7 @@ export const AIVerificationPanel: React.FC<AIVerificationPanelProps> = ({
     };
 
     const isLoading = isAnalyzing || isAutoFixing;
+    const analyseDone = feedback !== null || autoFixResult !== null;
 
     return (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex flex-col gap-5">
@@ -100,32 +106,25 @@ export const AIVerificationPanel: React.FC<AIVerificationPanelProps> = ({
             {/* En-tête */}
             <div className="flex justify-between items-start border-b pb-4">
                 <div>
-                    <h3 className="text-xl font-bold text-gray-800">Verification IA</h3>
+                    <h3 className="text-xl font-bold text-gray-800">Vérification IA</h3>
                     <p className="text-xs text-gray-400 mt-1">
-                        Compare le script genere au cours source et corrige automatiquement.
+                        Compare le script généré au cours source, concept par concept.
                     </p>
                 </div>
                 {score !== null && <ScoreBadge score={score} />}
             </div>
 
-            {/* Etat initial */}
-            {!feedback && !autoFixResult && !isLoading && (
-                <div className="text-center py-4 flex flex-col gap-3">
-                    <p className="text-gray-500 text-sm">Le script n'a pas encore ete analyse.</p>
-                    <div className="flex gap-3 justify-center flex-wrap">
-                        <button
-                            onClick={runAnalysis}
-                            className="px-5 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition text-sm"
-                        >
-                            Analyser le script
-                        </button>
-                        <button
-                            onClick={runAutoFix}
-                            className="px-5 py-2 bg-[#E63337] text-white rounded-lg font-semibold hover:bg-red-700 transition text-sm"
-                        >
-                            Corriger automatiquement jusqu'a 95%
-                        </button>
-                    </div>
+            {/* État initial — analyse non faite */}
+            {!analyseDone && !isLoading && (
+                <div className="text-center py-6 flex flex-col gap-3">
+                    <p className="text-gray-500 text-sm">Le script n'a pas encore été analysé.</p>
+                    <button
+                        onClick={runAnalysis}
+                        className="px-6 py-2.5 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition text-sm mx-auto"
+                    >
+                        Analyser le script
+                    </button>
+                    <p className="text-xs text-gray-400">L'analyse est nécessaire avant toute correction.</p>
                 </div>
             )}
 
@@ -134,13 +133,17 @@ export const AIVerificationPanel: React.FC<AIVerificationPanelProps> = ({
                 <div className="text-center py-8 flex flex-col items-center gap-3">
                     <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
                     <p className="text-blue-700 font-semibold">{progress || 'Traitement en cours...'}</p>
-                    <p className="text-gray-400 text-xs">Ne fermez pas cette fenetre.</p>
+                    <p className="text-gray-400 text-xs">Ne fermez pas cette fenêtre.</p>
                 </div>
             )}
 
-            {/* Résultat analyse simple */}
+            {/* Résultat analyse */}
             {feedback && !isLoading && (
                 <div className="flex flex-col gap-4">
+                    {feedback.suggestions?.[0] && (
+                        <p className="text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2 border">{feedback.suggestions[0]}</p>
+                    )}
+
                     <div className="bg-orange-50 rounded-lg p-4 border border-orange-100">
                         <h4 className="font-bold text-orange-800 mb-2">
                             Concepts manquants ({feedback.concepts_manquants?.length || 0})
@@ -154,23 +157,14 @@ export const AIVerificationPanel: React.FC<AIVerificationPanelProps> = ({
                         )}
                     </div>
 
-                    {feedback.informations_erronees?.length > 0 && (
-                        <div className="bg-red-50 rounded-lg p-4 border border-red-100">
-                            <h4 className="font-bold text-red-800 mb-2">
-                                Informations erronees ({feedback.informations_erronees.length})
-                            </h4>
-                            <ul className="list-disc list-inside text-sm text-red-900 space-y-1 max-h-40 overflow-y-auto">
-                                {feedback.informations_erronees.map((e, i) => <li key={i}>{e}</li>)}
-                            </ul>
-                        </div>
+                    {(feedback.concepts_manquants?.length ?? 0) > 0 && (
+                        <button
+                            onClick={runAutoFix}
+                            className="w-full py-3 bg-[#E63337] text-white rounded-xl font-bold text-base hover:bg-red-700 transition"
+                        >
+                            Corriger automatiquement jusqu'à 95% →
+                        </button>
                     )}
-
-                    <button
-                        onClick={runAutoFix}
-                        className="w-full py-3 bg-[#E63337] text-white rounded-xl font-bold text-base hover:bg-red-700 transition"
-                    >
-                        Corriger automatiquement jusqu'a 95% →
-                    </button>
 
                     <button onClick={runAnalysis} className="text-xs text-gray-400 hover:text-gray-600 underline self-center">
                         Relancer l'analyse
@@ -184,60 +178,36 @@ export const AIVerificationPanel: React.FC<AIVerificationPanelProps> = ({
                     <div className={`rounded-xl p-4 border text-center ${autoFixResult.targetReached ? 'bg-green-50 border-green-200' : 'bg-orange-50 border-orange-200'}`}>
                         <p className={`font-bold text-lg ${autoFixResult.targetReached ? 'text-green-800' : 'text-orange-800'}`}>
                             {autoFixResult.targetReached
-                                ? `Script valide — ${autoFixResult.finalScore}% de fidelite`
-                                : `Score final : ${autoFixResult.finalScore}% (${autoFixResult.iterations} passe(s))`}
+                                ? `Script validé — ${autoFixResult.finalScore}% de fidélité`
+                                : `Score final : ${autoFixResult.finalScore}% (${autoFixResult.passCount} passe(s))`}
                         </p>
                         <p className="text-sm text-gray-500 mt-1">
                             {autoFixResult.targetReached
                                 ? 'Le contenu du cours est correctement retranscrit.'
-                                : 'Correction partielle — voir les points restants ci-dessous.'}
+                                : 'Correction partielle — relancez une analyse pour voir les points restants.'}
                         </p>
                     </div>
 
-                    {/* Concepts encore manquants → à corriger manuellement */}
-                    {!autoFixResult.targetReached && autoFixResult.remainingConcepts?.length > 0 && (
-                        <div className="bg-orange-50 rounded-lg p-4 border border-orange-200">
-                            <p className="font-bold text-orange-800 mb-2 text-sm">
-                                À ajouter manuellement ({autoFixResult.remainingConcepts.length} concept{autoFixResult.remainingConcepts.length > 1 ? 's' : ''}) :
-                            </p>
-                            <ul className="list-disc list-inside text-sm text-orange-900 space-y-1 max-h-48 overflow-y-auto">
-                                {autoFixResult.remainingConcepts.map((c, i) => (
-                                    <li key={i}>{c}</li>
-                                ))}
-                            </ul>
-                        </div>
-                    )}
-
-                    {!autoFixResult.targetReached && autoFixResult.remainingFacts?.length > 0 && (
-                        <div className="bg-red-50 rounded-lg p-4 border border-red-200">
-                            <p className="font-bold text-red-800 mb-2 text-sm">
-                                Faits à vérifier ({autoFixResult.remainingFacts.length}) :
-                            </p>
-                            <ul className="list-disc list-inside text-sm text-red-900 space-y-1 max-h-32 overflow-y-auto">
-                                {autoFixResult.remainingFacts.map((f, i) => (
-                                    <li key={i}>{f}</li>
-                                ))}
-                            </ul>
-                        </div>
-                    )}
-
-                    <div className="text-xs text-gray-400 space-y-1">
-                        <p className="font-semibold text-gray-500">Detail des passes :</p>
-                        {autoFixResult.history.map(h => (
-                            <div key={h.iteration} className="flex justify-between">
-                                <span>Passe {h.iteration}</span>
-                                <span>{h.score}% — {h.missingCount >= 0 ? `${h.missingCount} concept(s)` : 'erreur'}</span>
+                    <div className="text-xs text-gray-400 space-y-1 bg-gray-50 rounded-lg p-3 border">
+                        <p className="font-semibold text-gray-500 mb-1">Détail des passes :</p>
+                        {autoFixResult.passHistory?.map(h => (
+                            <div key={h.pass} className="flex justify-between">
+                                <span>Passe {h.pass}</span>
+                                <span>{h.score}% — {h.missingCount} concept(s) manquant(s)</span>
                             </div>
                         ))}
                     </div>
 
-                    <button
-                        onClick={runAutoFix}
-                        disabled={isAutoFixing}
-                        className="text-xs text-gray-400 hover:text-gray-600 underline self-center disabled:opacity-50"
-                    >
-                        Relancer une correction
-                    </button>
+                    <div className="flex gap-2 justify-center flex-wrap">
+                        <button onClick={runAnalysis} className="text-xs text-blue-600 hover:text-blue-800 underline">
+                            Relancer une analyse
+                        </button>
+                        {!autoFixResult.targetReached && (
+                            <button onClick={runAutoFix} disabled={isAutoFixing} className="text-xs text-gray-400 hover:text-gray-600 underline disabled:opacity-50">
+                                Relancer la correction
+                            </button>
+                        )}
+                    </div>
                 </div>
             )}
 
