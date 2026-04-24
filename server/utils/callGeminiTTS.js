@@ -32,7 +32,10 @@ async function generateAudio(dialogues, outputPath) {
   if (!apiKey) throw new Error('GEMINI_API_KEY manquante');
 
   // Construire le script multi-locuteur
-  const speedInstruction = "Speak at a calm, measured educational pace. Take time on key concepts. Natural pauses between sentences.\n\n";
+  const speedInstruction = "Speak at a calm, measured educational pace. " +
+    "Inès is a professional French woman, warm and clear. " +
+    "Yannick is a young French man, enthusiastic and curious, with energy in his voice. " +
+    "Natural pauses between sentences.\n\n";
 
   const script = speedInstruction + dialogues
     .sort((a, b) => a.order_index - b.order_index)
@@ -61,7 +64,7 @@ async function generateAudio(dialogues, outputPath) {
             multiSpeakerVoiceConfig: {
               speakerVoiceConfigs: [
                 { speaker: 'Inès',    voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } } },
-                { speaker: 'Yannick', voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Sadaltager' } } }
+                { speaker: 'Yannick', voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Charon' } } }
               ]
             }
           }
