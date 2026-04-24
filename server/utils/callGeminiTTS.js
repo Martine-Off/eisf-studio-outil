@@ -32,7 +32,9 @@ async function generateAudio(dialogues, outputPath) {
   if (!apiKey) throw new Error('GEMINI_API_KEY manquante');
 
   // Construire le script multi-locuteur
-  const script = dialogues
+  const speedInstruction = "Speak at a calm, measured educational pace. Take time on key concepts. Natural pauses between sentences.\n\n";
+
+  const script = speedInstruction + dialogues
     .sort((a, b) => a.order_index - b.order_index)
     .map(d => {
       const speaker = d.character === 'ines' ? 'Inès' : 'Yannick';
