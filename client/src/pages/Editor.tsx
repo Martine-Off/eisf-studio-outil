@@ -192,7 +192,7 @@ function SortableDialogue({
                 <textarea
                     data-no-dnd="true"
                     onPointerDown={(e) => e.stopPropagation()}
-                    className="w-full bg-transparent border-none p-0 text-lg text-foreground leading-relaxed resize-none focus:ring-0 outline-none font-sans"
+                    className="w-full bg-transparent border-none p-0 text-[13px] font-normal text-foreground leading-relaxed resize-none focus:ring-0 outline-none font-sans"
                     value={editingField === 'studio' ? dialogue.text_studio : (dialogue.text_reading ?? dialogue.text_studio)}
                     onChange={(e) => onUpdate(dialogue.id, editingField, e.target.value)}
                     rows={Math.max(2, Math.ceil((editingField === 'studio' ? dialogue.text_studio : (dialogue.text_reading ?? dialogue.text_studio)).length / 80))}
@@ -241,6 +241,8 @@ export default function Editor() {
     const [generatedChapters, setGeneratedChapters] = useState<Set<number>>(new Set());
     const [generatedIdMap, setGeneratedIdMap] = useState<Record<number, number>>({});
     const [isGeneratingAll, setIsGeneratingAll] = useState(false);
+    const [selectedChapterIndex, setSelectedChapterIndex] = useState<number>(0);
+    const [chapterDurations, setChapterDurations] = useState<Record<number, number>>({});
 
     const sensors = useSensors(
         useSensor(PointerSensor),
@@ -504,7 +506,7 @@ export default function Editor() {
                 orderIndex: index,
                 previousChapter: editableChapters[index - 1] || null,
                 nextChapter: editableChapters[index + 1] || null,
-                targetDuration
+                targetDuration: chapterDurations[index] ?? 5
             });
             
             const newPodcastId = res.data.podcastId;
@@ -640,41 +642,37 @@ export default function Editor() {
     return (
         <AppLayout>
             <div className="max-w-5xl mx-auto pb-20">
-                <div className="mb-8 mt-4 flex items-center justify-center gap-4">
+                {/* Stepper EISF */}
+                <div className="flex items-center justify-center gap-2 mb-8 mt-2">
                     {[
-                        { id: 'preview', label: 'Aperçu' },
-                        { id: 'chapters', label: 'Chapitres' },
+                        { id: 'preview', label: 'Aperçu source' },
+                        { id: 'chapters', label: 'Structure du cours' },
                         { id: 'editor', label: 'Éditeur' },
-                        { id: 'audio', label: 'Audio' }
                     ].map((s, i) => {
                         const stepOrder = ['preview', 'chapters', 'editor', 'audio'];
                         const idxS = stepOrder.indexOf(s.id);
                         const idxCurrent = stepOrder.indexOf(step);
                         const isDone = idxS < idxCurrent;
                         const isCurrent = idxS === idxCurrent;
-                        
                         return (
-                            <div key={s.id} className="flex items-center">
+                            <div key={s.id} className="flex items-center gap-2">
                                 <button
-                                    onClick={() => isDone ? saveAndGoTo(s.id as Step) : null}
-                                    className={`flex items-center gap-2 px-4 py-2 rounded-full font-bold transition-all ${
-                                        isCurrent ? 'bg-primary text-primary-foreground shadow-sm' :
-                                        isDone ? 'bg-secondary text-foreground hover:bg-secondary/80 cursor-pointer' :
-                                        'bg-card text-muted-foreground opacity-50 cursor-not-allowed border border-border'
+                                    onClick={() => isDone ? saveAndGoTo(s.id as Step) : undefined}
+                                    disabled={!isDone && !isCurrent}
+                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
+                                        isCurrent
+                                            ? 'bg-[#D6475B] text-white shadow-sm'
+                                            : isDone
+                                            ? 'bg-white text-foreground border border-[#E0DCE0] hover:border-[#D6475B] cursor-pointer'
+                                            : 'bg-white text-muted-foreground border border-[#E0DCE0] opacity-50 cursor-not-allowed'
                                     }`}
                                 >
-                                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${
-                                        isCurrent ? 'bg-background/20 text-primary-foreground' :
-                                        isDone ? 'bg-background text-foreground' :
-                                        'bg-secondary text-muted-foreground'
-                                    }`}>
-                                        {i + 1}
-                                    </span>
+                                    <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                                        isCurrent ? 'bg-white/25 text-white' : isDone ? 'bg-[#BDD145]/20 text-[#5a6e00]' : 'bg-[#E6E2E6] text-muted-foreground'
+                                    }`}>{i + 1}</span>
                                     {s.label}
                                 </button>
-                                    {i < 3 && (
-                                        <div className={`w-6 h-[2px] mx-2 ${isDone ? 'bg-secondary' : 'bg-border/50'}`}></div>
-                                    )}
+                                {i < 2 && <div className={`w-8 h-px ${isDone ? 'bg-[#D6475B]/40' : 'bg-[#E0DCE0]'}`} />}
                             </div>
                         );
                     })}
@@ -804,7 +802,7 @@ export default function Editor() {
                                 <div className="flex justify-end">
                                     <button
                                         onClick={() => saveAndGoTo('chapters')}
-                                        className="flex items-center gap-2 eisf-gradient text-primary-foreground px-8 py-3 rounded-xl font-bold shadow-eisf hover:opacity-90 transition-all"
+                                        className="flex items-center gap-2 bg-[#D6475B] text-white hover:bg-[#c03d50] px-8 py-3 rounded-xl font-bold shadow-eisf hover:opacity-90 transition-all"
                                     >
                                         Voir le découpage des chapitres →
                                     </button>
@@ -830,110 +828,137 @@ export default function Editor() {
                 )}
 
                 {step === 'chapters' && previewData && !previewing && (
-                    <div className="space-y-6">
-                        <div className="bg-card border border-border rounded-2xl p-6">
-                            <h3 className="font-bold text-foreground mb-1">🗂️ Découpage proposé</h3>
-                            <p className="text-sm text-muted-foreground mb-4">
-                                L'application a détecté {editableChapters.length} chapitre(s) dans votre cours.
-                                Vous pouvez modifier les titres et générer chaque épisode un par un.
-                            </p>
-
-                            <div className="space-y-3">
+                    <div className="grid lg:grid-cols-[320px_1fr] gap-5">
+                        {/* Left — chapter list */}
+                        <div className="bg-white rounded-2xl border border-[#E0DCE0] shadow-sm overflow-hidden">
+                            <div className="px-5 py-4 border-b border-[#E0DCE0]">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <h3 className="font-bold text-sm text-foreground">Structure du cours</h3>
+                                        <p className="text-[11px] text-muted-foreground mt-0.5">{editableChapters.length} chapitre{editableChapters.length > 1 ? 's' : ''} détecté{editableChapters.length > 1 ? 's' : ''}</p>
+                                    </div>
+                                    <span className="text-[10px] font-bold tracking-widest uppercase bg-[#E6E2E6] text-muted-foreground px-2 py-1 rounded-full">
+                                        Étape 2 / 3
+                                    </span>
+                                </div>
+                            </div>
+                            <div className="p-3 space-y-1.5 max-h-[520px] overflow-y-auto">
                                 {editableChapters.map((chapter, i) => {
                                     const isGenerating = generatingChapters.has(i);
                                     const isGenerated = generatedChapters.has(i);
-                                    
-                                    const isFocused = focusChapterIndex === i;
+                                    const isSelected = selectedChapterIndex === i;
                                     return (
-                                        <div key={i}
-                                             ref={isFocused ? focusChapterRef : null}
-                                             onClick={() => {
-                                                 if (isGenerated) {
-                                                     const podcastId = generatedIdMap[i];
-                                                     if (podcastId) {
-                                                         navigate(`/project/${projectId}/podcast/${podcastId}/edit`);
-                                                     } else {
-                                                         navigate(`/project/${projectId}/podcasts`);
-                                                     }
-                                                 }
-                                             }}
-                                             className={`flex items-center gap-4 bg-secondary rounded-xl px-5 py-4 transition-all
-                                                ${isGenerated ? 'opacity-90 border border-green-500/30 cursor-pointer hover:bg-green-50/50 hover:border-green-500/50 group' : ''}
-                                                ${isFocused && !isGenerated ? 'ring-2 ring-primary ring-offset-2 border border-primary/30' : ''}`}>
-                                            <div className="flex-shrink-0 w-10 h-10 bg-background rounded-lg flex items-center justify-center text-xl shadow-sm">
-                                                {isGenerated ? '✅' : '📻'}
-                                            </div>
-                                            
-                                            <div className="flex-1">
-                                                <input 
-                                                    type="text"
-                                                    value={chapter.title}
-                                                    onChange={(e) => updateChapterTitle(i, e.target.value)}
-                                                    className="w-full bg-transparent border-none p-0 font-bold text-foreground text-sm focus:ring-0 outline-none"
-                                                    placeholder="Titre du podcast..."
-                                                />
-                                                <div className="flex items-center gap-3 mt-1">
-                                                    <span className="text-[10px] bg-background px-2 py-0.5 rounded text-muted-foreground font-bold uppercase tracking-wider">
-                                                        {chapter.wordCount} mots
-                                                    </span>
-                                                    <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded font-bold uppercase tracking-wider">
-                                                        ~{chapter.estimatedMinutes} min
-                                                    </span>
+                                        <div
+                                            key={i}
+                                            ref={focusChapterIndex === i ? focusChapterRef : null}
+                                            onClick={() => setSelectedChapterIndex(i)}
+                                            className={`flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-all border ${
+                                                isSelected
+                                                    ? 'bg-[#D6475B]/[0.06] border-[#D6475B]/30'
+                                                    : isGenerated
+                                                    ? 'bg-[#BDD145]/[0.06] border-[#BDD145]/20 hover:bg-[#BDD145]/[0.1]'
+                                                    : 'bg-[#F8F7F8] border-transparent hover:bg-[#F0EEF0]'
+                                            }`}
+                                        >
+                                            <GripVertical className="h-3.5 w-3.5 text-muted-foreground/40 flex-shrink-0" />
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-xs font-semibold text-foreground truncate">{chapter.title}</p>
+                                                <div className="flex items-center gap-2 mt-0.5">
+                                                    <span className="text-[10px] text-muted-foreground">{chapter.wordCount} mots</span>
+                                                    <span className="text-[10px] text-[#6BB8CD]">~{chapter.estimatedMinutes} min</span>
                                                 </div>
                                             </div>
-
-                                            <div className="flex-shrink-0">
-                                                <button
-                                                    onClick={() => handleGenerateSingle(i)}
-                                                    disabled={isGenerating || isGenerated}
-                                                    className={`flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-xs transition-all ${
-                                                        isGenerated 
-                                                            ? 'bg-green-500/10 text-green-600 border border-green-500/20' 
-                                                            : 'bg-primary text-primary-foreground shadow-sm hover:opacity-90 active:scale-95 disabled:opacity-50'
-                                                    }`}
-                                                >
-                                                    {isGenerating ? <Loader2 size={14} className="animate-spin" /> : isGenerated ? <CheckCircle size={14} /> : null}
-                                                    {isGenerating ? 'En cours...' : isGenerated ? 'Généré' : 'Générer celui-ci'}
-                                                </button>
-                                            </div>
+                                            {isGenerated && <CheckCircle className="h-3.5 w-3.5 text-[#BDD145] flex-shrink-0" />}
+                                            {isGenerating && <Loader2 className="h-3.5 w-3.5 text-[#D6475B] animate-spin flex-shrink-0" />}
                                         </div>
                                     );
                                 })}
                             </div>
                         </div>
 
-                        {/* Barre de progression pendant la génération globale */}
-                        {isGeneratingAll && (
-                            <div className="bg-card border border-primary/20 rounded-2xl p-6 shadow-sm animate-in fade-in slide-in-from-bottom-4 duration-500 mb-2">
-                                <div className="flex justify-between items-center mb-2">
-                                    <span className="text-sm font-bold text-primary flex items-center gap-2">
-                                        <Loader2 size={16} className="animate-spin" />
-                                        Génération des chapitres en cours...
-                                    </span>
-                                    <span className="text-sm font-black text-primary">
-                                        {generatedChapters.size} / {editableChapters.length}
-                                    </span>
-                                </div>
-                                <div className="w-full h-3 bg-secondary rounded-full overflow-hidden border border-border">
-                                    <div 
-                                        className="h-full eisf-gradient transition-all duration-500 ease-out shadow-[0_0_10px_rgba(52,101,174,0.3)]"
-                                        style={{ width: `${(generatedChapters.size / editableChapters.length) * 100}%` }}
-                                    ></div>
-                                </div>
-                                <p className="text-[10px] text-muted-foreground mt-2 uppercase font-bold tracking-widest text-center">
-                                    Estimation restante : {Math.ceil((editableChapters.length - generatedChapters.size) * 0.5)} minute(s)
-                                </p>
-                            </div>
-                        )}
+                        {/* Right — selected chapter detail */}
+                        {editableChapters[selectedChapterIndex] && (() => {
+                            const ch = editableChapters[selectedChapterIndex];
+                            const i = selectedChapterIndex;
+                            const isGenerating = generatingChapters.has(i);
+                            const isGenerated = generatedChapters.has(i);
+                            const dur = chapterDurations[i] ?? 5;
+                            return (
+                                <div className="bg-white rounded-2xl border border-[#E0DCE0] shadow-sm overflow-hidden flex flex-col">
+                                    <div className="px-6 py-4 border-b border-[#E0DCE0] flex items-start justify-between gap-4">
+                                        <div className="flex-1">
+                                            <input
+                                                type="text"
+                                                value={ch.title}
+                                                onChange={(e) => updateChapterTitle(i, e.target.value)}
+                                                className="w-full font-bold text-sm text-foreground bg-transparent border-none p-0 focus:ring-0 outline-none"
+                                                placeholder="Titre du chapitre…"
+                                            />
+                                            <p className="text-[11px] text-muted-foreground mt-0.5">
+                                                {ch.wordCount} mots · Lecture estimée : ~{ch.estimatedMinutes}:{String(Math.round((ch.estimatedMinutes % 1) * 60)).padStart(2, '0')} min
+                                            </p>
+                                        </div>
+                                        {/* Per-chapter duration selector */}
+                                        <div className="flex items-center gap-1 flex-shrink-0">
+                                            {[4, 5, 6, 7].map(d => (
+                                                <button
+                                                    key={d}
+                                                    onClick={() => setChapterDurations(prev => ({ ...prev, [i]: d }))}
+                                                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${
+                                                        dur === d
+                                                            ? 'bg-[#6BB8CD] text-white'
+                                                            : 'bg-[#F0EEF0] text-muted-foreground hover:bg-[#E6E2E6]'
+                                                    }`}
+                                                >
+                                                    {d} min
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
 
-                        <div className="flex items-center justify-start">
-                            <button
-                                onClick={() => saveAndGoTo('preview')}
-                                className="text-muted-foreground hover:text-foreground text-sm font-medium transition-colors"
-                            >
-                                ← Retour à l'aperçu
-                            </button>
-                        </div>
+                                    {/* Source extract */}
+                                    <div className="px-6 py-4 flex-1 overflow-hidden">
+                                        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">
+                                            Extrait du document source (.docx)
+                                        </p>
+                                        <div className="text-sm text-muted-foreground leading-relaxed max-h-72 overflow-y-auto pr-1">
+                                            {ch.lines.slice(0, 8).map((line, j) => (
+                                                <p key={j} className="mb-2">{line}</p>
+                                            ))}
+                                            {ch.lines.length > 8 && (
+                                                <p className="text-xs text-muted-foreground/60 italic">
+                                                    […] Suite du contenu analysé par l'IA pour la conversion en dialogue podcast.
+                                                </p>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Generate button */}
+                                    <div className="px-6 pb-5 pt-2">
+                                        <button
+                                            onClick={() => {
+                                                if (isGenerated) {
+                                                    const podcastId = generatedIdMap[i];
+                                                    if (podcastId) navigate(`/project/${projectId}/podcast/${podcastId}/edit`);
+                                                    else navigate(`/project/${projectId}/podcasts`);
+                                                } else {
+                                                    handleGenerateSingle(i);
+                                                }
+                                            }}
+                                            disabled={isGenerating}
+                                            className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                                                isGenerated
+                                                    ? 'bg-[#BDD145]/15 text-[#5a6e00] border border-[#BDD145]/30 hover:bg-[#BDD145]/25'
+                                                    : 'bg-[#D6475B] text-white hover:bg-[#c03d50] disabled:opacity-50'
+                                            }`}
+                                        >
+                                            {isGenerating && <Loader2 className="h-4 w-4 animate-spin" />}
+                                            {isGenerated ? 'Ouvrir dans l\'éditeur →' : isGenerating ? 'Génération en cours…' : 'Générer ce chapitre'}
+                                        </button>
+                                    </div>
+                                </div>
+                            );
+                        })()}
                     </div>
                 )}
 
@@ -1023,7 +1048,7 @@ export default function Editor() {
                                     <button
                                         onClick={handleGenerateAudio}
                                         disabled={generatingAudio || displayedDialogues.length === 0}
-                                        className="eisf-gradient text-primary-foreground font-bold px-10 py-4 rounded-xl shadow-eisf hover:opacity-90 active:scale-95 transition-all disabled:opacity-50 flex items-center gap-3 mx-auto"
+                                        className="bg-[#D6475B] text-white hover:bg-[#c03d50] font-bold px-10 py-4 rounded-xl shadow-eisf hover:opacity-90 active:scale-95 transition-all disabled:opacity-50 flex items-center gap-3 mx-auto"
                                     >
                                         {generatingAudio
                                             ? <><Loader2 size={20} className="animate-spin" /> Generation en cours ({displayedDialogues.length} repliques)...</>

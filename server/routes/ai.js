@@ -650,14 +650,9 @@ function slugify(str) {
 }
 
 function buildPodcastTitle(orderIndex, projectTitle, chapterTitle) {
-    const num = String((orderIndex || 0) + 1).padStart(2, '0');
-    const now = new Date();
-    const dd = String(now.getDate()).padStart(2, '0');
-    const mm = String(now.getMonth() + 1).padStart(2, '0');
-    const yy = String(now.getFullYear()).slice(-2);
-    const hh = String(now.getHours()).padStart(2, '0');
-    const min = String(now.getMinutes()).padStart(2, '0');
-    return `${num}_${slugify(projectTitle)}_${slugify(chapterTitle)}_${dd}${mm}${yy}${hh}${min}`;
+    const num = (orderIndex || 0) + 1;
+    const clean = (chapterTitle || '').replace(/^#+\s*/, '').trim();
+    return clean ? `Chapitre ${num} — ${clean}` : `Chapitre ${num}`;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

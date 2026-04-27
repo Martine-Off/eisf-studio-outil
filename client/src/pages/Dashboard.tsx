@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../utils/api';
 import { Link } from 'react-router-dom';
-import { Plus, Clock, Trash2, FileText, CheckCircle } from 'lucide-react';
+import { Plus, Clock, Trash2, FileText, BookOpen, Search, SlidersHorizontal, CalendarDays, CheckCircle, Loader2 } from 'lucide-react';
 import AppLayout from '../components/AppLayout';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -12,11 +12,54 @@ interface Project {
     created_at: string;
     updated_at: string;
     podcast_count: number;
+    total_duration_min?: number;
+    chapter_count?: number;
+}
+
+type StatusKey = 'verified' | 'published' | 'in_progress' | 'draft' | string;
+
+const STATUS_MAP: Record<string, { label: string; className: string }> = {
+    verified: {
+        label: 'Vérifié',
+        className: 'bg-[#BDD145]/20 text-[#5a6e00] border border-[#BDD145]/40',
+    },
+    published: {
+        label: 'Vérifié',
+        className: 'bg-[#BDD145]/20 text-[#5a6e00] border border-[#BDD145]/40',
+    },
+    in_progress: {
+        label: 'En cours',
+        className: 'bg-[#6BB8CD]/20 text-[#1a6a80] border border-[#6BB8CD]/40',
+    },
+    draft: {
+        label: 'Brouillon',
+        className: 'bg-white text-muted-foreground border border-[#D4D0D4]',
+    },
+};
+
+function getStatus(status: StatusKey) {
+    return STATUS_MAP[status] ?? STATUS_MAP['in_progress'];
+}
+
+function StatusBadge({ status }: { status: string }) {
+    const s = getStatus(status);
+    const isActive = status === 'in_progress';
+    return (
+        <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${s.className}`}>
+            {isActive ? (
+                <Loader2 className="h-2.5 w-2.5 animate-spin" />
+            ) : (
+                <span className={`h-1.5 w-1.5 rounded-full ${status === 'draft' ? 'bg-[#999]' : 'bg-current'}`} />
+            )}
+            {s.label}
+        </span>
+    );
 }
 
 export default function Dashboard() {
     const [projects, setProjects] = useState<Project[]>([]);
     const [loading, setLoading] = useState(true);
+    const [search, setSearch] = useState('');
     const [deleteCandidate, setDeleteCandidate] = useState<number | null>(null);
 
     useEffect(() => {
@@ -51,153 +94,172 @@ export default function Dashboard() {
         }
     };
 
+    const filtered = projects.filter(p =>
+        p.title.toLowerCase().includes(search.toLowerCase())
+    );
+
     return (
         <AppLayout>
-            {/* Header section with Stats */}
-            <div className="mb-10">
-                <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8">
-                    <div>
-                        <h1 className="text-4xl font-extrabold text-foreground tracking-tight font-display mb-2">
-                            Tableau de bord
-                        </h1>
-                        <p className="text-muted-foreground text-lg">
-                            Bienvenue dans votre espace de création Studio EISF.
-                        </p>
-                    </div>
-
-                    <Link
-                        to="/new-project"
-                        className="flex items-center gap-2 eisf-gradient text-primary-foreground px-6 py-3.5 rounded-xl font-bold shadow-eisf transition-all hover:opacity-90 active:scale-95"
-                    >
-                        <Plus size={20} />
-                        Nouveau Projet
-                    </Link>
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-6">
+                <div>
+                    <h1 className="text-2xl font-extrabold text-foreground mb-0.5">Mes Projets</h1>
+                    <p className="text-sm text-muted-foreground">
+                        Gérez vos contenus de formation et podcasts e-learning.
+                    </p>
                 </div>
-
-                {/* Stats Cards */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <StatCard icon={FileText} label="Total Projets" value={projects.length} color="blue" />
-                    <StatCard icon={CheckCircle} label="Terminés" value={projects.filter(p => p.status === 'published').length} color="green" />
-                    <StatCard icon={Clock} label="En cours" value={projects.filter(p => p.status === 'draft').length} color="amber" />
-                </div>
+                {!loading && (
+                    <span className="flex-shrink-0 flex items-center gap-1.5 text-xs font-semibold text-muted-foreground bg-white px-3 py-1.5 rounded-full border border-[#E0DCE0] self-start">
+                        <span className="h-1.5 w-1.5 rounded-full bg-[#D6475B]" />
+                        {projects.length} projet{projects.length > 1 ? 's' : ''} au total
+                    </span>
+                )}
             </div>
 
+            {/* Search & Filters */}
+            <div className="flex flex-col sm:flex-row gap-3 mb-6">
+                <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <input
+                        type="text"
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        placeholder="Rechercher un projet…"
+                        className="w-full bg-white border border-[#E0DCE0] rounded-lg pl-9 pr-4 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-[#D6475B]/30 focus:border-[#D6475B] transition-all"
+                    />
+                </div>
+                <button className="flex items-center gap-1.5 bg-white border border-[#E0DCE0] rounded-lg px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:border-[#D4D0D4] transition-colors">
+                    <SlidersHorizontal className="h-4 w-4" />
+                    Filtrer par statut
+                </button>
+                <button className="flex items-center gap-1.5 bg-white border border-[#E0DCE0] rounded-lg px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:border-[#D4D0D4] transition-colors">
+                    <CalendarDays className="h-4 w-4" />
+                    Trier par date
+                </button>
+            </div>
+
+            {/* Grid */}
             {loading ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {[1, 2, 3].map(i => (
-                        <div key={i} className="h-56 bg-card border border-border rounded-2xl shadow-sm animate-pulse"></div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    {[1, 2, 3, 4].map(i => (
+                        <div key={i} className="h-44 bg-white border border-[#E0DCE0] rounded-xl shadow-sm animate-pulse" />
                     ))}
                 </div>
-            ) : projects.length === 0 ? (
-                <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="bg-card rounded-3xl border-2 border-dashed border-border p-16 text-center flex flex-col items-center justify-center"
-                >
-                    <div className="w-20 h-20 bg-secondary rounded-full flex items-center justify-center mx-auto mb-6">
-                        <FileText size={40} className="text-primary opacity-50" />
-                    </div>
-                    <h3 className="text-2xl font-bold text-foreground mb-2">
-                        Aucun projet pour le moment
-                    </h3>
-                    <p className="text-muted-foreground mb-8 max-w-md mx-auto">
-                        Commencez par créer votre premier projet pour générer du contenu audio pédagogique.
-                    </p>
-                    <Link
-                        to="/new-project"
-                        className="inline-flex items-center gap-2 eisf-gradient text-primary-foreground px-8 py-3.5 rounded-xl font-bold shadow-lg transition-all hover:opacity-90"
-                    >
-                        <Plus size={18} />
-                        Créer maintenant
-                    </Link>
-                </motion.div>
             ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {projects.map((project, index) => (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    {filtered.map((project, index) => (
                         <motion.div
                             key={project.id}
-                            initial={{ opacity: 0, y: 20 }}
+                            initial={{ opacity: 0, y: 12 }}
                             animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: index * 0.05 }}
+                            transition={{ delay: index * 0.04 }}
                         >
                             <Link
                                 to={`/project/${project.id}/podcasts`}
-                                className="group block bg-card border border-border rounded-2xl p-6 shadow-sm hover:shadow-eisf-hover transition-all duration-300 h-full flex flex-col relative overflow-hidden"
+                                className="group relative flex flex-col bg-white border border-[#E0DCE0] rounded-xl p-5 shadow-sm hover:shadow-[0_4px_20px_0_rgb(0,0,0,0.09)] hover:border-[#D6475B]/30 transition-all duration-200 h-full"
                             >
-                                <div className="flex justify-between items-start mb-4">
-                                    <div className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${project.status === 'published'
-                                        ? 'bg-green-100 text-green-700 border border-green-200'
-                                        : 'bg-secondary text-primary border border-border'
-                                        }`}>
-                                        {project.status === 'published' ? 'Généré' : 'Brouillon'}
-                                    </div>
-
-                                    <button
-                                        onClick={(e) => handleDeleteClick(e, project.id)}
-                                        className="p-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg transition-colors"
-                                        title="Supprimer"
-                                    >
-                                        <Trash2 size={16} />
-                                    </button>
-                                </div>
-
-                                <div className="flex-1 mb-6">
-                                    <h3 className="text-xl font-bold text-foreground mb-2 line-clamp-2 group-hover:text-primary transition-colors font-display">
+                                {/* Title + Date */}
+                                <div className="flex-1 mb-4">
+                                    <h3 className="font-bold text-sm text-foreground line-clamp-2 mb-1.5 group-hover:text-[#D6475B] transition-colors leading-snug">
                                         {project.title}
                                     </h3>
-                                    <p className="text-sm text-muted-foreground line-clamp-2">
-                                        Dernière modification le {new Date(project.updated_at).toLocaleDateString()}
-                                    </p>
+                                    <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                                        <CalendarDays className="h-3 w-3" />
+                                        {new Date(project.created_at).toLocaleDateString('fr-FR', {
+                                            day: '2-digit', month: '2-digit', year: 'numeric'
+                                        })}
+                                    </div>
                                 </div>
 
-                                <div className="pt-4 border-t border-border flex items-center justify-between text-xs font-semibold text-muted-foreground">
-                                    <div className="flex items-center gap-2">
-                                        <Clock size={14} />
-                                        <span>{project.podcast_count > 0 ? `${project.podcast_count} podcast${project.podcast_count > 1 ? 's' : ''}` : 'Aucun podcast'}</span>
-                                    </div>
-                                    <div className="flex items-center gap-2 text-primary group-hover:translate-x-1 transition-transform">
-                                        <span>Ouvrir</span>
-                                        <Plus size={14} />
-                                    </div>
+                                {/* Status badge */}
+                                <div className="mb-4">
+                                    <StatusBadge status={project.status} />
                                 </div>
+
+                                {/* Footer stats */}
+                                <div className="flex items-center justify-between text-[11px] text-muted-foreground border-t border-[#F0EEF0] pt-3">
+                                    <span className="flex items-center gap-1">
+                                        <BookOpen className="h-3 w-3" />
+                                        {project.chapter_count ?? project.podcast_count ?? 0} chapitre{(project.chapter_count ?? project.podcast_count ?? 0) > 1 ? 's' : ''}
+                                    </span>
+                                    <span className="flex items-center gap-1">
+                                        <Clock className="h-3 w-3" />
+                                        {project.total_duration_min
+                                            ? `${project.total_duration_min} min`
+                                            : '—'}
+                                    </span>
+                                </div>
+
+                                {/* Delete button */}
+                                <button
+                                    onClick={(e) => handleDeleteClick(e, project.id)}
+                                    className="absolute top-3 right-3 p-1.5 rounded-lg text-muted-foreground hover:text-[#D6475B] hover:bg-[#D6475B]/10 opacity-0 group-hover:opacity-100 transition-all"
+                                    title="Supprimer"
+                                >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                </button>
                             </Link>
                         </motion.div>
                     ))}
+
+                    {/* New project card */}
+                    <motion.div
+                        initial={{ opacity: 0, y: 12 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: filtered.length * 0.04 }}
+                    >
+                        <Link
+                            to="/new-project"
+                            className="flex flex-col items-center justify-center border-2 border-dashed border-[#D4D0D4] rounded-xl p-5 text-center hover:border-[#D6475B] hover:bg-[#D6475B]/[0.02] transition-all duration-200 h-full min-h-[160px] group"
+                        >
+                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#F0EEF0] group-hover:bg-[#D6475B]/10 mb-3 transition-colors">
+                                <Plus className="h-5 w-5 text-muted-foreground group-hover:text-[#D6475B] transition-colors" />
+                            </div>
+                            <p className="text-sm font-semibold text-muted-foreground group-hover:text-[#D6475B] transition-colors">
+                                Créer un nouveau projet
+                            </p>
+                            <p className="text-xs text-muted-foreground/70 mt-1">
+                                Importez votre fichier .docx
+                            </p>
+                        </Link>
+                    </motion.div>
                 </div>
             )}
 
-            {/* Delete Confirmation Modal */}
+            {/* Delete Modal */}
             <AnimatePresence>
                 {deleteCandidate !== null && (
                     <motion.div
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+                        className="fixed inset-0 bg-black/45 z-50 flex items-center justify-center p-4"
+                        onClick={() => setDeleteCandidate(null)}
                     >
                         <motion.div
                             initial={{ scale: 0.95, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}
                             exit={{ scale: 0.95, opacity: 0 }}
-                            className="bg-card border border-border shadow-2xl rounded-2xl max-w-md w-full p-6 text-center"
+                            onClick={(e) => e.stopPropagation()}
+                            className="bg-white border border-[#E0DCE0] shadow-2xl rounded-2xl max-w-sm w-full p-6 text-center"
                         >
-                            <div className="w-16 h-16 bg-destructive/10 text-destructive rounded-full flex items-center justify-center mx-auto mb-4">
-                                <Trash2 size={32} />
+                            <div className="w-12 h-12 bg-[#D6475B]/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <Trash2 className="h-6 w-6 text-[#D6475B]" />
                             </div>
-                            <h3 className="text-xl font-bold mb-2">Supprimer ce projet ?</h3>
-                            <p className="text-muted-foreground mb-6">
-                                Cette action est irréversible.
+                            <h3 className="text-lg font-bold mb-1">Supprimer ce projet ?</h3>
+                            <p className="text-sm text-muted-foreground mb-6">
+                                Cette action est irréversible. Tous les podcasts associés seront supprimés.
                             </p>
-                            <div className="flex items-center gap-3 w-full">
+                            <div className="flex gap-3">
                                 <button
                                     onClick={() => setDeleteCandidate(null)}
-                                    className="flex-1 bg-secondary text-foreground font-bold py-3 rounded-xl hover:bg-secondary/80 transition-colors"
+                                    className="flex-1 bg-[#F0EEF0] text-foreground font-semibold py-2.5 rounded-lg hover:bg-[#E6E2E6] transition-colors text-sm"
                                 >
                                     Annuler
                                 </button>
                                 <button
                                     onClick={confirmDelete}
-                                    className="flex-1 bg-destructive text-destructive-foreground font-bold py-3 rounded-xl hover:bg-destructive/90 transition-colors"
+                                    className="flex-1 bg-[#D6475B] text-white font-semibold py-2.5 rounded-lg hover:bg-[#c03d50] transition-colors text-sm"
                                 >
                                     Confirmer
                                 </button>
@@ -209,21 +271,3 @@ export default function Dashboard() {
         </AppLayout>
     );
 }
-
-function StatCard({ icon: Icon, label, value, color }: { icon: any, label: string, value: number, color: string }) {
-    return (
-        <div className="bg-card border border-border rounded-2xl p-5 flex items-center gap-4 shadow-sm">
-            <div className={`h-12 w-12 rounded-xl flex items-center justify-center ${color === 'blue' ? 'bg-primary/10 text-primary' :
-                color === 'green' ? 'bg-green-100 text-green-600' :
-                    'bg-amber-100 text-amber-600'
-                }`}>
-                <Icon size={24} />
-            </div>
-            <div>
-                <p className="text-sm font-medium text-muted-foreground">{label}</p>
-                <p className="text-2xl font-bold text-foreground">{value}</p>
-            </div>
-        </div>
-    );
-}
-

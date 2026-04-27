@@ -27,12 +27,20 @@ function pcmToWav(pcmBuffer, sampleRate = 24000) {
   return Buffer.concat([header, pcmBuffer]);
 }
 
-async function generateAudio(dialogues, outputPath) {
+const ALLOWED_VOICES = new Set(['Kore', 'Charon', 'Fenrir', 'Orus', 'Sadaltager', 'Aoede', 'Puck', 'Zephyr']);
+
+async function generateAudio(dialogues, outputPath, options = {}) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error('GEMINI_API_KEY manquante');
 
-  // Construire le script multi-locuteur
-  const speedInstruction = "Speak at a calm, measured educational pace. Take time on key concepts. Natural pauses between sentences.\n\n";
+  const voiceInes    = ALLOWED_VOICES.has(options.voiceInes)    ? options.voiceInes    : 'Kore';
+  const voiceYannick = ALLOWED_VOICES.has(options.voiceYannick) ? options.voiceYannick : 'Charon';
+  const speed        = options.speed;
+
+  const speedInstruction =
+    speed === 0.9 ? "Speak slowly and clearly. Take extra time on key concepts. Long natural pauses between sentences.\n\n" :
+    speed === 1.1 ? "Speak at a lively, confident educational pace. Keep energy high. Brief natural pauses.\n\n" :
+                    "Speak at a calm, measured educational pace. Take time on key concepts. Natural pauses between sentences.\n\n";
 
   const script = speedInstruction + dialogues
     .sort((a, b) => a.order_index - b.order_index)
@@ -60,8 +68,8 @@ async function generateAudio(dialogues, outputPath) {
           speechConfig: {
             multiSpeakerVoiceConfig: {
               speakerVoiceConfigs: [
-                { speaker: 'Inès',    voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } } },
-                { speaker: 'Yannick', voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Sadaltager' } } }
+                { speaker: 'Inès',    voiceConfig: { prebuiltVoiceConfig: { voiceName: voiceInes    } } },
+                { speaker: 'Yannick', voiceConfig: { prebuiltVoiceConfig: { voiceName: voiceYannick } } }
               ]
             }
           }
