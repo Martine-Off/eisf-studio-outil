@@ -234,7 +234,7 @@ router.post('/:id/verify', authMiddleware, async (req, res) => {
     }
 });
 
-// Génération audio TTS — en attente de configuration n8n
+// Génération audio TTS
 router.post('/:id/generate-audio', authMiddleware, async (req, res) => {
     try {
         const podcastId = req.params.id;

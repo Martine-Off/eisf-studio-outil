@@ -1,6 +1,5 @@
-// Appel centralisé vers Make (ex-n8n) — génération dialogue
-// Le prompt est dans Make ; Express envoie uniquement les données brutes.
-// MAKE_WEBHOOK_URL absent → mock (génération désactivée, acceptable en dev)
+// Appel centralisé vers Make — toute la génération et vérification IA
+// MAKE_WEBHOOK_URL absent → retourne null (fonctionnalités IA désactivées)
 async function callWebhook(payload) {
   const url = process.env.MAKE_WEBHOOK_URL;
   if (!url) {

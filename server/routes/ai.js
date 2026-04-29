@@ -3,7 +3,6 @@ const pool = require('../models/db');
 const authMiddleware = require('../middleware/auth');
 const mammoth = require('mammoth');
 const { callWebhook } = require('../utils/callWebhook');
-const callGPT = require('../utils/callGPT');
 
 const INTRO_TEXT = "<break time=\"2s\" /> Bonjour et bienvenue dans ce podcast de formation EISF — votre capsule audio pour comprendre, apprendre et progresser à votre rythme. Cet épisode, généré par intelligence artificielle à partir de contenus rédigés et validés par nos formateurs, vous accompagne dans vos apprentissages théoriques.";
 const OUTRO_TEXT = "Ce podcast est une création EISF. Il a été généré par intelligence artificielle à partir de contenus pédagogiques rédigés et validés par nos formateurs. Toute reproduction ou diffusion est interdite sans autorisation. <break time=\"2s\" />";
@@ -57,12 +56,11 @@ function extractSourceSectionLocal(cleanedText, orderIndex) {
 
 async function verifyScriptAgainstSource(segmentContent, scriptText) {
   // ─── Appel 1 : extraction des concepts du source ──────────────────────────
-  const conceptsText = await callGPT(
-    `Tu es un extracteur de concepts pédagogiques.
-Liste UNIQUEMENT les concepts, faits, chiffres présents dans ce texte.
-Format : une ligne par concept, commençant par "- ". Sois atomique et exhaustif.`,
-    `Extrais TOUS les concepts de ce contenu source :\n\n${segmentContent}`
-  );
+  const conceptsText = await callWebhook({
+    type: 'verify-extract-concepts',
+    prompt: `Tu es un extracteur de concepts pédagogiques.\nListe UNIQUEMENT les concepts, faits, chiffres présents dans ce texte.\nFormat : une ligne par concept, commençant par "- ". Sois atomique et exhaustif.\n\nExtrais TOUS les concepts de ce contenu source :\n\n${segmentContent}`
+  });
+  if (!conceptsText) throw new Error('Extraction des concepts impossible (Make n\'a pas répondu)');
 
   const concepts = conceptsText
     .split('\n')
@@ -73,12 +71,11 @@ Format : une ligne par concept, commençant par "- ". Sois atomique et exhaustif
   if (concepts.length === 0) throw new Error('Aucun concept extrait du source');
 
   // ─── Appel 2 : vérification binaire présent/absent dans le script ─────────
-  const verificationText = await callGPT(
-    `Pour chaque concept, réponds UNIQUEMENT "present" ou "absent"
-selon qu'il est couvert (même reformulé) dans le script.
-Format strict par ligne : concept | present   ou   concept | absent`,
-    `CONCEPTS:\n${concepts.map(c => `- ${c}`).join('\n')}\n\nSCRIPT:\n${scriptText}`
-  );
+  const verificationText = await callWebhook({
+    type: 'verify-check-concepts',
+    prompt: `Pour chaque concept, réponds UNIQUEMENT "present" ou "absent" selon qu'il est couvert (même reformulé) dans le script.\nFormat strict par ligne : concept | present   ou   concept | absent\n\nCONCEPTS:\n${concepts.map(c => `- ${c}`).join('\n')}\n\nSCRIPT:\n${scriptText}`
+  });
+  if (!verificationText) throw new Error('Vérification des concepts impossible (Make n\'a pas répondu)');
 
   // ─── Score calculé mathématiquement par l'app (présents / total × 100) ────
   const lines = verificationText.split('\n').filter(l => l.includes('|'));
@@ -950,17 +947,13 @@ router.post('/fix-missing-concepts', authMiddleware, async (req, res) => {
             return res.json({ updatedDialogues: [] });
         }
 
-        const correctedScript = await callGPT(
-            `Tu reçois un script de podcast et une liste de concepts absents.
-Injecte chaque concept naturellement dans une réplique existante.
-Ne change pas le ton. Ne crée pas de nouvelles répliques.
-Retourne le script complet modifié en JSON avec la même structure (tableau de dialogues avec id, character, text_studio, text_reading, section).
-Réponds UNIQUEMENT en JSON valide, sans markdown.`,
-            `CONCEPTS MANQUANTS:\n${missingConcepts.map((c, i) => `${i + 1}. ${c}`).join('\n')}\n\nSCRIPT:\n${dialogueText}`
-        );
+        const correctedScript = await callWebhook({
+            type: 'fix-missing-concepts',
+            prompt: `Tu reçois un script de podcast et une liste de concepts absents.\nInjecte chaque concept naturellement dans une réplique existante.\nNe change pas le ton. Ne crée pas de nouvelles répliques.\nRetourne le script complet modifié en JSON avec la même structure (tableau de dialogues avec id, character, text_studio, text_reading, section).\nRéponds UNIQUEMENT en JSON valide, sans markdown.\n\nCONCEPTS MANQUANTS:\n${missingConcepts.map((c, i) => `${i + 1}. ${c}`).join('\n')}\n\nSCRIPT:\n${dialogueText}`
+        });
 
-        if (correctedScript.startsWith('[MOCK]')) {
-            return res.json({ updatedDialogues: [] });
+        if (!correctedScript) {
+            return res.status(502).json({ error: 'Make n\'a pas répondu pour la correction des concepts' });
         }
 
         const resultJson = parseJSON(correctedScript.replace(/```json|```/g, '').trim());
@@ -1049,17 +1042,12 @@ router.post("/auto-verify-and-fix", async (req, res) => {
       if (lastScore >= targetScore) break;
       if (verif.missingConcepts.length === 0) break;
 
-      // ─── APPEL DE CORRECTION (n8n → GPT) ────────────────────────────────
-      const fixText = await callGPT(
-        `Tu es un correcteur de script de podcast pédagogique.
-On te donne un script existant (JSON) et une liste de concepts manquants tirés du contenu source.
-RÈGLES STRICTES :
-- Intégrer les concepts manquants naturellement dans le dialogue entre Inès et Yannick
-- Ne jamais supprimer ni modifier les répliques existantes — seulement en ajouter ou les enrichir
-- Respecter le style oral (tics de langage, balises <break>, hésitations)
-- Réponds UNIQUEMENT avec le tableau JSON complet des dialogues corrigés, sans markdown`,
-        `CONCEPTS MANQUANTS À INTÉGRER :\n${verif.missingConcepts.map((c, i) => `${i + 1}. ${c}`).join("\n")}\n\nSOURCE :\n${segmentContent}\n\nSCRIPT ACTUEL (JSON) :\n${JSON.stringify(currentDialogues, null, 2)}`
-      );
+      // ─── APPEL DE CORRECTION (Make) ──────────────────────────────────────
+      const fixText = await callWebhook({
+        type: 'fix-script',
+        prompt: `Tu es un correcteur de script de podcast pédagogique.\nOn te donne un script existant (JSON) et une liste de concepts manquants tirés du contenu source.\nRÈGLES STRICTES :\n- Intégrer les concepts manquants naturellement dans le dialogue entre Inès et Yannick\n- Ne jamais supprimer ni modifier les répliques existantes — seulement en ajouter ou les enrichir\n- Respecter le style oral (tics de langage, balises <break>, hésitations)\n- Réponds UNIQUEMENT avec le tableau JSON complet des dialogues corrigés, sans markdown\n\nCONCEPTS MANQUANTS À INTÉGRER :\n${verif.missingConcepts.map((c, i) => `${i + 1}. ${c}`).join("\n")}\n\nSOURCE :\n${segmentContent}\n\nSCRIPT ACTUEL (JSON) :\n${JSON.stringify(currentDialogues, null, 2)}`
+      });
+      if (!fixText) break;
 
       try {
         const clean = fixText.replace(/```json|```/g, "").trim();
