@@ -3,7 +3,7 @@ const pool = require('../models/db');
 const authMiddleware = require('../middleware/auth');
 const mammoth = require('mammoth');
 const { callWebhook } = require('../utils/callWebhook');
-const { callMistral } = require('../utils/callMistral');
+const callGPT = require('../utils/callGPT');
 
 const INTRO_TEXT = "<break time=\"2s\" /> Bonjour et bienvenue dans ce podcast de formation EISF — votre capsule audio pour comprendre, apprendre et progresser à votre rythme. Cet épisode, généré par intelligence artificielle à partir de contenus rédigés et validés par nos formateurs, vous accompagne dans vos apprentissages théoriques.";
 const OUTRO_TEXT = "Ce podcast est une création EISF. Il a été généré par intelligence artificielle à partir de contenus pédagogiques rédigés et validés par nos formateurs. Toute reproduction ou diffusion est interdite sans autorisation. <break time=\"2s\" />";
@@ -56,34 +56,31 @@ function extractSourceSectionLocal(cleanedText, orderIndex) {
 }
 
 async function verifyScriptAgainstSource(segmentContent, scriptText) {
-  // ─── APPEL 1 : Extraction des concepts (Mistral, format liste texte) ──────
-  const conceptsText = await callMistral(
+  // ─── Appel 1 : extraction des concepts du source ──────────────────────────
+  const conceptsText = await callGPT(
     `Tu es un extracteur de concepts pédagogiques.
 Liste UNIQUEMENT les concepts, faits, chiffres présents dans ce texte.
 Format : une ligne par concept, commençant par "- ". Sois atomique et exhaustif.`,
     `Extrais TOUS les concepts de ce contenu source :\n\n${segmentContent}`
   );
 
-  if (conceptsText.startsWith('[MOCK]')) {
-    return { fidelityScore: 0, totalConcepts: 0, validatedConcepts: 0, missingConcepts: [], allResults: [] };
-  }
+  const concepts = conceptsText
+    .split('\n')
+    .filter(l => l.startsWith('- '))
+    .map(l => l.slice(2).trim())
+    .filter(Boolean);
 
-  const concepts = conceptsText.split('\n').filter(l => l.startsWith('- ')).map(l => l.slice(2).trim()).filter(Boolean);
-  if (concepts.length === 0) throw new Error("Aucun concept extrait du source");
+  if (concepts.length === 0) throw new Error('Aucun concept extrait du source');
 
-  // ─── APPEL 2 : Vérification binaire (Mistral, format "concept | present/absent") ──
-  const verificationText = await callMistral(
+  // ─── Appel 2 : vérification binaire présent/absent dans le script ─────────
+  const verificationText = await callGPT(
     `Pour chaque concept, réponds UNIQUEMENT "present" ou "absent"
 selon qu'il est couvert (même reformulé) dans le script.
-Format strict : concept | present   ou   concept | absent`,
+Format strict par ligne : concept | present   ou   concept | absent`,
     `CONCEPTS:\n${concepts.map(c => `- ${c}`).join('\n')}\n\nSCRIPT:\n${scriptText}`
   );
 
-  if (verificationText.startsWith('[MOCK]')) {
-    return { fidelityScore: 0, totalConcepts: concepts.length, validatedConcepts: 0, missingConcepts: concepts, allResults: [] };
-  }
-
-  // ─── CALCUL MATHÉMATIQUE DU SCORE (pas par le LLM) ───────────────────────
+  // ─── Score calculé mathématiquement par l'app (présents / total × 100) ────
   const lines = verificationText.split('\n').filter(l => l.includes('|'));
   const total = lines.length;
   const validated = lines.filter(l => l.toLowerCase().includes('present')).length;
@@ -953,11 +950,12 @@ router.post('/fix-missing-concepts', authMiddleware, async (req, res) => {
             return res.json({ updatedDialogues: [] });
         }
 
-        const correctedScript = await callMistral(
+        const correctedScript = await callGPT(
             `Tu reçois un script de podcast et une liste de concepts absents.
 Injecte chaque concept naturellement dans une réplique existante.
 Ne change pas le ton. Ne crée pas de nouvelles répliques.
-Retourne le script complet modifié en JSON avec la même structure (tableau de dialogues avec id, character, text_studio, text_reading, section).`,
+Retourne le script complet modifié en JSON avec la même structure (tableau de dialogues avec id, character, text_studio, text_reading, section).
+Réponds UNIQUEMENT en JSON valide, sans markdown.`,
             `CONCEPTS MANQUANTS:\n${missingConcepts.map((c, i) => `${i + 1}. ${c}`).join('\n')}\n\nSCRIPT:\n${dialogueText}`
         );
 
@@ -1051,8 +1049,8 @@ router.post("/auto-verify-and-fix", async (req, res) => {
       if (lastScore >= targetScore) break;
       if (verif.missingConcepts.length === 0) break;
 
-      // ─── APPEL DE CORRECTION (Mistral) ──────────────────────────────────
-      const fixText = await callMistral(
+      // ─── APPEL DE CORRECTION (n8n → GPT) ────────────────────────────────
+      const fixText = await callGPT(
         `Tu es un correcteur de script de podcast pédagogique.
 On te donne un script existant (JSON) et une liste de concepts manquants tirés du contenu source.
 RÈGLES STRICTES :

@@ -56,12 +56,21 @@ export default function ProjectPodcasts() {
         <AppLayout>
             <div className="max-w-5xl mx-auto pb-20 mt-6">
 
+                {/* ── Retour chapitres ── */}
+                <button
+                    onClick={() => navigate(`/editor/${projectId}`, { state: { step: 2 } })}
+                    className="flex items-center gap-1 text-xs font-semibold text-muted-foreground hover:text-[#D6475B] transition-colors mb-3 group"
+                >
+                    <ChevronLeft size={14} className="group-hover:-translate-x-0.5 transition-transform" />
+                    Chapitres
+                </button>
+
                 {/* ── Stepper ── */}
                 <div className="flex items-center justify-center gap-2 mb-6 mt-1">
                     {[
-                        { label: 'Aperçu source', href: `/editor/${projectId}` },
-                        { label: 'Structure du cours', href: `/editor/${projectId}` },
-                        { label: 'Éditeur', href: null },
+                        { label: 'Aperçu source', href: `/editor/${projectId}`, navState: undefined },
+                        { label: 'Structure du cours', href: `/editor/${projectId}`, navState: { step: 2 } },
+                        { label: 'Éditeur', href: null, navState: undefined },
                     ].map((s, i) => {
                         const isCurrent = i === 2;
                         const isDone = i < 2;
@@ -70,6 +79,7 @@ export default function ProjectPodcasts() {
                                 {isDone ? (
                                     <Link
                                         to={s.href!}
+                                        state={s.navState}
                                         className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-white text-foreground border border-[#E0DCE0] hover:border-[#D6475B] transition-colors"
                                     >
                                         <span className="w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold bg-[#BDD145]/20 text-[#5a6e00]">{i + 1}</span>
@@ -90,7 +100,7 @@ export default function ProjectPodcasts() {
                 {/* Header */}
                 <div className="flex items-center gap-3 mb-6 mt-2">
                     <button
-                        onClick={() => navigate(`/editor/${projectId}`)}
+                        onClick={() => navigate(`/editor/${projectId}`, { state: { step: 2 } })}
                         className="p-2 bg-card border border-border rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-all shadow-sm"
                     >
                         <ChevronLeft size={16} />

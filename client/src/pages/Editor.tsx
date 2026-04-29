@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
-import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useParams, useNavigate, useSearchParams, useLocation, Link } from 'react-router-dom';
 import {
     DndContext,
     closestCenter,
@@ -207,6 +207,7 @@ function SortableDialogue({
 export default function Editor() {
     const { projectId } = useParams();
     const navigate = useNavigate();
+    const location = useLocation();
     const [searchParams] = useSearchParams();
     const focusChapterIndex = searchParams.get('chapter') !== null ? Number(searchParams.get('chapter')) : null;
     const focusChapterRef = useRef<HTMLDivElement | null>(null);
@@ -258,13 +259,6 @@ export default function Editor() {
         if (projectId) loadData();
     }, [projectId]);
 
-    // Auto-lancer le preview quand on arrive sur 'preview' ou 'chapters' sans données
-    useEffect(() => {
-        if ((step === 'preview' || step === 'chapters') && !previewData && !previewing && projectId) {
-            handlePreview();
-        }
-    }, [step]);
-
     // Synchroniser les chapitres éditables quand les données de preview arrivent
     useEffect(() => {
         if (previewData?.chapters) {
@@ -299,7 +293,11 @@ export default function Editor() {
         onSave: () => handleSaveAction(dialogues),
     });
 
-    const handlePreview = async () => {
+    const previewInFlightRef = useRef(false);
+
+    const handlePreview = useCallback(async () => {
+        if (previewInFlightRef.current) return;
+        previewInFlightRef.current = true;
         setPreviewing(true);
         try {
             const res = await api.post('/ai/preview', { projectId: Number(projectId) });
@@ -308,8 +306,9 @@ export default function Editor() {
             console.error('Erreur prévisualisation:', error);
         } finally {
             setPreviewing(false);
+            previewInFlightRef.current = false;
         }
-    };
+    }, [projectId]);
 
     const loadData = async () => {
         try {
@@ -353,7 +352,15 @@ export default function Editor() {
             }
 
             setDialogues(allDialogues);
-            setStep(focusChapterIndex !== null ? 'preview' : (allDialogues.length > 0 ? 'editor' : 'preview'));
+            const initialStep: Step = location.state?.step === 2
+                ? 'chapters'
+                : focusChapterIndex !== null ? 'preview'
+                : allDialogues.length > 0 ? 'editor'
+                : 'preview';
+            setStep(initialStep);
+            if (initialStep === 'preview' || initialStep === 'chapters') {
+                handlePreview();
+            }
         } catch (error) {
             console.error('Erreur chargement projet:', error);
         } finally {
@@ -405,6 +412,9 @@ export default function Editor() {
             await handleSaveAction(dialogues);
         }
         setStep(newStep);
+        if ((newStep === 'preview' || newStep === 'chapters') && !previewData) {
+            handlePreview();
+        }
     };
 
     const displayedDialogues = useMemo(() => {
@@ -922,10 +932,10 @@ export default function Editor() {
                                             Extrait du document source (.docx)
                                         </p>
                                         <div className="text-sm text-muted-foreground leading-relaxed max-h-72 overflow-y-auto pr-1">
-                                            {ch.lines.slice(0, 8).map((line, j) => (
+                                            {(ch.lines ?? []).slice(0, 8).map((line, j) => (
                                                 <p key={j} className="mb-2">{line}</p>
                                             ))}
-                                            {ch.lines.length > 8 && (
+                                            {(ch.lines ?? []).length > 8 && (
                                                 <p className="text-xs text-muted-foreground/60 italic">
                                                     […] Suite du contenu analysé par l'IA pour la conversion en dialogue podcast.
                                                 </p>

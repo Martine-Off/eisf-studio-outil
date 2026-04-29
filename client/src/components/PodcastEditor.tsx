@@ -9,7 +9,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import {
     Loader2, CheckCircle, ChevronLeft, ChevronRight, GripVertical, Pencil,
-    X, FileDown, Plus, ShieldCheck, AlertTriangle, RotateCcw, Clock, FileText, Users
+    X, FileDown, Plus, ShieldCheck, AlertTriangle, RotateCcw, Clock, FileText, Users, Trash2
 } from 'lucide-react';
 import api from '../utils/api';
 import { useKeyboardNav } from '../hooks/useKeyboardNav';
@@ -98,16 +98,23 @@ function ScoreGauge({ score }: { score: number | null }) {
 // ─── Dialogue card ────────────────────────────────────────────────────────────
 
 function SortableDialogue({
-    dialogue, onUpdate, onAccept, onReject, activePropositionMatch, elementRef
+    dialogue, onUpdate, onAccept, onReject, onDelete, activePropositionMatch, elementRef
 }: {
     dialogue: Dialogue;
     onUpdate: (id: number, field: 'studio', text: string) => void;
     onAccept: (id: number, fullMatch: string) => void;
     onReject: (id: number, fullMatch: string) => void;
+    onDelete: (id: number) => void;
     activePropositionMatch: string | null;
     elementRef: (el: HTMLDivElement | null) => void;
 }) {
     const [editing, setEditing] = useState(false);
+    const [confirmDelete, setConfirmDelete] = useState(false);
+    useEffect(() => {
+        if (!confirmDelete) return;
+        const t = setTimeout(() => setConfirmDelete(false), 3000);
+        return () => clearTimeout(t);
+    }, [confirmDelete]);
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: dialogue.id });
 
     const style = { transform: CSS.Transform.toString(transform), transition, zIndex: isDragging ? 50 : 'auto', opacity: isDragging ? 0.8 : 1 };
@@ -210,14 +217,33 @@ function SortableDialogue({
                     )}
                 </div>
 
-                {/* Edit toggle button */}
-                <button
-                    onClick={() => setEditing(v => !v)}
-                    className="flex-shrink-0 p-1.5 text-muted-foreground hover:text-foreground hover:bg-[#F0EEF0] rounded-lg opacity-0 group-hover:opacity-100 transition-all"
-                    title={editing ? 'Fermer' : 'Éditer'}
-                >
-                    {editing ? <X className="h-3.5 w-3.5" /> : <Pencil className="h-3.5 w-3.5" />}
-                </button>
+                {/* Actions — edit + delete */}
+                <div className="flex-shrink-0 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                    <button
+                        onClick={() => setEditing(v => !v)}
+                        className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-[#F0EEF0] rounded-lg transition-all"
+                        title={editing ? 'Fermer' : 'Éditer'}
+                    >
+                        {editing ? <X className="h-3.5 w-3.5" /> : <Pencil className="h-3.5 w-3.5" />}
+                    </button>
+                    {confirmDelete ? (
+                        <button
+                            onClick={() => onDelete(dialogue.id)}
+                            className="p-1.5 bg-[#D6475B] text-white rounded-lg text-[9px] font-bold leading-none px-1.5 py-1 whitespace-nowrap transition-all"
+                            title="Confirmer la suppression"
+                        >
+                            Suppr.
+                        </button>
+                    ) : (
+                        <button
+                            onClick={() => setConfirmDelete(true)}
+                            className="p-1.5 text-muted-foreground hover:text-[#D6475B] hover:bg-[#D6475B]/10 rounded-lg transition-all"
+                            title="Supprimer cette réplique"
+                        >
+                            <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                    )}
+                </div>
             </div>
         </div>
     );
@@ -296,7 +322,7 @@ export default function PodcastEditor() {
         dialogueElRefs.current.get(prop.dialogueId)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }, [allPropositions]);
 
-    const handleUpdate = (id: number, field: 'studio', text: string) => {
+    const handleUpdate = (id: number, _field: 'studio', text: string) => {
         setDialogues(items => items.map(item => item.id === id ? { ...item, text_studio: text } : item));
         setSaveStatus('unsaved');
     };
@@ -334,6 +360,16 @@ export default function PodcastEditor() {
             }
             setSaveStatus('saved');
         } catch (e) { console.error('Erreur sauvegarde:', e); setSaveStatus('unsaved'); }
+    };
+
+    const handleDeleteDialogue = async (id: number) => {
+        setDialogues(prev => prev.filter(d => d.id !== id));
+        setSaveStatus('unsaved');
+        try {
+            await api.delete(`/dialogues/${id}`);
+        } catch (e) {
+            console.error('Erreur suppression réplique:', e);
+        }
     };
 
     const handleAddDialogue = async (character: 'ines' | 'yannick', text: string) => {
@@ -419,6 +455,13 @@ export default function PodcastEditor() {
         } finally { setIsGeneratingAudio(false); }
     };
 
+    const handleNavigateBack = () => {
+        if (saveStatus === 'unsaved') {
+            if (!window.confirm('Des modifications non sauvegardées seront perdues. Continuer ?')) return;
+        }
+        navigate(`/editor/${projectId}`, { state: { step: 2 } });
+    };
+
     const handleShowSource = async () => {
         setShowSourceModal(true);
         if (sourceText !== null) return;
@@ -433,7 +476,6 @@ export default function PodcastEditor() {
     const totalWords = dialogues.reduce((sum, d) => sum + (d.text_studio?.split(/\s+/).length ?? 0), 0);
     const totalSecs = dialogues.reduce((sum, d) => sum + (d.duration_seconds ?? 0), 0);
     const totalMins = Math.floor(totalSecs / 60);
-    const exportBlocked = (verification.score ?? 0) < 95 && verification.status !== 'idle';
     const canExport = !hasPendingPropositions && (verification.status === 'success' || verification.status === 'idle');
 
     if (loading) return (
@@ -518,20 +560,29 @@ export default function PodcastEditor() {
 
             <div className={`max-w-[1300px] mx-auto ${(verification.status !== 'idle' || hasPendingPropositions) ? 'mt-12' : ''}`}>
 
+                {/* ── Retour chapitres ── */}
+                <button
+                    onClick={handleNavigateBack}
+                    className="flex items-center gap-1 text-xs font-semibold text-muted-foreground hover:text-[#D6475B] transition-colors mb-3 group"
+                >
+                    <ChevronLeft className="h-3.5 w-3.5 group-hover:-translate-x-0.5 transition-transform" />
+                    Chapitres
+                </button>
+
                 {/* ── Stepper ── */}
                 <div className="flex items-center justify-center gap-2 mb-6 mt-1">
                     {[
-                        { label: 'Aperçu source', href: `/editor/${projectId}` },
-                        { label: 'Structure du cours', href: `/editor/${projectId}` },
-                        { label: 'Éditeur', href: null },
+                        { label: 'Aperçu source', href: `/editor/${projectId}`, navState: undefined },
+                        { label: 'Structure du cours', href: `/editor/${projectId}`, navState: { step: 2 } },
+                        { label: 'Éditeur', href: null, navState: undefined },
                     ].map((s, i) => {
-                        const isCurrent = i === 2;
                         const isDone = i < 2;
                         return (
                             <div key={i} className="flex items-center gap-2">
                                 {isDone ? (
                                     <Link
                                         to={s.href!}
+                                        state={s.navState}
                                         className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-white text-foreground border border-[#E0DCE0] hover:border-[#D6475B] transition-colors"
                                     >
                                         <span className="w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold bg-[#BDD145]/20 text-[#5a6e00]">{i + 1}</span>
@@ -611,6 +662,7 @@ export default function PodcastEditor() {
                                         onUpdate={handleUpdate}
                                         onAccept={handleAccept}
                                         onReject={handleReject}
+                                        onDelete={handleDeleteDialogue}
                                         activePropositionMatch={activeProp?.dialogueId === d.id ? activeProp.fullMatch : null}
                                         elementRef={(el) => { if (el) dialogueElRefs.current.set(d.id, el); else dialogueElRefs.current.delete(d.id); }}
                                     />
