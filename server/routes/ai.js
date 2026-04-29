@@ -421,6 +421,7 @@ VÉRIFIE AVANT D'ENVOYER :
         } else {
             console.log('🤖 [AI] Appel Make webhook...');
             generatedText = await callWebhook({
+                type: 'generate',
                 sourceText: content,
                 targetDuration,
                 targetWords: targetWords,
@@ -574,6 +575,7 @@ Réponds UNIQUEMENT en JSON valide :
 }`;
 
             const rawText = await callWebhook({
+                type: 'generate',
                 sourceText: segment.content,
                 chapterTitle: segment.title,
                 targetDuration: 7,
@@ -743,6 +745,7 @@ Réponds UNIQUEMENT en JSON valide :
 
         console.log(`[GENERATE-SINGLE] Appel Make pour ${segment.title}...`);
         const rawText = await callWebhook({
+            type: 'generate',
             sourceText: segment.content,
             chapterTitle: segment.title,
             targetDuration,
