@@ -220,7 +220,6 @@ export default function Editor() {
     const [step, setStep] = useState<Step>('editor');
     const [previewData, setPreviewData] = useState<PreviewData | null>(null);
     const [previewing, setPreviewing] = useState(false);
-    const [targetDuration, setTargetDuration] = useState(5);
     const [regeneratingId, setRegeneratingId] = useState<number | null>(null);
     const [verifying, setVerifying] = useState(false);
     const [verificationReport, setVerificationReport] = useState<VerificationReport | null>(null);
@@ -243,7 +242,6 @@ export default function Editor() {
     const [generatedIdMap, setGeneratedIdMap] = useState<Record<number, number>>({});
     const [isGeneratingAll, setIsGeneratingAll] = useState(false);
     const [selectedChapterIndex, setSelectedChapterIndex] = useState<number>(0);
-    const [chapterDurations, setChapterDurations] = useState<Record<number, number>>({});
 
     const sensors = useSensors(
         useSensor(PointerSensor),
@@ -516,7 +514,6 @@ export default function Editor() {
                 orderIndex: index,
                 previousChapter: editableChapters[index - 1] || null,
                 nextChapter: editableChapters[index + 1] || null,
-                targetDuration: chapterDurations[index] ?? 5
             });
             
             const newPodcastId = res.data.podcastId;
@@ -892,7 +889,6 @@ export default function Editor() {
                             const i = selectedChapterIndex;
                             const isGenerating = generatingChapters.has(i);
                             const isGenerated = generatedChapters.has(i);
-                            const dur = chapterDurations[i] ?? 5;
                             return (
                                 <div className="bg-white rounded-2xl border border-[#E0DCE0] shadow-sm overflow-hidden flex flex-col">
                                     <div className="px-6 py-4 border-b border-[#E0DCE0] flex items-start justify-between gap-4">
@@ -908,22 +904,9 @@ export default function Editor() {
                                                 {ch.wordCount} mots · Lecture estimée : ~{ch.estimatedMinutes}:{String(Math.round((ch.estimatedMinutes % 1) * 60)).padStart(2, '0')} min
                                             </p>
                                         </div>
-                                        {/* Per-chapter duration selector */}
-                                        <div className="flex items-center gap-1 flex-shrink-0">
-                                            {[4, 5, 6, 7].map(d => (
-                                                <button
-                                                    key={d}
-                                                    onClick={() => setChapterDurations(prev => ({ ...prev, [i]: d }))}
-                                                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${
-                                                        dur === d
-                                                            ? 'bg-[#6BB8CD] text-white'
-                                                            : 'bg-[#F0EEF0] text-muted-foreground hover:bg-[#E6E2E6]'
-                                                    }`}
-                                                >
-                                                    {d} min
-                                                </button>
-                                            ))}
-                                        </div>
+                                        <span className="flex-shrink-0 text-xs font-semibold text-muted-foreground bg-[#F0EEF0] px-2.5 py-1 rounded-lg">
+                                            ~7 min estimées
+                                        </span>
                                     </div>
 
                                     {/* Source extract */}

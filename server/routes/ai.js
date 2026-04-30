@@ -192,7 +192,7 @@ function findSentenceBoundary(text, nearChar) {
     return best !== null ? best : nearChar;
 }
 
-function rebalanceSegments(segments, minWords = 350, maxWords = 1200) {
+function rebalanceSegments(segments, minWords = 780, maxWords = 1300) {
     // Fusion des segments trop courts
     const merged = [];
     let i = 0;
@@ -356,13 +356,14 @@ Réponds UNIQUEMENT en JSON valide, sans texte avant ni après :
 router.post('/generate', authMiddleware, async (req, res) => {
     try {
         console.log('[GENERATE] Début');
-        const { projectId, content, targetDuration } = req.body;
+        const { projectId, content } = req.body;
 
-        if (!content || !targetDuration) {
-            return res.status(400).json({ error: 'Contenu et durée cible requis' });
+        if (!content) {
+            return res.status(400).json({ error: 'Contenu requis' });
         }
 
-        const targetWords = targetDuration * 150;
+        const targetDuration = 7;
+        const targetWords = targetDuration * 130;
         const prompt = `
 Tu es un générateur de podcasts pédagogiques EISF (École Internationale du Savoir-Faire Français).
 
@@ -657,7 +658,8 @@ function buildPodcastTitle(orderIndex, projectTitle, chapterTitle) {
 router.post('/generate-single-chapter', authMiddleware, async (req, res) => {
     try {
         console.log('[GENERATE-SINGLE] Début');
-        const { projectId, segment, orderIndex, previousChapter, nextChapter, targetDuration = 7 } = req.body;
+        const { projectId, segment, orderIndex, previousChapter, nextChapter } = req.body;
+        const targetDuration = 7;
 
         if (!segment || !segment.content) {
             return res.status(400).json({ error: 'Segment content is required' });
@@ -731,7 +733,7 @@ TITRE DE L'ÉPISODE : ${segment.title}
 CONTENU SOURCE À TRANSFORMER (tout garder, aucun concept ne peut être omis) :
 ${segment.content}
 
-Durée cible : ${targetDuration} minutes (≈ ${Math.round(targetDuration * 150)} mots de dialogue au total).
+Durée cible : ${targetDuration} minutes (≈ ${Math.round(targetDuration * 130)} mots de dialogue au total).
 Si le contenu source ne suffit pas à atteindre cette durée sans invention, complète avec des [PROPOSITION: ...] pédagogiquement cohérents (exemples concrets du domaine, cas pratiques, reformulations approfondies) — jamais de faits non vérifiables.
 
 Réponds UNIQUEMENT en JSON valide :
