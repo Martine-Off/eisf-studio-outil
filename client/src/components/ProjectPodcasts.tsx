@@ -5,6 +5,17 @@ import api from '../utils/api';
 import AppLayout from '../components/AppLayout';
 import type { Project, Podcast } from '../types';
 
+/** Détecte les slugs techniques (underscores + chiffres) et retourne un titre propre. */
+function cleanTitle(podcast: Podcast, idx: number): string {
+    const t = podcast.title;
+    if (!t) return `Podcast ${(podcast.order_index ?? idx) + 1}`;
+    // Slug pattern : contient des underscores ou commence par des chiffres
+    if (/_/.test(t) || /^\d/.test(t)) {
+        return `Podcast ${(podcast.order_index ?? idx) + 1}`;
+    }
+    return t;
+}
+
 function formatUpdatedAt(dateStr: string): string {
     const d = new Date(dateStr);
     const date = d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
@@ -44,10 +55,52 @@ export default function ProjectPodcasts() {
     return (
         <AppLayout>
             <div className="max-w-5xl mx-auto pb-20 mt-6">
+
+                {/* ── Retour chapitres ── */}
+                <button
+                    onClick={() => navigate(`/editor/${projectId}`, { state: { step: 2 } })}
+                    className="flex items-center gap-1 text-xs font-semibold text-muted-foreground hover:text-[#D6475B] transition-colors mb-3 group"
+                >
+                    <ChevronLeft size={14} className="group-hover:-translate-x-0.5 transition-transform" />
+                    Chapitres
+                </button>
+
+                {/* ── Stepper ── */}
+                <div className="flex items-center justify-center gap-2 mb-6 mt-1">
+                    {[
+                        { label: 'Aperçu source', href: `/editor/${projectId}`, navState: undefined },
+                        { label: 'Structure du cours', href: `/editor/${projectId}`, navState: { step: 2 } },
+                        { label: 'Éditeur', href: null, navState: undefined },
+                    ].map((s, i) => {
+                        const isCurrent = i === 2;
+                        const isDone = i < 2;
+                        return (
+                            <div key={i} className="flex items-center gap-2">
+                                {isDone ? (
+                                    <Link
+                                        to={s.href!}
+                                        state={s.navState}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-white text-foreground border border-[#E0DCE0] hover:border-[#D6475B] transition-colors"
+                                    >
+                                        <span className="w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold bg-[#BDD145]/20 text-[#5a6e00]">{i + 1}</span>
+                                        {s.label}
+                                    </Link>
+                                ) : (
+                                    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-[#D6475B] text-white shadow-sm">
+                                        <span className="w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold bg-white/25 text-white">{i + 1}</span>
+                                        {s.label}
+                                    </div>
+                                )}
+                                {i < 2 && <div className={`w-8 h-px ${isDone ? 'bg-[#D6475B]/40' : 'bg-[#E0DCE0]'}`} />}
+                            </div>
+                        );
+                    })}
+                </div>
+
                 {/* Header */}
                 <div className="flex items-center gap-3 mb-6 mt-2">
                     <button
-                        onClick={() => navigate(`/editor/${projectId}`)}
+                        onClick={() => navigate(`/editor/${projectId}`, { state: { step: 2 } })}
                         className="p-2 bg-card border border-border rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-all shadow-sm"
                     >
                         <ChevronLeft size={16} />
@@ -88,34 +141,37 @@ export default function ProjectPodcasts() {
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {podcasts.map((podcast) => {
+                        {podcasts.map((podcast, idx) => {
                             const isGenerated = (podcast.word_count ?? 0) > 0;
                             const mins = estimateMinutes(podcast.duration_seconds, podcast.word_count);
+                            const displayTitle = cleanTitle(podcast, idx);
                             return (
                                 <div key={podcast.id} className={`rounded-xl p-4 transition-shadow flex flex-col items-start border ${
                                     isGenerated
-                                        ? 'bg-card border-border hover:shadow-md shadow-sm'
-                                        : 'bg-secondary/40 border-dashed border-border opacity-75'
+                                        ? 'bg-white border-[#E0DCE0] hover:shadow-md shadow-sm hover:border-[#D6475B]/20'
+                                        : 'bg-[#F8F7F8] border-dashed border-[#D4D0D4] opacity-75'
                                 }`}>
                                     <div className={`w-9 h-9 rounded-lg flex items-center justify-center mb-3 ${
-                                        isGenerated ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
+                                        isGenerated ? 'bg-[#D6475B]/10 text-[#D6475B]' : 'bg-[#E6E2E6] text-muted-foreground'
                                     }`}>
                                         <Mic size={18} />
                                     </div>
 
                                     <div className="w-full flex items-start justify-between gap-2 mb-1">
                                         <h3 className={`font-semibold text-sm leading-snug ${isGenerated ? 'text-foreground' : 'text-muted-foreground'}`}>
-                                            {podcast.title || `Podcast #${podcast.id}`}
+                                            {displayTitle}
                                         </h3>
                                         {!isGenerated ? (
-                                            <span className="flex-shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-full border bg-secondary text-muted-foreground border-border whitespace-nowrap">
+                                            <span className="flex-shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-full border bg-white text-muted-foreground border-[#D4D0D4] whitespace-nowrap">
                                                 À générer
                                             </span>
                                         ) : podcast.fidelity_score != null ? (
                                             <span className={`flex-shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-full border ${
-                                                podcast.fidelity_score >= 95 ? 'bg-green-100 text-green-800 border-green-200' :
-                                                podcast.fidelity_score >= 70 ? 'bg-orange-100 text-orange-800 border-orange-200' :
-                                                                                'bg-red-100 text-red-800 border-red-200'
+                                                podcast.fidelity_score >= 95
+                                                    ? 'bg-[#BDD145]/20 text-[#5a6e00] border-[#BDD145]/40'
+                                                    : podcast.fidelity_score >= 70
+                                                    ? 'bg-[#E6A440]/20 text-[#7a5200] border-[#E6A440]/40'
+                                                    : 'bg-[#D6475B]/10 text-[#D6475B] border-[#D6475B]/20'
                                             }`}>
                                                 {Math.round(podcast.fidelity_score)}%
                                             </span>
@@ -135,20 +191,20 @@ export default function ProjectPodcasts() {
                                         <p className="text-[10px] text-muted-foreground mb-3">{formatUpdatedAt(podcast.updated_at)}</p>
                                     )}
 
-                                    <div className="mt-auto w-full pt-3 border-t border-border">
+                                    <div className="mt-auto w-full pt-3 border-t border-[#F0EEF0]">
                                         {isGenerated ? (
                                             <button
                                                 onClick={() => navigate(`/project/${projectId}/podcast/${podcast.id}/edit`)}
-                                                className="w-full text-center bg-accent/10 hover:bg-accent/20 text-accent text-sm font-bold py-2 rounded-lg transition-colors"
+                                                className="w-full text-center bg-[#D6475B]/10 hover:bg-[#D6475B]/20 text-[#D6475B] text-xs font-semibold py-2 rounded-lg transition-colors"
                                             >
-                                                Voir / Modifier le script
+                                                Ouvrir l'éditeur
                                             </button>
                                         ) : (
                                             <button
                                                 onClick={() => navigate(`/editor/${projectId}?chapter=${podcast.order_index ?? 0}`)}
-                                                className="w-full text-center bg-primary/10 hover:bg-primary/20 text-primary text-sm font-bold py-2 rounded-lg transition-colors"
+                                                className="w-full text-center bg-[#6BB8CD]/10 hover:bg-[#6BB8CD]/20 text-[#1a6a80] text-xs font-semibold py-2 rounded-lg transition-colors"
                                             >
-                                                🎙️ Générer ce podcast
+                                                Générer ce chapitre
                                             </button>
                                         )}
                                     </div>

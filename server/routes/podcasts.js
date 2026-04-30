@@ -234,7 +234,7 @@ router.post('/:id/verify', authMiddleware, async (req, res) => {
     }
 });
 
-// Génération audio TTS — en attente de configuration n8n
+// Génération audio TTS
 router.post('/:id/generate-audio', authMiddleware, async (req, res) => {
     try {
         const podcastId = req.params.id;
@@ -257,7 +257,8 @@ router.post('/:id/generate-audio', authMiddleware, async (req, res) => {
         if (!fs.existsSync(audioDir)) fs.mkdirSync(audioDir, { recursive: true });
         const outputPath = path.join(audioDir, `podcast_${podcastId}.wav`);
 
-        await generateAudio(dialoguesRes.rows, outputPath);
+        const { voiceInes, voiceYannick, speed } = req.body;
+        await generateAudio(dialoguesRes.rows, outputPath, { voiceInes, voiceYannick, speed: Number(speed) || 1.0 });
 
         const totalWords = dialoguesRes.rows.reduce((sum, d) =>
             sum + (d.text_reading || d.text_studio || '').split(' ').length, 0);

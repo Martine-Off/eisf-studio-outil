@@ -7,13 +7,17 @@ import {
     arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Loader2, CheckCircle, ChevronLeft, ChevronRight, GripVertical, Pencil, X, FileDown, ChevronDown } from 'lucide-react';
+import {
+    Loader2, CheckCircle, ChevronLeft, ChevronRight, GripVertical, Pencil,
+    X, FileDown, Plus, ShieldCheck, AlertTriangle, RotateCcw, Clock, FileText, Users, Trash2
+} from 'lucide-react';
 import api from '../utils/api';
 import { useKeyboardNav } from '../hooks/useKeyboardNav';
 import AppLayout from '../components/AppLayout';
-import { AIVerificationPanel } from './AIVerificationPanel';
-import GenerateAudioModal from '../components/GenerateAudioModal';
+import GenerateAudioModal, { type AudioSettings } from '../components/GenerateAudioModal';
 import { motion, AnimatePresence } from 'framer-motion';
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface Dialogue {
     id: number;
@@ -26,65 +30,97 @@ interface Dialogue {
     podcast_id?: number;
 }
 
-interface TextPart {
-    type: 'text' | 'proposition';
-    content: string;
-    fullMatch: string;
-}
+interface TextPart { type: 'text' | 'proposition'; content: string; fullMatch: string; }
+interface PropositionRef { dialogueId: number; partIndex: number; fullMatch: string; content: string; }
 
-interface PropositionRef {
-    dialogueId: number;
-    partIndex: number;
-    fullMatch: string;
-    content: string;
+interface VerificationState {
+    status: 'idle' | 'running' | 'success' | 'insufficient';
+    score: number | null;
+    missingConcepts: string[];
+    confusingElements: string[];
+    passCount: number;
 }
 
 function parseTextParts(text: string): TextPart[] {
     const parts: TextPart[] = [];
     const regex = /\[PROPOSITION:\s*(.*?)\]/g;
-    let lastIndex = 0;
-    let match;
+    let lastIndex = 0, match;
     while ((match = regex.exec(text)) !== null) {
-        if (match.index > lastIndex) {
-            parts.push({ type: 'text', content: text.slice(lastIndex, match.index), fullMatch: '' });
-        }
+        if (match.index > lastIndex) parts.push({ type: 'text', content: text.slice(lastIndex, match.index), fullMatch: '' });
         parts.push({ type: 'proposition', content: match[1].trim(), fullMatch: match[0] });
         lastIndex = match.index + match[0].length;
     }
-    if (lastIndex < text.length) {
-        parts.push({ type: 'text', content: text.slice(lastIndex), fullMatch: '' });
-    }
+    if (lastIndex < text.length) parts.push({ type: 'text', content: text.slice(lastIndex), fullMatch: '' });
     return parts;
 }
 
-function hasPropositions(text: string): boolean {
-    return /\[PROPOSITION:/i.test(text);
+function fmtDuration(secs: number) {
+    const m = Math.floor(secs / 60), s = secs % 60;
+    return `${m}:${String(s).padStart(2, '0')}`;
 }
 
-// ─── Composant réplique ───────────────────────────────────────────────────────
+// ─── Circular gauge ───────────────────────────────────────────────────────────
+
+function ScoreGauge({ score }: { score: number | null }) {
+    const pct = score ?? 0;
+    const color = pct >= 95 ? '#BDD145' : pct >= 70 ? '#E6A440' : '#D6475B';
+    const dashArray = 220;
+    const dashOffset = dashArray * (1 - pct / 100);
+    return (
+        <div className="flex flex-col items-center gap-1">
+            <div className="relative w-28 h-28">
+                <svg className="w-28 h-28 -rotate-90" viewBox="0 0 100 100">
+                    <circle cx="50" cy="50" r="35" fill="none" stroke="#E6E2E6" strokeWidth="8" />
+                    <circle
+                        cx="50" cy="50" r="35" fill="none"
+                        stroke={color} strokeWidth="8"
+                        strokeLinecap="round"
+                        strokeDasharray={`${dashArray} 220`}
+                        strokeDashoffset={dashOffset}
+                        style={{ transition: 'stroke-dashoffset 0.8s ease' }}
+                    />
+                </svg>
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                    {score === null ? (
+                        <span className="text-sm text-muted-foreground font-medium">—</span>
+                    ) : (
+                        <>
+                            <span className="text-2xl font-extrabold text-foreground leading-none">{score}%</span>
+                            <span className="text-[9px] uppercase tracking-widest text-muted-foreground mt-0.5">Fidélité</span>
+                        </>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ─── Dialogue card ────────────────────────────────────────────────────────────
+
 function SortableDialogue({
-    dialogue, onUpdate, onAccept, onReject, activePropositionMatch, elementRef
+    dialogue, onUpdate, onAccept, onReject, onDelete, activePropositionMatch, elementRef
 }: {
     dialogue: Dialogue;
-    onUpdate: (id: number, field: 'studio' | 'reading', text: string) => void;
+    onUpdate: (id: number, field: 'studio', text: string) => void;
     onAccept: (id: number, fullMatch: string) => void;
     onReject: (id: number, fullMatch: string) => void;
+    onDelete: (id: number) => void;
     activePropositionMatch: string | null;
     elementRef: (el: HTMLDivElement | null) => void;
 }) {
-    const [editingField, setEditingField] = useState<'studio' | 'reading' | null>(null);
-    const [showReading, setShowReading] = useState(false);
+    const [editing, setEditing] = useState(false);
+    const [confirmDelete, setConfirmDelete] = useState(false);
+    useEffect(() => {
+        if (!confirmDelete) return;
+        const t = setTimeout(() => setConfirmDelete(false), 3000);
+        return () => clearTimeout(t);
+    }, [confirmDelete]);
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: dialogue.id });
 
-    const style = {
-        transform: CSS.Transform.toString(transform),
-        transition,
-        zIndex: isDragging ? 50 : 'auto',
-        opacity: isDragging ? 0.8 : 1
-    };
+    const style = { transform: CSS.Transform.toString(transform), transition, zIndex: isDragging ? 50 : 'auto', opacity: isDragging ? 0.8 : 1 };
     const isInes = dialogue.character.toLowerCase() === 'ines';
-    const textStudioParts = parseTextParts(dialogue.text_studio);
-    const studioHasProps = textStudioParts.some(p => p.type === 'proposition');
+    const textParts = parseTextParts(dialogue.text_studio);
+    const hasProps = textParts.some(p => p.type === 'proposition');
 
     const mergedRef = useCallback((el: HTMLDivElement | null) => {
         setNodeRef(el);
@@ -96,128 +132,116 @@ function SortableDialogue({
             ref={mergedRef}
             style={style}
             {...attributes}
-            className={`group relative flex gap-4 p-6 rounded-2xl border-2 transition-all duration-200 outline-none
-                ${isDragging ? 'shadow-xl scale-[1.01] border-primary' : ''}
-                ${studioHasProps ? 'border-amber-300 bg-amber-50/40' : isInes
-                    ? 'bg-card border-transparent hover:border-primary/30 shadow-sm'
-                    : 'bg-accent/5 border-transparent hover:border-accent/30 shadow-sm'
-                }`}
+            className={`group relative bg-white rounded-xl border transition-all duration-200 ${
+                isDragging ? 'shadow-xl border-[#D6475B]/40 scale-[1.01]' :
+                hasProps ? 'border-[#E6A440]/50 bg-[#FFF8EE]' :
+                'border-[#E0DCE0] hover:border-[#D6475B]/20 hover:shadow-sm'
+            }`}
         >
-            {/* Drag handle */}
-            <div className="w-8 flex flex-col items-center justify-center gap-2 cursor-grab text-muted-foreground hover:text-primary transition-colors flex-shrink-0" {...listeners}>
-                <GripVertical size={20} />
-            </div>
+            <div className="flex items-start gap-3 px-3 py-3">
+                {/* Drag handle */}
+                <div
+                    className="mt-1 cursor-grab text-muted-foreground/30 hover:text-muted-foreground transition-colors flex-shrink-0 opacity-0 group-hover:opacity-100"
+                    {...listeners}
+                >
+                    <GripVertical className="h-4 w-4" />
+                </div>
 
-            {/* Avatar */}
-            <div className="w-10 flex-shrink-0 flex flex-col items-center pt-1">
-                <div className={`w-10 h-10 rounded-full flex flex-col items-center justify-center font-bold text-sm shadow-inner
-                    ${isInes ? 'bg-[#f4ebe1] text-[#3465ae]' : 'bg-[#fcebdf] text-[#e63337]'}`}>
+                {/* Avatar */}
+                <div className={`flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold ${
+                    isInes ? 'bg-[#D6475B]/15 text-[#D6475B]' : 'bg-[#3465AE]/15 text-[#3465AE]'
+                }`}>
                     {isInes ? 'I' : 'Y'}
                 </div>
-            </div>
 
-            {/* Content */}
-            <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between mb-3">
-                    <span className={`font-black uppercase tracking-wide text-sm ${isInes ? 'text-[#3465ae]' : 'text-[#e63337]'}`}>
+                <div className="flex-1 min-w-0">
+                    {/* Character badge */}
+                    <span className={`inline-block text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full mb-1.5 ${
+                        isInes ? 'bg-[#D6475B]/10 text-[#D6475B]' : 'bg-[#3465AE]/10 text-[#3465AE]'
+                    }`}>
                         {isInes ? 'Inès' : 'Yannick'}
                     </span>
-                    {studioHasProps && editingField === null && (
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 bg-amber-100 px-2 py-0.5 rounded-full">
-                            ⚠ propositions en attente
-                        </span>
-                    )}
-                </div>
 
-                {/* Texte Studio */}
-                <div className="mb-3">
-                    <div className="flex items-center gap-2 mb-1">
-                        <span className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground/60">Texte Studio</span>
-                        <button
-                            onClick={() => setEditingField(editingField === 'studio' ? null : 'studio')}
-                            className="text-[10px] px-2 py-0.5 rounded border border-border text-muted-foreground hover:text-foreground transition-all flex items-center gap-1"
-                        >
-                            {editingField === 'studio' ? <><X size={10} /> Fermer</> : <><Pencil size={10} /> Éditer</>}
-                        </button>
-                    </div>
-
-                    {editingField === 'studio' ? (
+                    {/* Text — clic pour éditer */}
+                    {editing ? (
                         <textarea
                             data-no-dnd="true"
                             onPointerDown={(e) => e.stopPropagation()}
-                            className="w-full bg-transparent border border-border rounded-lg p-2 text-base text-foreground leading-relaxed resize-none focus:ring-1 focus:ring-primary outline-none font-sans"
+                            className="w-full bg-[#F8F7F8] border border-[#E0DCE0] rounded-lg px-3 py-2 text-[13px] font-normal text-foreground leading-relaxed resize-none focus:outline-none focus:ring-2 focus:ring-[#D6475B]/30 focus:border-[#D6475B]"
                             value={dialogue.text_studio}
                             onChange={(e) => onUpdate(dialogue.id, 'studio', e.target.value)}
-                            rows={Math.max(3, Math.ceil(dialogue.text_studio.length / 90))}
-                            spellCheck={false}
+                            onBlur={() => setEditing(false)}
+                            onKeyDown={(e) => { if (e.key === 'Escape') { e.preventDefault(); setEditing(false); } }}
+                            rows={Math.max(2, Math.ceil(dialogue.text_studio.length / 90))}
+                            autoFocus
                         />
                     ) : (
-                        <div className="text-base text-foreground leading-relaxed font-sans whitespace-pre-wrap">
-                            {textStudioParts.map((part, i) =>
+                        <div
+                            className="text-[13px] font-normal text-foreground/90 leading-relaxed whitespace-pre-wrap cursor-text"
+                            onClick={() => setEditing(true)}
+                            title="Cliquez pour éditer"
+                        >
+                            {textParts.map((part, i) =>
                                 part.type === 'proposition' ? (
-                                    <span
-                                        key={i}
-                                        className={`inline-flex items-baseline gap-1 rounded px-1.5 py-0.5 mx-0.5 text-amber-900 font-medium
-                                            ${part.fullMatch === activePropositionMatch
-                                                ? 'bg-amber-300 ring-2 ring-amber-500'
-                                                : 'bg-amber-100 border border-amber-300'
-                                            }`}
-                                    >
+                                    <span key={i} className={`inline-flex items-baseline gap-1 rounded px-1.5 py-0.5 mx-0.5 text-[#7a5200] font-medium ${
+                                        part.fullMatch === activePropositionMatch
+                                            ? 'bg-[#E6A440]/40 ring-2 ring-[#E6A440]'
+                                            : 'bg-[#E6A440]/20 border border-[#E6A440]/40'
+                                    }`}>
                                         <span>{part.content}</span>
                                         <button
-                                            onClick={() => onAccept(dialogue.id, part.fullMatch)}
-                                            title="Garder cette proposition"
-                                            className="ml-1 text-green-700 hover:text-green-900 font-bold text-sm leading-none"
+                                            onClick={(e) => { e.stopPropagation(); onAccept(dialogue.id, part.fullMatch); }}
+                                            title="Garder"
+                                            className="ml-1 text-[#BDD145] hover:text-green-700 font-bold text-sm"
                                         >✓</button>
                                         <button
-                                            onClick={() => onReject(dialogue.id, part.fullMatch)}
-                                            title="Supprimer cette proposition"
-                                            className="text-red-500 hover:text-red-700 font-bold text-sm leading-none"
+                                            onClick={(e) => { e.stopPropagation(); onReject(dialogue.id, part.fullMatch); }}
+                                            title="Supprimer"
+                                            className="text-[#D6475B] hover:text-red-700 font-bold text-sm"
                                         >✗</button>
                                     </span>
-                                ) : (
-                                    <span key={i}>{part.content}</span>
-                                )
+                                ) : <span key={i}>{part.content}</span>
                             )}
+                            {!dialogue.text_studio && (
+                                <span className="text-muted-foreground italic">Cliquez pour saisir une réplique…</span>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Duration estimate */}
+                    {dialogue.duration_seconds > 0 && (
+                        <div className="flex items-center gap-1 mt-1.5 text-[11px] text-muted-foreground">
+                            <Clock className="h-3 w-3" />
+                            <span>Durée estimée : {fmtDuration(dialogue.duration_seconds)}</span>
                         </div>
                     )}
                 </div>
 
-                {/* Texte Lecture — collapsé par défaut */}
-                <div className="mt-2">
+                {/* Actions — edit + delete */}
+                <div className="flex-shrink-0 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-all">
                     <button
-                        onClick={() => { setShowReading(v => !v); if (editingField === 'reading') setEditingField(null); }}
-                        className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-bold text-muted-foreground/60 hover:text-muted-foreground transition-colors"
+                        onClick={() => setEditing(v => !v)}
+                        className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-[#F0EEF0] rounded-lg transition-all"
+                        title={editing ? 'Fermer' : 'Éditer'}
                     >
-                        <ChevronRight size={10} className={`transition-transform ${showReading ? 'rotate-90' : ''}`} />
-                        Version lecture (export)
+                        {editing ? <X className="h-3.5 w-3.5" /> : <Pencil className="h-3.5 w-3.5" />}
                     </button>
-                    {showReading && (
-                        <div className="mt-1.5">
-                            <div className="flex items-center gap-2 mb-1">
-                                <button
-                                    onClick={() => setEditingField(editingField === 'reading' ? null : 'reading')}
-                                    className="text-[10px] px-2 py-0.5 rounded border border-border text-muted-foreground hover:text-foreground transition-all flex items-center gap-1"
-                                >
-                                    {editingField === 'reading' ? <><X size={10} /> Fermer</> : <><Pencil size={10} /> Éditer</>}
-                                </button>
-                            </div>
-                            {editingField === 'reading' ? (
-                                <textarea
-                                    data-no-dnd="true"
-                                    onPointerDown={(e) => e.stopPropagation()}
-                                    className="w-full bg-transparent border border-border rounded-lg p-2 text-sm text-muted-foreground leading-relaxed resize-none focus:ring-1 focus:ring-primary outline-none font-sans"
-                                    value={dialogue.text_reading ?? dialogue.text_studio}
-                                    onChange={(e) => onUpdate(dialogue.id, 'reading', e.target.value)}
-                                    rows={Math.max(2, Math.ceil((dialogue.text_reading ?? dialogue.text_studio).length / 90))}
-                                    spellCheck={false}
-                                />
-                            ) : (
-                                <p className="text-sm text-muted-foreground leading-relaxed">
-                                    {dialogue.text_reading ?? dialogue.text_studio}
-                                </p>
-                            )}
-                        </div>
+                    {confirmDelete ? (
+                        <button
+                            onClick={() => onDelete(dialogue.id)}
+                            className="p-1.5 bg-[#D6475B] text-white rounded-lg text-[9px] font-bold leading-none px-1.5 py-1 whitespace-nowrap transition-all"
+                            title="Confirmer la suppression"
+                        >
+                            Suppr.
+                        </button>
+                    ) : (
+                        <button
+                            onClick={() => setConfirmDelete(true)}
+                            className="p-1.5 text-muted-foreground hover:text-[#D6475B] hover:bg-[#D6475B]/10 rounded-lg transition-all"
+                            title="Supprimer cette réplique"
+                        >
+                            <Trash2 className="h-3.5 w-3.5" />
+                        </button>
                     )}
                 </div>
             </div>
@@ -225,24 +249,31 @@ function SortableDialogue({
     );
 }
 
-// ─── Composant principal ──────────────────────────────────────────────────────
+// ─── Main component ────────────────────────────────────────────────────────────
+
 export default function PodcastEditor() {
     const { projectId, podcastId } = useParams();
     const navigate = useNavigate();
     const [dialogues, setDialogues] = useState<Dialogue[]>([]);
     const [loading, setLoading] = useState(true);
     const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved');
-    const [podcastInfo, setPodcastInfo] = useState<{ title: string; project_title?: string }>({ title: 'Chargement...' });
-    const [showVerificationPanel, setShowVerificationPanel] = useState(false);
+    const [podcastInfo, setPodcastInfo] = useState<{ title: string; project_title?: string; word_count?: number }>({ title: 'Chargement...' });
     const [isAudioModalOpen, setIsAudioModalOpen] = useState(false);
+    const [audioUrl, setAudioUrl] = useState<string | null>(null);
+    const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
+    const [isAddingDialogue, setIsAddingDialogue] = useState(false);
+    const [newDialogueChar, setNewDialogueChar] = useState<'ines' | 'yannick'>('ines');
+    const [newDialogueText, setNewDialogueText] = useState('');
+    const [isSubmittingNew, setIsSubmittingNew] = useState(false);
     const [showSourceModal, setShowSourceModal] = useState(false);
     const [sourceText, setSourceText] = useState<string | null>(null);
     const [loadingSource, setLoadingSource] = useState(false);
-    const [audioUrl, setAudioUrl] = useState<string | null>(null);
-    const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
+    const [verification, setVerification] = useState<VerificationState>({
+        status: 'idle', score: null, missingConcepts: [], confusingElements: [], passCount: 0
+    });
 
     // Proposition navigation
-    const [currentPropGlobalIdx, setCurrentPropGlobalIdx] = useState(0);
+    const [currentPropIdx, setCurrentPropIdx] = useState(0);
     const dialogueElRefs = useRef<Map<number, HTMLDivElement>>(new Map());
 
     const sensors = useSensors(
@@ -251,31 +282,14 @@ export default function PodcastEditor() {
     );
     const saveStateRef = useRef({ status: saveStatus, dialogues });
     useEffect(() => { saveStateRef.current = { status: saveStatus, dialogues }; }, [saveStatus, dialogues]);
-
     useEffect(() => { if (podcastId) loadData(); }, [podcastId]);
     useEffect(() => {
-        const timer = setInterval(() => {
+        const t = setInterval(() => {
             if (saveStateRef.current.status === 'unsaved') handleSaveAction(saveStateRef.current.dialogues);
         }, 30000);
-        return () => clearInterval(timer);
+        return () => clearInterval(t);
     }, []);
-
     useKeyboardNav({ onSave: () => handleSaveAction(dialogues) });
-
-    const handleShowSource = async () => {
-        setShowSourceModal(true);
-        if (sourceText !== null) return;
-        setLoadingSource(true);
-        try {
-            const res = await api.get(`/podcasts/${podcastId}/source-section`);
-            setSourceText(res.data.source_text || '');
-        } catch (err) {
-            setSourceText('Impossible de charger le texte source.');
-            console.error(err);
-        } finally {
-            setLoadingSource(false);
-        }
-    };
 
     const loadData = async () => {
         try {
@@ -285,68 +299,41 @@ export default function PodcastEditor() {
             ]);
             setPodcastInfo(infoRes.data);
             if (infoRes.data.audio_url) {
-                const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-                setAudioUrl(`${baseUrl}${infoRes.data.audio_url}`);
+                const base = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+                setAudioUrl(`${base}${infoRes.data.audio_url}`);
             }
-            setDialogues(dlgsRes.data || []);
-        } catch (error) {
-            console.error('Erreur chargement podcast:', error);
-        } finally {
-            setLoading(false);
-        }
+            const dlgs: Dialogue[] = dlgsRes.data || [];
+            setDialogues(dlgs.sort((a, b) => a.order_index - b.order_index));
+        } catch (e) { console.error('Erreur chargement podcast:', e); }
+        finally { setLoading(false); }
     };
 
-    // Toutes les propositions à traiter (liste plate)
-    const allPropositions: PropositionRef[] = dialogues.flatMap(d => {
-        const parts = parseTextParts(d.text_studio);
-        return parts
+    const allPropositions: PropositionRef[] = dialogues.flatMap(d =>
+        parseTextParts(d.text_studio)
             .filter(p => p.type === 'proposition')
-            .map((p, partIndex) => ({
-                dialogueId: d.id,
-                partIndex,
-                fullMatch: p.fullMatch,
-                content: p.content,
-            }));
-    });
+            .map((p, i) => ({ dialogueId: d.id, partIndex: i, fullMatch: p.fullMatch, content: p.content }))
+    );
+    const activeProp = allPropositions[currentPropIdx] ?? null;
+    const hasPendingPropositions = allPropositions.length > 0;
 
-    const activeProp = allPropositions[currentPropGlobalIdx] ?? null;
-
-    const scrollToProposition = useCallback((idx: number) => {
+    const scrollToProp = useCallback((idx: number) => {
         const prop = allPropositions[idx];
         if (!prop) return;
-        const el = dialogueElRefs.current.get(prop.dialogueId);
-        el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        dialogueElRefs.current.get(prop.dialogueId)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }, [allPropositions]);
 
-    const goPrev = () => {
-        const idx = Math.max(0, currentPropGlobalIdx - 1);
-        setCurrentPropGlobalIdx(idx);
-        scrollToProposition(idx);
-    };
-    const goNext = () => {
-        const idx = Math.min(allPropositions.length - 1, currentPropGlobalIdx + 1);
-        setCurrentPropGlobalIdx(idx);
-        scrollToProposition(idx);
-    };
-
-    const handleUpdate = (id: number, field: 'studio' | 'reading', text: string) => {
-        setDialogues(items => items.map(item =>
-            item.id === id ? { ...item, [field === 'studio' ? 'text_studio' : 'text_reading']: text } : item
-        ));
+    const handleUpdate = (id: number, _field: 'studio', text: string) => {
+        setDialogues(items => items.map(item => item.id === id ? { ...item, text_studio: text } : item));
         setSaveStatus('unsaved');
     };
 
     const handleAccept = (dialogueId: number, fullMatch: string) => {
-        // Extraire le texte de la proposition et le garder sans les crochets
         const content = fullMatch.replace(/\[PROPOSITION:\s*(.*?)\]/, '$1').trim();
         setDialogues(items => items.map(item =>
-            item.id === dialogueId
-                ? { ...item, text_studio: item.text_studio.replace(fullMatch, content) }
-                : item
+            item.id === dialogueId ? { ...item, text_studio: item.text_studio.replace(fullMatch, content) } : item
         ));
         setSaveStatus('unsaved');
-        // Recentrer sur la proposition suivante si elle existe
-        setCurrentPropGlobalIdx(idx => Math.max(0, Math.min(idx, allPropositions.length - 2)));
+        setCurrentPropIdx(i => Math.max(0, Math.min(i, allPropositions.length - 2)));
     };
 
     const handleReject = (dialogueId: number, fullMatch: string) => {
@@ -356,317 +343,628 @@ export default function PodcastEditor() {
                 : item
         ));
         setSaveStatus('unsaved');
-        setCurrentPropGlobalIdx(idx => Math.max(0, Math.min(idx, allPropositions.length - 2)));
+        setCurrentPropIdx(i => Math.max(0, Math.min(i, allPropositions.length - 2)));
     };
 
-    const handleSaveAction = async (currentDialogues: Dialogue[]) => {
+    const handleSaveAction = async (current: Dialogue[]) => {
         if (saveStatus === 'saving') return;
         setSaveStatus('saving');
         try {
-            await Promise.all(currentDialogues.map(d =>
-                api.patch(`/dialogues/${d.id}`, {
-                    text_studio: d.text_studio,
-                    text_reading: d.text_reading || d.text_studio
-                })
+            await Promise.all(current.map(d =>
+                api.patch(`/dialogues/${d.id}`, { text_studio: d.text_studio, text_reading: d.text_reading || d.text_studio })
             ));
-            if (currentDialogues.length > 0) {
-                await api.patch(`/dialogues/reorder`, {
-                    dialogues: currentDialogues.map((d, index) => ({ id: d.id, order_index: index }))
+            if (current.length > 0) {
+                await api.patch('/dialogues/reorder', {
+                    dialogues: current.map((d, i) => ({ id: d.id, order_index: i }))
                 });
             }
             setSaveStatus('saved');
-        } catch (error) {
-            console.error('Erreur sauvegarde:', error);
-            setSaveStatus('unsaved');
+        } catch (e) { console.error('Erreur sauvegarde:', e); setSaveStatus('unsaved'); }
+    };
+
+    const handleDeleteDialogue = async (id: number) => {
+        setDialogues(prev => prev.filter(d => d.id !== id));
+        setSaveStatus('unsaved');
+        try {
+            await api.delete(`/dialogues/${id}`);
+        } catch (e) {
+            console.error('Erreur suppression réplique:', e);
         }
     };
 
-    const handleDragEnd = async (event: DragEndEvent) => {
+    const handleAddDialogue = async (character: 'ines' | 'yannick', text: string) => {
+        setIsSubmittingNew(true);
+        const tempId = -(Date.now());
+        const newDlg: Dialogue = {
+            id: tempId, character, text_studio: text,
+            section: '', duration_seconds: 0, order_index: dialogues.length, podcast_id: Number(podcastId)
+        };
+        setDialogues(prev => [...prev, newDlg]);
+        setSaveStatus('unsaved');
+        setIsAddingDialogue(false);
+        setNewDialogueText('');
+        setNewDialogueChar('ines');
+        try {
+            const res = await api.post(`/podcasts/${podcastId}/dialogues`, {
+                character, text_studio: text, order_index: dialogues.length
+            });
+            if (res.data?.id) {
+                setDialogues(prev => prev.map(d => d.id === tempId ? { ...d, id: res.data.id } : d));
+            }
+        } catch (e) {
+            console.error('Erreur ajout réplique:', e);
+        } finally {
+            setIsSubmittingNew(false);
+        }
+    };
+
+    const handleDragEnd = (event: DragEndEvent) => {
         const { active, over } = event;
         if (active.id !== over?.id) {
-            setDialogues((items) => {
-                const oldIndex = items.findIndex((item) => item.id === active.id);
-                const newIndex = items.findIndex((item) => item.id === over?.id);
-                return arrayMove(items, oldIndex, newIndex);
+            setDialogues(items => {
+                const oi = items.findIndex(i => i.id === active.id);
+                const ni = items.findIndex(i => i.id === over?.id);
+                return arrayMove(items, oi, ni);
             });
             setSaveStatus('unsaved');
         }
     };
 
-    const handleGenerateAudio = async () => {
+    const handleVerify = async () => {
+        setVerification(v => ({ ...v, status: 'running' }));
+        try {
+            const res = await api.post(`/podcasts/${podcastId}/verify`);
+            const score: number = res.data.fidelity_score ?? 0;
+            const missing: string[] = res.data.ia_feedback?.concepts_manquants ?? [];
+            const confusing: string[] = res.data.ia_feedback?.informations_erronees ?? [];
+            setVerification({
+                status: score >= 95 ? 'success' : 'insufficient',
+                score, missingConcepts: missing, confusingElements: confusing, passCount: 0
+            });
+        } catch (e) { console.error('Erreur vérification:', e); setVerification(v => ({ ...v, status: 'idle' })); }
+    };
+
+    const handleAutoFix = async () => {
+        setVerification(v => ({ ...v, status: 'running' }));
+        try {
+            const res = await api.post('/ai/auto-verify-and-fix', { podcastId: Number(podcastId) }, { timeout: 300000 });
+            const { finalScore, passCount } = res.data;
+            setVerification({
+                status: finalScore >= 95 ? 'success' : 'insufficient',
+                score: finalScore, missingConcepts: [], confusingElements: [], passCount
+            });
+            await loadData();
+        } catch (e) { console.error('Erreur correction:', e); setVerification(v => ({ ...v, status: 'idle' })); }
+    };
+
+    const handleGenerateAudio = async (settings: AudioSettings) => {
         setIsAudioModalOpen(false);
         setIsGeneratingAudio(true);
         try {
-            const response = await api.post(`/podcasts/${podcastId}/generate-audio`, {}, { timeout: 300000 });
-            const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-            setAudioUrl(`${baseUrl}${response.data.audio_url}`);
-        } catch (error: any) {
-            const msg = error?.response?.data?.error;
-            if (msg === 'tts_not_configured') {
-                alert("La génération audio sera disponible prochainement (configuration n8n en cours).");
-            } else {
-                console.error("Erreur TTS:", error);
-                alert("Erreur lors de la génération audio.");
-            }
-        } finally {
-            setIsGeneratingAudio(false);
-        }
+            const res = await api.post(`/podcasts/${podcastId}/generate-audio`, {
+                voiceInes: settings.voiceInes,
+                voiceYannick: settings.voiceYannick,
+                speed: settings.speed,
+            }, { timeout: 300000 });
+            const base = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+            setAudioUrl(`${base}${res.data.audio_url}`);
+        } catch (e: any) {
+            if (e?.response?.data?.error === 'tts_not_configured') {
+                alert('La génération audio sera disponible prochainement.');
+            } else { console.error('Erreur TTS:', e); alert('Erreur lors de la génération audio.'); }
+        } finally { setIsGeneratingAudio(false); }
     };
 
+    const handleNavigateBack = () => {
+        if (saveStatus === 'unsaved') {
+            if (!window.confirm('Des modifications non sauvegardées seront perdues. Continuer ?')) return;
+        }
+        navigate(`/editor/${projectId}`, { state: { step: 2 } });
+    };
+
+    const handleShowSource = async () => {
+        setShowSourceModal(true);
+        if (sourceText !== null) return;
+        setLoadingSource(true);
+        try {
+            const res = await api.get(`/podcasts/${podcastId}/source-section`);
+            setSourceText(res.data.source_text || '');
+        } catch { setSourceText('Impossible de charger le texte source.'); }
+        finally { setLoadingSource(false); }
+    };
+
+    const totalWords = dialogues.reduce((sum, d) => sum + (d.text_studio?.split(/\s+/).length ?? 0), 0);
+    const totalSecs = dialogues.reduce((sum, d) => sum + (d.duration_seconds ?? 0), 0);
+    const totalMins = Math.floor(totalSecs / 60);
+    const canExport = !hasPendingPropositions && (verification.status === 'success' || verification.status === 'idle');
+
     if (loading) return (
-        <div className="h-screen flex items-center justify-center bg-background">
-            <Loader2 className="animate-spin text-primary" size={40} />
+        <div className="h-screen flex items-center justify-center bg-[#E6E2E6]">
+            <Loader2 className="animate-spin text-[#D6475B]" size={32} />
         </div>
     );
 
-    const hasPendingPropositions = allPropositions.length > 0;
-
     return (
         <AppLayout>
-            {/* Barre de navigation des propositions */}
+            {/* ── Bannière état vérification ── */}
             <AnimatePresence>
+                {verification.status === 'running' && (
+                    <motion.div
+                        initial={{ y: -48, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: -48, opacity: 0 }}
+                        className="fixed top-14 left-0 right-0 z-40 bg-[#6BB8CD] text-white px-6 py-2.5 flex items-center justify-between"
+                    >
+                        <span className="flex items-center gap-2 text-sm font-semibold">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            Vérification en cours… analyse du chapitre
+                        </span>
+                        <span className="text-xs opacity-80">Traitement des concepts pédagogiques</span>
+                    </motion.div>
+                )}
+                {verification.status === 'success' && (
+                    <motion.div
+                        initial={{ y: -48, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: -48, opacity: 0 }}
+                        className="fixed top-14 left-0 right-0 z-40 bg-[#F0F7E0] border-b border-[#BDD145]/40 px-6 py-2 flex items-center justify-between"
+                    >
+                        <span className="flex items-center gap-2 text-sm font-semibold text-[#5a6e00]">
+                            <CheckCircle className="h-4 w-4" />
+                            VÉRIFICATION RÉUSSIE &nbsp;|&nbsp; Fidélité : {verification.score}% — Aucun concept manquant détecté dans ce chapitre.
+                        </span>
+                        <span className="text-xs font-semibold text-[#5a6e00]">Statut : Validé</span>
+                    </motion.div>
+                )}
+                {verification.status === 'insufficient' && (
+                    <motion.div
+                        initial={{ y: -48, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: -48, opacity: 0 }}
+                        className="fixed top-14 left-0 right-0 z-40 bg-amber-50 border-b border-amber-200 px-6 py-2 flex items-center justify-between"
+                    >
+                        <span className="flex items-center gap-2 text-sm font-semibold text-amber-800">
+                            <AlertTriangle className="h-4 w-4" />
+                            Fidélité : {verification.score}% — {verification.missingConcepts.length} concept{verification.missingConcepts.length > 1 ? 's' : ''} manquant{verification.missingConcepts.length > 1 ? 's' : ''} détecté{verification.missingConcepts.length > 1 ? 's' : ''} dans le chapitre actuel.
+                        </span>
+                        <button
+                            onClick={handleAutoFix}
+                            className="flex items-center gap-1.5 text-xs font-semibold text-amber-800 hover:text-amber-900 bg-amber-100 hover:bg-amber-200 border border-amber-300 rounded-lg px-3 py-1.5 transition-colors"
+                        >
+                            <RotateCcw className="h-3.5 w-3.5" />
+                            Corriger automatiquement
+                        </button>
+                    </motion.div>
+                )}
                 {hasPendingPropositions && (
                     <motion.div
-                        initial={{ y: -60, opacity: 0 }}
-                        animate={{ y: 0, opacity: 1 }}
-                        exit={{ y: -60, opacity: 0 }}
-                        className="fixed top-0 left-0 right-0 z-50 bg-amber-50 border-b-2 border-amber-300 shadow-md px-6 py-3 flex items-center gap-4 flex-wrap"
+                        initial={{ y: -48, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: -48, opacity: 0 }}
+                        className="fixed top-14 left-0 right-0 z-50 bg-[#FFF3DB] border-b-2 border-[#E6A440]/50 px-6 py-2.5 flex items-center gap-4 flex-wrap"
                     >
-                        <span className="text-amber-800 font-bold text-sm">
+                        <span className="text-[#7a5200] font-bold text-sm">
                             ⚠ {allPropositions.length} proposition{allPropositions.length > 1 ? 's' : ''} à valider
                         </span>
                         <div className="flex items-center gap-2">
-                            <button
-                                onClick={goPrev}
-                                disabled={currentPropGlobalIdx === 0}
-                                className="p-1.5 rounded-lg border border-amber-300 text-amber-700 hover:bg-amber-100 disabled:opacity-30 transition-all"
-                            >
-                                <ChevronLeft size={16} />
+                            <button onClick={() => { const i = Math.max(0, currentPropIdx - 1); setCurrentPropIdx(i); scrollToProp(i); }} disabled={currentPropIdx === 0} className="p-1.5 rounded-lg border border-[#E6A440]/50 text-[#7a5200] hover:bg-[#E6A440]/10 disabled:opacity-30">
+                                <ChevronLeft className="h-4 w-4" />
                             </button>
-                            <span className="text-sm font-bold text-amber-800 tabular-nums min-w-[60px] text-center">
-                                {currentPropGlobalIdx + 1} / {allPropositions.length}
-                            </span>
-                            <button
-                                onClick={goNext}
-                                disabled={currentPropGlobalIdx >= allPropositions.length - 1}
-                                className="p-1.5 rounded-lg border border-amber-300 text-amber-700 hover:bg-amber-100 disabled:opacity-30 transition-all"
-                            >
-                                <ChevronRight size={16} />
+                            <span className="text-sm font-bold text-[#7a5200] tabular-nums min-w-[52px] text-center">{currentPropIdx + 1} / {allPropositions.length}</span>
+                            <button onClick={() => { const i = Math.min(allPropositions.length - 1, currentPropIdx + 1); setCurrentPropIdx(i); scrollToProp(i); }} disabled={currentPropIdx >= allPropositions.length - 1} className="p-1.5 rounded-lg border border-[#E6A440]/50 text-[#7a5200] hover:bg-[#E6A440]/10 disabled:opacity-30">
+                                <ChevronRight className="h-4 w-4" />
                             </button>
                         </div>
                         {activeProp && (
                             <>
-                                <button
-                                    onClick={() => handleAccept(activeProp.dialogueId, activeProp.fullMatch)}
-                                    className="px-3 py-1.5 rounded-lg bg-green-100 border border-green-300 text-green-800 font-bold text-sm hover:bg-green-200 transition-all flex items-center gap-1"
-                                >
-                                    ✓ Garder
-                                </button>
-                                <button
-                                    onClick={() => handleReject(activeProp.dialogueId, activeProp.fullMatch)}
-                                    className="px-3 py-1.5 rounded-lg bg-red-50 border border-red-200 text-red-700 font-bold text-sm hover:bg-red-100 transition-all flex items-center gap-1"
-                                >
-                                    ✗ Supprimer
-                                </button>
-                                <span className="text-xs text-amber-700 italic truncate max-w-xs">
-                                    « {activeProp.content.slice(0, 60)}{activeProp.content.length > 60 ? '…' : ''} »
-                                </span>
+                                <button onClick={() => handleAccept(activeProp.dialogueId, activeProp.fullMatch)} className="px-3 py-1.5 rounded-lg bg-[#BDD145]/20 border border-[#BDD145]/40 text-[#5a6e00] font-bold text-sm hover:bg-[#BDD145]/30">✓ Garder</button>
+                                <button onClick={() => handleReject(activeProp.dialogueId, activeProp.fullMatch)} className="px-3 py-1.5 rounded-lg bg-[#D6475B]/10 border border-[#D6475B]/20 text-[#D6475B] font-bold text-sm hover:bg-[#D6475B]/20">✗ Supprimer</button>
+                                <span className="text-xs text-[#7a5200] italic truncate max-w-xs">«&nbsp;{activeProp.content.slice(0, 60)}{activeProp.content.length > 60 ? '…' : ''}&nbsp;»</span>
                             </>
                         )}
                     </motion.div>
                 )}
             </AnimatePresence>
 
-            <div className={`max-w-5xl mx-auto pb-20 ${hasPendingPropositions ? 'mt-20' : 'mt-6'}`}>
-                <div className="flex flex-col md:flex-row justify-between gap-4 mb-6 mt-2">
+            <div className={`max-w-[1300px] mx-auto ${(verification.status !== 'idle' || hasPendingPropositions) ? 'mt-12' : ''}`}>
+
+                {/* ── Retour chapitres ── */}
+                <button
+                    onClick={handleNavigateBack}
+                    className="flex items-center gap-1 text-xs font-semibold text-muted-foreground hover:text-[#D6475B] transition-colors mb-3 group"
+                >
+                    <ChevronLeft className="h-3.5 w-3.5 group-hover:-translate-x-0.5 transition-transform" />
+                    Chapitres
+                </button>
+
+                {/* ── Stepper ── */}
+                <div className="flex items-center justify-center gap-2 mb-6 mt-1">
+                    {[
+                        { label: 'Aperçu source', href: `/editor/${projectId}`, navState: undefined },
+                        { label: 'Structure du cours', href: `/editor/${projectId}`, navState: { step: 2 } },
+                        { label: 'Éditeur', href: null, navState: undefined },
+                    ].map((s, i) => {
+                        const isDone = i < 2;
+                        return (
+                            <div key={i} className="flex items-center gap-2">
+                                {isDone ? (
+                                    <Link
+                                        to={s.href!}
+                                        state={s.navState}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-white text-foreground border border-[#E0DCE0] hover:border-[#D6475B] transition-colors"
+                                    >
+                                        <span className="w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold bg-[#BDD145]/20 text-[#5a6e00]">{i + 1}</span>
+                                        {s.label}
+                                    </Link>
+                                ) : (
+                                    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-[#D6475B] text-white shadow-sm">
+                                        <span className="w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold bg-white/25 text-white">{i + 1}</span>
+                                        {s.label}
+                                    </div>
+                                )}
+                                {i < 2 && <div className={`w-8 h-px ${isDone ? 'bg-[#D6475B]/40' : 'bg-[#E0DCE0]'}`} />}
+                            </div>
+                        );
+                    })}
+                </div>
+
+                {/* Header */}
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-6">
                     <div className="flex items-center gap-3">
                         <button
                             onClick={() => { handleSaveAction(dialogues); navigate(`/project/${projectId}/podcasts`); }}
-                            className="p-2 bg-card border border-border rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-all shadow-sm"
+                            className="p-2 bg-white border border-[#E0DCE0] rounded-lg text-muted-foreground hover:text-foreground hover:border-[#D6475B]/30 transition-all"
                         >
-                            <ChevronLeft size={16} />
+                            <ChevronLeft className="h-4 w-4" />
                         </button>
                         <div>
                             <nav className="flex items-center gap-1 text-xs text-muted-foreground mb-0.5">
-                                <Link to="/dashboard" className="hover:text-foreground transition-colors">Projets</Link>
+                                <Link to="/dashboard" className="hover:text-foreground">Projets</Link>
                                 <span>/</span>
                                 {podcastInfo.project_title && (
-                                    <>
-                                        <Link to={`/project/${projectId}/podcasts`} className="hover:text-foreground transition-colors">
-                                            {podcastInfo.project_title}
-                                        </Link>
-                                        <span>/</span>
-                                    </>
+                                    <><Link to={`/project/${projectId}/podcasts`} className="hover:text-foreground">{podcastInfo.project_title}</Link><span>/</span></>
                                 )}
-                                <span className="text-foreground font-medium truncate max-w-[180px]">{podcastInfo.title || 'Podcast'}</span>
+                                <span className="text-foreground font-medium truncate max-w-[180px]">{podcastInfo.title}</span>
                             </nav>
-                            <h1 className="text-lg font-extrabold text-foreground tracking-tight font-display leading-tight">
-                                {podcastInfo.title || 'Éditeur de podcast'}
-                            </h1>
+                            <h1 className="text-lg font-bold text-foreground">Éditeur de Dialogue</h1>
+                            <p className="text-xs text-muted-foreground">Révisez et ajustez les répliques générées par l'IA.</p>
                         </div>
                     </div>
-
-                    <div className="flex items-center gap-2 flex-wrap">
-                        {/* Dropdown Exporter */}
-                        <div className="relative group/export z-50">
-                            <button className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-all shadow-sm bg-card border border-border text-foreground hover:bg-secondary">
-                                <FileDown size={14} />
-                                Exporter
-                                <ChevronDown size={12} />
-                            </button>
-                            <div className="absolute right-0 top-full mt-2 w-52 bg-card border border-border shadow-2xl rounded-xl p-2 opacity-0 pointer-events-none group-hover/export:opacity-100 group-hover/export:pointer-events-auto transition-all flex flex-col origin-top-right">
-                                <div className="text-[10px] font-bold text-muted-foreground px-2 py-1 uppercase tracking-wider">Texte (.txt)</div>
-                                <button onClick={() => window.open(`/api/podcasts/${podcastId}/export-txt`)} className="text-left px-3 py-2 hover:bg-secondary rounded-lg text-sm transition-colors text-foreground font-medium">Script API (Speaker 1/2)</button>
-                                <div className="h-[1px] bg-border my-1" />
-                                <div className="text-[10px] font-bold text-muted-foreground px-2 py-1 uppercase tracking-wider">Word (.docx)</div>
-                                <button onClick={() => window.open(`/api/podcasts/${podcastId}/export-word/studio`)} className="text-left px-3 py-2 hover:bg-secondary rounded-lg text-sm transition-colors text-foreground font-medium">Version Studio</button>
-                                <button onClick={() => window.open(`/api/podcasts/${podcastId}/export-word/lecture`)} className="text-left px-3 py-2 hover:bg-secondary rounded-lg text-sm transition-colors text-foreground font-medium">Version Lecture</button>
-                                <div className="h-[1px] bg-border my-1" />
-                                <div className="text-[10px] font-bold text-muted-foreground px-2 py-1 uppercase tracking-wider">Référence</div>
-                                <button onClick={handleShowSource} className="text-left px-3 py-2 hover:bg-secondary rounded-lg text-sm transition-colors text-foreground font-medium">Texte source</button>
-                            </div>
-                        </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
                         <button
-                            onClick={() => setShowVerificationPanel(true)}
-                            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-all shadow-sm bg-accent/10 border border-accent/20 text-accent hover:bg-accent/20"
+                            onClick={handleShowSource}
+                            className="flex items-center gap-1.5 bg-white border border-[#E0DCE0] rounded-lg px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors"
                         >
-                            ✨ Vérifier (IA)
+                            <FileText className="h-3.5 w-3.5" />
+                            Historique
+                        </button>
+                        <button
+                            onClick={() => { setIsAddingDialogue(true); setNewDialogueChar(dialogues[dialogues.length - 1]?.character === 'ines' ? 'yannick' : 'ines'); }}
+                            className="flex items-center gap-1.5 bg-white border border-[#E0DCE0] rounded-lg px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:text-[#D6475B] hover:border-[#D6475B]/30 transition-colors"
+                        >
+                            <Plus className="h-3.5 w-3.5" />
+                            Ajouter une réplique
                         </button>
                         <button
                             onClick={() => handleSaveAction(dialogues)}
                             disabled={saveStatus === 'saving'}
-                            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-all shadow-sm bg-card border border-border text-foreground hover:bg-secondary"
+                            className="flex items-center gap-1.5 bg-white border border-[#E0DCE0] rounded-lg px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground transition-all"
                         >
-                            {saveStatus === 'saving' && <Loader2 size={14} className="animate-spin" />}
-                            {saveStatus === 'saved' && <CheckCircle size={14} className="text-green-500" />}
+                            {saveStatus === 'saving' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : saveStatus === 'saved' ? <CheckCircle className="h-3.5 w-3.5 text-[#BDD145]" /> : null}
                             Sauvegarder
-                        </button>
-                        <button
-                            onClick={() => !audioUrl && !isGeneratingAudio && !hasPendingPropositions && setIsAudioModalOpen(true)}
-                            disabled={isGeneratingAudio || hasPendingPropositions}
-                            title={hasPendingPropositions ? 'Validez toutes les propositions avant de générer l\'audio' : ''}
-                            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-all shadow-sm ${
-                                audioUrl
-                                    ? 'bg-green-100 text-green-700 cursor-default'
-                                    : hasPendingPropositions
-                                    ? 'bg-amber-100 text-amber-600 cursor-not-allowed border border-amber-200'
-                                    : isGeneratingAudio
-                                    ? 'bg-indigo-200 text-indigo-500 cursor-wait'
-                                    : 'bg-indigo-600 text-white hover:bg-indigo-700'
-                            }`}
-                        >
-                            {audioUrl
-                                ? '✅ Audio prêt'
-                                : hasPendingPropositions
-                                ? `⚠ ${allPropositions.length} proposition${allPropositions.length > 1 ? 's' : ''}`
-                                : isGeneratingAudio
-                                ? <><Loader2 size={14} className="animate-spin" /> En cours...</>
-                                : '🎙️ Générer le podcast'
-                            }
                         </button>
                     </div>
                 </div>
 
-                <div className="space-y-4">
-                    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                        <SortableContext items={dialogues.map(d => d.id)} strategy={verticalListSortingStrategy}>
-                            {dialogues.map(d => (
-                                <SortableDialogue
-                                    key={d.id}
-                                    dialogue={d}
-                                    onUpdate={handleUpdate}
-                                    onAccept={handleAccept}
-                                    onReject={handleReject}
-                                    activePropositionMatch={activeProp?.dialogueId === d.id ? activeProp.fullMatch : null}
-                                    elementRef={(el) => {
-                                        if (el) dialogueElRefs.current.set(d.id, el);
-                                        else dialogueElRefs.current.delete(d.id);
-                                    }}
-                                />
-                            ))}
-                        </SortableContext>
-                    </DndContext>
+                {/* 2-col layout */}
+                <div className="grid lg:grid-cols-[1fr_300px] gap-5">
+
+                    {/* Left — dialogue list */}
+                    <div className="space-y-3">
+                        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                            <SortableContext items={dialogues.map(d => d.id)} strategy={verticalListSortingStrategy}>
+                                {dialogues.map(d => (
+                                    <SortableDialogue
+                                        key={d.id}
+                                        dialogue={d}
+                                        onUpdate={handleUpdate}
+                                        onAccept={handleAccept}
+                                        onReject={handleReject}
+                                        onDelete={handleDeleteDialogue}
+                                        activePropositionMatch={activeProp?.dialogueId === d.id ? activeProp.fullMatch : null}
+                                        elementRef={(el) => { if (el) dialogueElRefs.current.set(d.id, el); else dialogueElRefs.current.delete(d.id); }}
+                                    />
+                                ))}
+                            </SortableContext>
+                        </DndContext>
+
+                        {/* Add dialogue — inline form */}
+                        <AnimatePresence>
+                            {isAddingDialogue ? (
+                                <motion.div
+                                    key="add-form"
+                                    initial={{ opacity: 0, y: 8 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: 8 }}
+                                    className="bg-white border-2 border-[#D6475B]/30 rounded-xl p-4 space-y-3"
+                                >
+                                    {/* Character picker */}
+                                    <div className="flex gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => setNewDialogueChar('ines')}
+                                            className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-semibold border transition-all ${
+                                                newDialogueChar === 'ines'
+                                                    ? 'bg-[#D6475B]/10 border-[#D6475B]/40 text-[#D6475B]'
+                                                    : 'border-[#E0DCE0] text-muted-foreground hover:border-[#D6475B]/20'
+                                            }`}
+                                        >
+                                            <span className="w-5 h-5 rounded-full bg-[#D6475B]/15 text-[#D6475B] flex items-center justify-center text-[10px] font-bold">I</span>
+                                            Inès
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setNewDialogueChar('yannick')}
+                                            className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-semibold border transition-all ${
+                                                newDialogueChar === 'yannick'
+                                                    ? 'bg-[#3465AE]/10 border-[#3465AE]/40 text-[#3465AE]'
+                                                    : 'border-[#E0DCE0] text-muted-foreground hover:border-[#3465AE]/20'
+                                            }`}
+                                        >
+                                            <span className="w-5 h-5 rounded-full bg-[#3465AE]/15 text-[#3465AE] flex items-center justify-center text-[10px] font-bold">Y</span>
+                                            Yannick
+                                        </button>
+                                    </div>
+
+                                    {/* Text input */}
+                                    <textarea
+                                        data-no-dnd="true"
+                                        autoFocus
+                                        value={newDialogueText}
+                                        onChange={(e) => setNewDialogueText(e.target.value)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Escape') { setIsAddingDialogue(false); setNewDialogueText(''); }
+                                        }}
+                                        placeholder="Saisissez la réplique…"
+                                        rows={3}
+                                        className="w-full bg-[#F8F7F8] border border-[#E0DCE0] rounded-lg px-3 py-2 text-[13px] font-normal text-foreground leading-relaxed resize-none focus:outline-none focus:ring-2 focus:ring-[#D6475B]/30 focus:border-[#D6475B]"
+                                    />
+
+                                    {/* Actions */}
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => { setIsAddingDialogue(false); setNewDialogueText(''); }}
+                                            className="flex-1 py-2 rounded-lg text-xs font-semibold border border-[#E0DCE0] text-muted-foreground hover:bg-[#F0EEF0] transition-colors"
+                                        >
+                                            Annuler
+                                        </button>
+                                        <button
+                                            onClick={() => newDialogueText.trim() && handleAddDialogue(newDialogueChar, newDialogueText.trim())}
+                                            disabled={!newDialogueText.trim() || isSubmittingNew}
+                                            className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold bg-[#D6475B] text-white hover:bg-[#c03d50] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                        >
+                                            {isSubmittingNew ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
+                                            Ajouter
+                                        </button>
+                                    </div>
+                                </motion.div>
+                            ) : (
+                                <motion.button
+                                    key="add-btn"
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0 }}
+                                    onClick={() => { setIsAddingDialogue(true); setNewDialogueChar(dialogues[dialogues.length - 1]?.character === 'ines' ? 'yannick' : 'ines'); }}
+                                    className="flex w-full items-center justify-center gap-2 text-sm text-muted-foreground border-2 border-dashed border-[#D4D0D4] rounded-xl py-3 hover:border-[#D6475B]/50 hover:text-[#D6475B] hover:bg-[#D6475B]/[0.02] transition-all"
+                                >
+                                    <Plus className="h-4 w-4" />
+                                    Ajouter une réplique
+                                </motion.button>
+                            )}
+                        </AnimatePresence>
+                    </div>
+
+                    {/* Right — fidelity panel */}
+                    <div className="space-y-4">
+                        {/* Score card */}
+                        <div className="bg-white rounded-xl border border-[#E0DCE0] shadow-sm p-5">
+                            <h3 className="text-sm font-bold text-foreground mb-4 flex items-center gap-1.5">
+                                <ShieldCheck className="h-4 w-4 text-[#6BB8CD]" />
+                                {verification.status === 'idle' ? 'Analyse de Fidélité' : 'Score de Fidélité'}
+                            </h3>
+
+                            <div className="flex justify-center mb-4">
+                                <ScoreGauge score={verification.score} />
+                            </div>
+
+                            {verification.status === 'success' && (
+                                <p className="text-xs text-center text-muted-foreground mb-3">
+                                    Votre script couvre l'intégralité des concepts clés du document source.
+                                </p>
+                            )}
+
+                            {/* Stats */}
+                            {verification.status === 'success' && (
+                                <div className="grid grid-cols-2 gap-2 mb-4">
+                                    <div className="bg-[#F8F7F8] rounded-lg p-2.5 text-center">
+                                        <p className="text-lg font-bold text-foreground">0</p>
+                                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Omissions</p>
+                                    </div>
+                                    <div className="bg-[#BDD145]/10 rounded-lg p-2.5 text-center">
+                                        <p className="text-sm font-bold text-[#5a6e00] flex items-center justify-center gap-1">
+                                            <CheckCircle className="h-3.5 w-3.5" /> OK
+                                        </p>
+                                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Cohérence</p>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Missing concepts */}
+                            {verification.status === 'insufficient' && verification.missingConcepts.length > 0 && (
+                                <div className="mb-4 space-y-1.5">
+                                    <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-2">
+                                        Concepts manquants ({verification.missingConcepts.length})
+                                    </p>
+                                    {verification.missingConcepts.map((c, i) => (
+                                        <div key={i} className="flex items-start gap-1.5 text-xs text-amber-800">
+                                            <span className="mt-0.5 flex-shrink-0 h-1.5 w-1.5 rounded-full bg-[#E6A440] mt-1.5" />
+                                            {c}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            {/* Verify / re-verify button */}
+                            {verification.status === 'idle' && (
+                                <button
+                                    onClick={handleVerify}
+                                    disabled={hasPendingPropositions}
+                                    className="w-full flex items-center justify-center gap-1.5 bg-[#D6475B] text-white text-xs font-semibold py-2.5 rounded-lg hover:bg-[#c03d50] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                >
+                                    <ShieldCheck className="h-3.5 w-3.5" />Lancer la vérification
+                                </button>
+                            )}
+                            {verification.status === 'insufficient' && verification.passCount < 2 && (
+                                <button
+                                    onClick={handleAutoFix}
+                                    disabled={hasPendingPropositions}
+                                    className="w-full flex items-center justify-center gap-1.5 bg-[#D6475B] text-white text-xs font-semibold py-2.5 rounded-lg hover:bg-[#c03d50] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                >
+                                    <RotateCcw className="h-3.5 w-3.5" />Relancer la correction
+                                </button>
+                            )}
+                            {verification.status === 'insufficient' && verification.passCount >= 2 && (
+                                <div className="flex items-start gap-2 text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5">
+                                    <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />
+                                    <span>Les 2 passes de correction automatique ont été épuisées. Modifiez les répliques manuellement, puis relancez l'analyse.</span>
+                                </div>
+                            )}
+                            {verification.status === 'insufficient' && verification.passCount >= 2 && (
+                                <button
+                                    onClick={handleVerify}
+                                    className="w-full flex items-center justify-center gap-1.5 text-xs font-semibold py-2 rounded-lg border border-[#E0DCE0] text-muted-foreground hover:text-foreground hover:border-[#D6475B]/30 transition-colors"
+                                >
+                                    <ShieldCheck className="h-3.5 w-3.5" />Relancer l'analyse
+                                </button>
+                            )}
+
+                            {verification.status === 'running' && (
+                                <div className="flex items-center justify-center gap-2 py-2 text-sm text-[#6BB8CD] font-medium">
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                    Analyse en cours…
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Project details */}
+                        <div className="bg-white rounded-xl border border-[#E0DCE0] shadow-sm p-5 space-y-3">
+                            <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Détails du projet</h3>
+                            <div className="space-y-2 text-sm">
+                                <div className="flex justify-between">
+                                    <span className="text-muted-foreground">Mots totaux :</span>
+                                    <span className="font-semibold">{totalWords.toLocaleString('fr-FR')} mots</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-muted-foreground">Durée totale :</span>
+                                    <span className="font-semibold">{totalMins > 0 ? `${totalMins}:${String(totalSecs % 60).padStart(2,'0')} min` : '—'}</span>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <span className="text-muted-foreground flex items-center gap-1"><Users className="h-3.5 w-3.5" />Intervenants :</span>
+                                    <div className="flex -space-x-1.5">
+                                        <div className="h-6 w-6 rounded-full bg-[#D6475B]/15 border-2 border-white flex items-center justify-center text-[9px] font-bold text-[#D6475B]">I</div>
+                                        <div className="h-6 w-6 rounded-full bg-[#3465AE]/15 border-2 border-white flex items-center justify-center text-[9px] font-bold text-[#3465AE]">Y</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <p className="text-[10px] text-muted-foreground/60 italic">Ces statistiques incluent les pauses naturelles et l'intonation synthétisée.</p>
+                        </div>
+
+                        {/* Export / finaliser */}
+                        <div className="bg-white rounded-xl border border-[#E0DCE0] shadow-sm p-5 space-y-3">
+                            <h3 className="text-xs font-bold uppercase tracking-wider text-[#D6475B] mb-1">Finaliser le projet</h3>
+                            <button
+                                onClick={() => canExport && !isGeneratingAudio && setIsAudioModalOpen(true)}
+                                disabled={!canExport || isGeneratingAudio || hasPendingPropositions}
+                                className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold transition-all ${
+                                    audioUrl ? 'bg-[#BDD145]/15 text-[#5a6e00] border border-[#BDD145]/30' :
+                                    !canExport ? 'bg-[#E6E2E6] text-muted-foreground cursor-not-allowed' :
+                                    'bg-[#D6475B] text-white hover:bg-[#c03d50]'
+                                }`}
+                            >
+                                {isGeneratingAudio ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                                {audioUrl ? '✅ Audio prêt' : '🎙 Générer l\'audio (MP3)'}
+                            </button>
+                            <button
+                                disabled={!canExport}
+                                onClick={() => canExport && window.open(`/api/podcasts/${podcastId}/export-word/studio`)}
+                                className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold border transition-all ${
+                                    !canExport ? 'border-[#E0DCE0] text-muted-foreground cursor-not-allowed opacity-50' :
+                                    'border-[#D6475B]/30 text-[#D6475B] hover:bg-[#D6475B]/5'
+                                }`}
+                            >
+                                <FileDown className="h-4 w-4" />
+                                Exporter le script (PDF)
+                            </button>
+                            {!canExport && (
+                                <div className="flex items-start gap-2 text-[11px] text-muted-foreground bg-[#F8F7F8] rounded-lg p-2.5">
+                                    <span className="flex-shrink-0 mt-0.5">ⓘ</span>
+                                    <span>
+                                        {hasPendingPropositions
+                                            ? 'Validez toutes les propositions avant d\'exporter.'
+                                            : `Export bloqué : La fidélité doit atteindre au moins 95% pour autoriser l'exportation. Veuillez corriger les concepts manquants.`}
+                                    </span>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Source doc info */}
+                        <div className="text-[11px] text-muted-foreground uppercase tracking-wider">Document source</div>
+                        <button
+                            onClick={handleShowSource}
+                            className="flex items-center justify-between w-full bg-white border border-[#E0DCE0] rounded-lg px-3 py-2 text-xs text-muted-foreground hover:border-[#D6475B]/30 hover:text-foreground transition-all"
+                        >
+                            <div className="flex items-center gap-2">
+                                <FileText className="h-3.5 w-3.5 text-[#D6475B]" />
+                                <span className="truncate max-w-[160px]">{podcastInfo.project_title || 'document_source.docx'}</span>
+                            </div>
+                        </button>
+                    </div>
                 </div>
             </div>
 
+            {/* Audio player */}
+            {audioUrl && (
+                <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-white border border-[#E0DCE0] shadow-xl rounded-full px-5 py-2 flex items-center gap-3">
+                    <span className="text-xs font-semibold text-muted-foreground">Aperçu audio</span>
+                    <audio src={audioUrl} controls className="h-8" />
+                </div>
+            )}
+
+            {/* Modal audio */}
+            <GenerateAudioModal
+                isOpen={isAudioModalOpen}
+                onCancel={() => setIsAudioModalOpen(false)}
+                onConfirm={handleGenerateAudio}
+                isGenerating={isGeneratingAudio}
+                estimatedDurationMin={Math.round(totalWords / 150) || undefined}
+            />
+
+            {/* Source modal */}
             <AnimatePresence>
-                {showVerificationPanel && (
+                {showSourceModal && (
                     <>
-                        <motion.div
-                            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                            onClick={() => setShowVerificationPanel(false)}
-                            className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40"
-                        />
-                        <motion.div
-                            initial={{ x: '100%', opacity: 0.5 }} animate={{ x: 0, opacity: 1 }}
-                            exit={{ x: '100%', opacity: 0.5 }}
-                            transition={{ type: "spring", damping: 25, stiffness: 200 }}
-                            className="fixed right-0 top-0 bottom-0 w-[400px] bg-card border-l border-border shadow-2xl z-50 flex flex-col"
-                        >
-                            <div className="p-6 border-b border-border flex items-center justify-between">
+                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowSourceModal(false)} className="fixed inset-0 bg-black/45 z-40" />
+                        <motion.div initial={{ scale: 0.96, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.96, opacity: 0 }} className="fixed inset-x-4 top-[8%] bottom-[8%] max-w-3xl mx-auto bg-white border border-[#E0DCE0] shadow-2xl rounded-2xl z-50 flex flex-col">
+                            <div className="p-5 border-b border-[#E0DCE0] flex items-center justify-between flex-shrink-0">
                                 <div>
-                                    <h2 className="font-bold text-lg">Vérification de l'IA</h2>
-                                    <p className="text-sm text-muted-foreground mt-1">Analyse de fidélité au script d'origine</p>
+                                    <h2 className="font-bold text-base">Texte source — {podcastInfo.title}</h2>
+                                    <p className="text-xs text-muted-foreground mt-0.5">Contenu du cours correspondant à ce chapitre</p>
                                 </div>
-                                <button onClick={() => setShowVerificationPanel(false)} className="p-2 hover:bg-secondary rounded-full">
-                                    <ChevronRight size={20} className="text-muted-foreground" />
-                                </button>
+                                <button onClick={() => setShowSourceModal(false)} className="p-2 hover:bg-[#F0EEF0] rounded-lg text-muted-foreground"><X className="h-4 w-4" /></button>
                             </div>
-                            <div className="p-6 flex-1 overflow-y-auto">
-                                <AIVerificationPanel podcastId={podcastId!} onCorrectionDone={loadData} />
+                            <div className="flex-1 overflow-y-auto p-5">
+                                {loadingSource ? (
+                                    <div className="flex items-center justify-center py-16"><Loader2 className="animate-spin text-[#D6475B]" size={28} /></div>
+                                ) : (
+                                    <pre className="whitespace-pre-wrap text-sm text-foreground font-sans leading-relaxed">{sourceText || 'Aucun texte source disponible.'}</pre>
+                                )}
                             </div>
                         </motion.div>
                     </>
                 )}
             </AnimatePresence>
-
-            <GenerateAudioModal
-                isOpen={isAudioModalOpen}
-                onCancel={() => setIsAudioModalOpen(false)}
-                onConfirm={handleGenerateAudio}
-            />
-
-            {/* Modale texte source */}
-            {showSourceModal && (
-                <>
-                    <div
-                        onClick={() => setShowSourceModal(false)}
-                        className="fixed inset-0 bg-black/50 z-40"
-                    />
-                    <div className="fixed inset-x-4 top-[10%] bottom-[10%] max-w-3xl mx-auto bg-card border border-border shadow-2xl rounded-2xl z-50 flex flex-col">
-                        <div className="p-6 border-b border-border flex items-center justify-between flex-shrink-0">
-                            <div>
-                                <h2 className="font-bold text-lg">Texte source — {podcastInfo.title}</h2>
-                                <p className="text-sm text-muted-foreground mt-0.5">Contenu du cours correspondant à ce chapitre</p>
-                            </div>
-                            <button
-                                onClick={() => setShowSourceModal(false)}
-                                className="p-2 hover:bg-secondary rounded-full text-muted-foreground hover:text-foreground transition-colors"
-                            >
-                                <X size={20} />
-                            </button>
-                        </div>
-                        <div className="flex-1 overflow-y-auto p-6">
-                            {loadingSource ? (
-                                <div className="flex items-center justify-center py-16">
-                                    <Loader2 className="animate-spin text-primary" size={32} />
-                                </div>
-                            ) : (
-                                <pre className="whitespace-pre-wrap text-sm text-foreground font-sans leading-relaxed">
-                                    {sourceText || 'Aucun texte source disponible.'}
-                                </pre>
-                            )}
-                        </div>
-                    </div>
-                </>
-            )}
-
-            {audioUrl && (
-                <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-white p-2 rounded-full shadow-2xl border flex items-center gap-4 px-6">
-                    <span className="text-sm font-bold text-gray-500">Aperçu Audio :</span>
-                    <audio src={audioUrl} controls className="h-8" />
-                </div>
-            )}
         </AppLayout>
     );
 }

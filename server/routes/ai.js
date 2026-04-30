@@ -3,7 +3,6 @@ const pool = require('../models/db');
 const authMiddleware = require('../middleware/auth');
 const mammoth = require('mammoth');
 const { callWebhook } = require('../utils/callWebhook');
-const { callMistral } = require('../utils/callMistral');
 
 const INTRO_TEXT = "<break time=\"2s\" /> Bonjour et bienvenue dans ce podcast de formation EISF — votre capsule audio pour comprendre, apprendre et progresser à votre rythme. Cet épisode, généré par intelligence artificielle à partir de contenus rédigés et validés par nos formateurs, vous accompagne dans vos apprentissages théoriques.";
 const OUTRO_TEXT = "Ce podcast est une création EISF. Il a été généré par intelligence artificielle à partir de contenus pédagogiques rédigés et validés par nos formateurs. Toute reproduction ou diffusion est interdite sans autorisation. <break time=\"2s\" />";
@@ -56,34 +55,29 @@ function extractSourceSectionLocal(cleanedText, orderIndex) {
 }
 
 async function verifyScriptAgainstSource(segmentContent, scriptText) {
-  // ─── APPEL 1 : Extraction des concepts (Mistral, format liste texte) ──────
-  const conceptsText = await callMistral(
-    `Tu es un extracteur de concepts pédagogiques.
-Liste UNIQUEMENT les concepts, faits, chiffres présents dans ce texte.
-Format : une ligne par concept, commençant par "- ". Sois atomique et exhaustif.`,
-    `Extrais TOUS les concepts de ce contenu source :\n\n${segmentContent}`
-  );
+  // ─── Appel 1 : extraction des concepts du source ──────────────────────────
+  const conceptsText = await callWebhook({
+    type: 'verify-extract-concepts',
+    prompt: `Tu es un extracteur de concepts pédagogiques.\nListe UNIQUEMENT les concepts, faits, chiffres présents dans ce texte.\nFormat : une ligne par concept, commençant par "- ". Sois atomique et exhaustif.\n\nExtrais TOUS les concepts de ce contenu source :\n\n${segmentContent}`
+  });
+  if (!conceptsText) throw new Error('Extraction des concepts impossible (Make n\'a pas répondu)');
 
-  if (conceptsText.startsWith('[MOCK]')) {
-    return { fidelityScore: 0, totalConcepts: 0, validatedConcepts: 0, missingConcepts: [], allResults: [] };
-  }
+  const concepts = conceptsText
+    .split('\n')
+    .filter(l => l.startsWith('- '))
+    .map(l => l.slice(2).trim())
+    .filter(Boolean);
 
-  const concepts = conceptsText.split('\n').filter(l => l.startsWith('- ')).map(l => l.slice(2).trim()).filter(Boolean);
-  if (concepts.length === 0) throw new Error("Aucun concept extrait du source");
+  if (concepts.length === 0) throw new Error('Aucun concept extrait du source');
 
-  // ─── APPEL 2 : Vérification binaire (Mistral, format "concept | present/absent") ──
-  const verificationText = await callMistral(
-    `Pour chaque concept, réponds UNIQUEMENT "present" ou "absent"
-selon qu'il est couvert (même reformulé) dans le script.
-Format strict : concept | present   ou   concept | absent`,
-    `CONCEPTS:\n${concepts.map(c => `- ${c}`).join('\n')}\n\nSCRIPT:\n${scriptText}`
-  );
+  // ─── Appel 2 : vérification binaire présent/absent dans le script ─────────
+  const verificationText = await callWebhook({
+    type: 'verify-check-concepts',
+    prompt: `Pour chaque concept, réponds UNIQUEMENT "present" ou "absent" selon qu'il est couvert (même reformulé) dans le script.\nFormat strict par ligne : concept | present   ou   concept | absent\n\nCONCEPTS:\n${concepts.map(c => `- ${c}`).join('\n')}\n\nSCRIPT:\n${scriptText}`
+  });
+  if (!verificationText) throw new Error('Vérification des concepts impossible (Make n\'a pas répondu)');
 
-  if (verificationText.startsWith('[MOCK]')) {
-    return { fidelityScore: 0, totalConcepts: concepts.length, validatedConcepts: 0, missingConcepts: concepts, allResults: [] };
-  }
-
-  // ─── CALCUL MATHÉMATIQUE DU SCORE (pas par le LLM) ───────────────────────
+  // ─── Score calculé mathématiquement par l'app (présents / total × 100) ────
   const lines = verificationText.split('\n').filter(l => l.includes('|'));
   const total = lines.length;
   const validated = lines.filter(l => l.toLowerCase().includes('present')).length;
@@ -198,7 +192,7 @@ function findSentenceBoundary(text, nearChar) {
     return best !== null ? best : nearChar;
 }
 
-function rebalanceSegments(segments, minWords = 350, maxWords = 1200) {
+function rebalanceSegments(segments, minWords = 780, maxWords = 1300) {
     // Fusion des segments trop courts
     const merged = [];
     let i = 0;
@@ -362,13 +356,14 @@ Réponds UNIQUEMENT en JSON valide, sans texte avant ni après :
 router.post('/generate', authMiddleware, async (req, res) => {
     try {
         console.log('[GENERATE] Début');
-        const { projectId, content, targetDuration } = req.body;
+        const { projectId, content } = req.body;
 
-        if (!content || !targetDuration) {
-            return res.status(400).json({ error: 'Contenu et durée cible requis' });
+        if (!content) {
+            return res.status(400).json({ error: 'Contenu requis' });
         }
 
-        const targetWords = targetDuration * 150;
+        const targetDuration = 7;
+        const targetWords = targetDuration * 130;
         const prompt = `
 Tu es un générateur de podcasts pédagogiques EISF (École Internationale du Savoir-Faire Français).
 
@@ -427,6 +422,7 @@ VÉRIFIE AVANT D'ENVOYER :
         } else {
             console.log('🤖 [AI] Appel Make webhook...');
             generatedText = await callWebhook({
+                type: 'generate',
                 sourceText: content,
                 targetDuration,
                 targetWords: targetWords,
@@ -580,6 +576,7 @@ Réponds UNIQUEMENT en JSON valide :
 }`;
 
             const rawText = await callWebhook({
+                type: 'generate',
                 sourceText: segment.content,
                 chapterTitle: segment.title,
                 targetDuration: 7,
@@ -650,14 +647,9 @@ function slugify(str) {
 }
 
 function buildPodcastTitle(orderIndex, projectTitle, chapterTitle) {
-    const num = String((orderIndex || 0) + 1).padStart(2, '0');
-    const now = new Date();
-    const dd = String(now.getDate()).padStart(2, '0');
-    const mm = String(now.getMonth() + 1).padStart(2, '0');
-    const yy = String(now.getFullYear()).slice(-2);
-    const hh = String(now.getHours()).padStart(2, '0');
-    const min = String(now.getMinutes()).padStart(2, '0');
-    return `${num}_${slugify(projectTitle)}_${slugify(chapterTitle)}_${dd}${mm}${yy}${hh}${min}`;
+    const num = (orderIndex || 0) + 1;
+    const clean = (chapterTitle || '').replace(/^#+\s*/, '').trim();
+    return clean ? `Chapitre ${num} — ${clean}` : `Chapitre ${num}`;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -666,7 +658,8 @@ function buildPodcastTitle(orderIndex, projectTitle, chapterTitle) {
 router.post('/generate-single-chapter', authMiddleware, async (req, res) => {
     try {
         console.log('[GENERATE-SINGLE] Début');
-        const { projectId, segment, orderIndex, previousChapter, nextChapter, targetDuration = 7 } = req.body;
+        const { projectId, segment, orderIndex, previousChapter, nextChapter } = req.body;
+        const targetDuration = 7;
 
         if (!segment || !segment.content) {
             return res.status(400).json({ error: 'Segment content is required' });
@@ -740,7 +733,7 @@ TITRE DE L'ÉPISODE : ${segment.title}
 CONTENU SOURCE À TRANSFORMER (tout garder, aucun concept ne peut être omis) :
 ${segment.content}
 
-Durée cible : ${targetDuration} minutes (≈ ${Math.round(targetDuration * 150)} mots de dialogue au total).
+Durée cible : ${targetDuration} minutes (≈ ${Math.round(targetDuration * 130)} mots de dialogue au total).
 Si le contenu source ne suffit pas à atteindre cette durée sans invention, complète avec des [PROPOSITION: ...] pédagogiquement cohérents (exemples concrets du domaine, cas pratiques, reformulations approfondies) — jamais de faits non vérifiables.
 
 Réponds UNIQUEMENT en JSON valide :
@@ -754,6 +747,7 @@ Réponds UNIQUEMENT en JSON valide :
 
         console.log(`[GENERATE-SINGLE] Appel Make pour ${segment.title}...`);
         const rawText = await callWebhook({
+            type: 'generate',
             sourceText: segment.content,
             chapterTitle: segment.title,
             targetDuration,
@@ -958,16 +952,13 @@ router.post('/fix-missing-concepts', authMiddleware, async (req, res) => {
             return res.json({ updatedDialogues: [] });
         }
 
-        const correctedScript = await callMistral(
-            `Tu reçois un script de podcast et une liste de concepts absents.
-Injecte chaque concept naturellement dans une réplique existante.
-Ne change pas le ton. Ne crée pas de nouvelles répliques.
-Retourne le script complet modifié en JSON avec la même structure (tableau de dialogues avec id, character, text_studio, text_reading, section).`,
-            `CONCEPTS MANQUANTS:\n${missingConcepts.map((c, i) => `${i + 1}. ${c}`).join('\n')}\n\nSCRIPT:\n${dialogueText}`
-        );
+        const correctedScript = await callWebhook({
+            type: 'fix-missing-concepts',
+            prompt: `Tu reçois un script de podcast et une liste de concepts absents.\nInjecte chaque concept naturellement dans une réplique existante.\nNe change pas le ton. Ne crée pas de nouvelles répliques.\nRetourne le script complet modifié en JSON avec la même structure (tableau de dialogues avec id, character, text_studio, text_reading, section).\nRéponds UNIQUEMENT en JSON valide, sans markdown.\n\nCONCEPTS MANQUANTS:\n${missingConcepts.map((c, i) => `${i + 1}. ${c}`).join('\n')}\n\nSCRIPT:\n${dialogueText}`
+        });
 
-        if (correctedScript.startsWith('[MOCK]')) {
-            return res.json({ updatedDialogues: [] });
+        if (!correctedScript) {
+            return res.status(502).json({ error: 'Make n\'a pas répondu pour la correction des concepts' });
         }
 
         const resultJson = parseJSON(correctedScript.replace(/```json|```/g, '').trim());
@@ -1056,17 +1047,12 @@ router.post("/auto-verify-and-fix", async (req, res) => {
       if (lastScore >= targetScore) break;
       if (verif.missingConcepts.length === 0) break;
 
-      // ─── APPEL DE CORRECTION (Mistral) ──────────────────────────────────
-      const fixText = await callMistral(
-        `Tu es un correcteur de script de podcast pédagogique.
-On te donne un script existant (JSON) et une liste de concepts manquants tirés du contenu source.
-RÈGLES STRICTES :
-- Intégrer les concepts manquants naturellement dans le dialogue entre Inès et Yannick
-- Ne jamais supprimer ni modifier les répliques existantes — seulement en ajouter ou les enrichir
-- Respecter le style oral (tics de langage, balises <break>, hésitations)
-- Réponds UNIQUEMENT avec le tableau JSON complet des dialogues corrigés, sans markdown`,
-        `CONCEPTS MANQUANTS À INTÉGRER :\n${verif.missingConcepts.map((c, i) => `${i + 1}. ${c}`).join("\n")}\n\nSOURCE :\n${segmentContent}\n\nSCRIPT ACTUEL (JSON) :\n${JSON.stringify(currentDialogues, null, 2)}`
-      );
+      // ─── APPEL DE CORRECTION (Make) ──────────────────────────────────────
+      const fixText = await callWebhook({
+        type: 'fix-script',
+        prompt: `Tu es un correcteur de script de podcast pédagogique.\nOn te donne un script existant (JSON) et une liste de concepts manquants tirés du contenu source.\nRÈGLES STRICTES :\n- Intégrer les concepts manquants naturellement dans le dialogue entre Inès et Yannick\n- Ne jamais supprimer ni modifier les répliques existantes — seulement en ajouter ou les enrichir\n- Respecter le style oral (tics de langage, balises <break>, hésitations)\n- Réponds UNIQUEMENT avec le tableau JSON complet des dialogues corrigés, sans markdown\n\nCONCEPTS MANQUANTS À INTÉGRER :\n${verif.missingConcepts.map((c, i) => `${i + 1}. ${c}`).join("\n")}\n\nSOURCE :\n${segmentContent}\n\nSCRIPT ACTUEL (JSON) :\n${JSON.stringify(currentDialogues, null, 2)}`
+      });
+      if (!fixText) break;
 
       try {
         const clean = fixText.replace(/```json|```/g, "").trim();

@@ -4,7 +4,7 @@ const pool = require('../models/db');
 const authMiddleware = require('../middleware/auth');
 const path = require('path');
 const fs = require('fs');
-const callGPT = require('../utils/callGPT');
+const { callWebhook } = require('../utils/callWebhook');
 const { parseStorylineFile } = require('../utils/storylineParser');
 
 const router = express.Router();
@@ -251,21 +251,12 @@ router.post('/:id/macro-verify', authMiddleware, async (req, res) => {
             fullContent = fullContent.substring(0, MAX_CONTENT) + '\n[... contenu tronqué ...]';
         }
 
-        // 3. Appel GPT via n8n
-        const systemPrompt = `Tu es un expert pédagogique et éditorial.
-Évalue cet ensemble de scripts de podcasts concernant un cours.
-Vérifie si le cours entier est bien couvert de façon cohérente, globale, et si rien d'important n'a été oublié.
-
-Renvoie UNIQUEMENT un objet JSON valide avec cette structure stricte, sans texte avant ni après :
-{
-  "score": <entier sur 100>,
-  "observations": [
-    "<observation 1>",
-    "<observation 2>"
-  ]
-}`;
-
-        const rawText = await callGPT(systemPrompt, `Voici les scripts concaténés :\n\n${fullContent}`);
+        // 3. Appel Make webhook — évaluation macro
+        const rawText = await callWebhook({
+            type: 'macro-evaluate',
+            prompt: `Tu es un expert pédagogique et éditorial.\nÉvalue cet ensemble de scripts de podcasts concernant un cours.\nVérifie si le cours entier est bien couvert de façon cohérente, globale, et si rien d'important n'a été oublié.\n\nRenvoie UNIQUEMENT un objet JSON valide avec cette structure stricte, sans texte avant ni après :\n{\n  "score": <entier sur 100>,\n  "observations": [\n    "<observation 1>",\n    "<observation 2>"\n  ]\n}\n\nVoici les scripts concaténés :\n\n${fullContent}`
+        });
+        if (!rawText) throw new Error('Make n\'a pas répondu pour l\'évaluation macro');
         const cleaned = rawText.replace(/```json\n?|```/g, '').trim();
         const parsedResponse = JSON.parse(cleaned);
         const macroScore = parseInt(parsedResponse.score, 10) || 0;

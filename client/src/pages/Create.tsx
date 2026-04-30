@@ -1,193 +1,264 @@
-import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useState, useRef, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 import AppLayout from '../components/AppLayout';
-import {
-    ChevronLeft,
-    Wand2,
-    Loader2,
-    X
-} from 'lucide-react';
-import { motion } from 'framer-motion';
-import WordImport from '../components/WordImport';
+import { UploadCloud, FileText, Hash, BookOpen, ArrowRight, Loader2, X, Info } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import mammoth from 'mammoth';
+
+interface ParsedStats {
+    wordCount: number;
+    estimatedChapters: number;
+    contentBlocks: number;
+    fileName: string;
+    fileSize: number;
+}
+
+function deriveTitle(fileName: string): string {
+    return fileName
+        .replace(/\.(docx?|pdf)$/i, '')
+        .replace(/[-_]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
 
 export default function Create() {
     const navigate = useNavigate();
+    const inputRef = useRef<HTMLInputElement>(null);
 
-    const [title, setTitle] = useState('');
     const [file, setFile] = useState<File | null>(null);
-    const [content, setContent] = useState('');
+    const [stats, setStats] = useState<ParsedStats | null>(null);
+    const [isDragging, setIsDragging] = useState(false);
+    const [isParsing, setIsParsing] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
     const [error, setError] = useState('');
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if ((!file && !content) || !title) return;
+    const parseFile = async (f: File) => {
+        setIsParsing(true);
+        setError('');
+        try {
+            const buffer = await f.arrayBuffer();
+            const result = await mammoth.extractRawText({ arrayBuffer: buffer });
+            const text = result.value;
+            const words = text.trim().split(/\s+/).filter(Boolean).length;
+            const paragraphs = text.split(/\n\s*\n/).filter(s => s.trim().length > 0);
+            const htmlResult = await mammoth.convertToHtml({ arrayBuffer: buffer });
+            const headingMatches = (htmlResult.value.match(/<h[1-2]/gi) ?? []).length;
+            setStats({
+                wordCount: words,
+                estimatedChapters: Math.max(headingMatches, Math.ceil(words / 800)),
+                contentBlocks: paragraphs.length,
+                fileName: f.name,
+                fileSize: f.size,
+            });
+            setFile(f);
+        } catch {
+            setError("Impossible de lire ce fichier. Vérifiez qu'il est bien au format .docx.");
+            setFile(null);
+            setStats(null);
+        } finally {
+            setIsParsing(false);
+        }
+    };
 
+    const handleDrop = useCallback((e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragging(false);
+        const dropped = e.dataTransfer.files[0];
+        if (!dropped) return;
+        if (!dropped.name.toLowerCase().endsWith('.docx')) {
+            setError('Seuls les fichiers .docx sont acceptés (max 25 Mo).');
+            return;
+        }
+        parseFile(dropped);
+    }, []);
+
+    const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const f = e.target.files?.[0];
+        if (!f) return;
+        if (!f.name.toLowerCase().endsWith('.docx')) {
+            setError('Seuls les fichiers .docx sont acceptés (max 25 Mo).');
+            return;
+        }
+        parseFile(f);
+    };
+
+    const handleContinue = async () => {
+        if (!file || !stats) return;
         setIsUploading(true);
         setError('');
 
         const formData = new FormData();
-        if (file) formData.append('file', file);
-        if (content) formData.append('content', content);
-        formData.append('title', title);
+        formData.append('file', file);
+        formData.append('title', deriveTitle(stats.fileName));
 
         try {
             const response = await api.post('/projects/create', formData, {
                 headers: { 'Content-Type': 'multipart/form-data' },
             });
-            // Redirect to Editor
             navigate(`/editor/${response.data.project.id}`);
         } catch (err: any) {
-            console.error('Erreur création:', err);
-            setError(err.response?.data?.error || "Erreur lors de la création du projet");
+            setError(err.response?.data?.error || 'Erreur lors de la création du projet.');
             setIsUploading(false);
         }
     };
 
+    const resetFile = () => {
+        setFile(null);
+        setStats(null);
+        setError('');
+        if (inputRef.current) inputRef.current.value = '';
+    };
+
     return (
         <AppLayout>
-            <div className="max-w-3xl mx-auto pb-20">
-                {/* Back Button */}
-                <Link to="/dashboard" className="inline-flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors mb-8 font-semibold">
-                    <ChevronLeft size={20} />
-                    Retour au tableau de bord
-                </Link>
-
+            <div className="max-w-2xl mx-auto py-4">
+                {/* Card */}
                 <motion.div
-                    initial={{ opacity: 0, y: 20 }}
+                    initial={{ opacity: 0, y: 14 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="bg-card rounded-3xl shadow-xl overflow-hidden border border-border"
+                    transition={{ duration: 0.3 }}
+                    className="bg-white rounded-2xl shadow-[0_2px_24px_0_rgb(0,0,0,0.09)] border border-[#E0DCE0] overflow-hidden"
                 >
-                    {/* Header Banner */}
-                    <div className="eisf-gradient p-10 text-primary-foreground relative overflow-hidden">
-                        <div className="absolute inset-0 bg-white/5 opacity-10 mix-blend-overlay"></div>
-                        <div className="relative z-10 flex items-center gap-6">
-                            <div className="h-16 w-16 bg-white/10 backdrop-blur-md rounded-2xl flex items-center justify-center border border-white/10">
-                                <Wand2 size={32} />
-                            </div>
-                            <div>
-                                <h1 className="text-3xl font-extrabold tracking-tight font-display">
-                                    Nouveau Podcast
-                                </h1>
-                                <p className="opacity-90 mt-1 font-medium">
-                                    L'IA transforme vos cours en dialogues captivants.
-                                </p>
-                            </div>
-                        </div>
+                    {/* Card header */}
+                    <div className="flex items-center justify-between px-8 pt-8 pb-0">
+                        <h1 className="text-lg font-bold text-foreground">Importer un fichier .docx</h1>
+                        <span className="text-[10px] font-bold tracking-widest uppercase bg-[#E6E2E6] text-muted-foreground px-2.5 py-1 rounded-full">
+                            Nouveau projet
+                        </span>
                     </div>
+                    <p className="px-8 mt-1 text-sm text-muted-foreground">
+                        Commencez par importer votre document source pour structurer votre module de formation.
+                    </p>
 
-                    {/* Form Body */}
-                    <form onSubmit={handleSubmit} className="p-10 space-y-8">
-                        {/* Project Title */}
-                        <div>
-                            <label className="text-sm font-bold text-foreground mb-2 block uppercase tracking-wider">
-                                Titre du projet
-                            </label>
-                            <input
-                                type="text"
-                                value={title}
-                                onChange={(e) => setTitle(e.target.value)}
-                                placeholder="Ex: La Sécurité Incendie - Module 1"
-                                className="w-full px-5 py-3.5 rounded-xl border border-input bg-background/50 focus:bg-background focus:ring-2 focus:ring-ring outline-none transition-all placeholder:text-muted-foreground font-medium"
-                                required
-                            />
-                        </div>
-
-                        {/* 2 Columns: Format & AI Engine */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                            <div>
-                                <label className="text-sm font-bold text-primary mb-2 block uppercase tracking-wider">
-                                    Gestion des durées
-                                </label>
-                                <div className="px-5 py-3.5 rounded-xl bg-primary/10 border border-primary/20 text-primary text-sm flex items-center gap-3">
-                                    ✨ Découpage dynamique (Max 7 min / module) administré automatiquement par l'IA.
-                                </div>
-                            </div>
-                            <div>
-                                <label className="text-sm font-bold text-foreground mb-2 block uppercase tracking-wider">
-                                    Profil & Casting
-                                </label>
-                                <div className="px-5 py-3.5 rounded-xl bg-secondary/50 border border-border text-foreground font-bold text-sm flex items-center gap-3">
-                                    <div className="flex -space-x-2">
-                                        <div className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center border-2 border-background text-[10px]">A</div>
-                                        <div className="w-8 h-8 rounded-full bg-accent text-accent-foreground flex items-center justify-center border-2 border-background text-[10px]">B</div>
-                                    </div>
-                                    Inès & Yannick (Classique)
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* File Upload / Source */}
-                        <div>
-                            <label className="text-sm font-bold text-foreground mb-3 block uppercase tracking-wider">
-                                Contenu source
-                            </label>
-
-                            <div className="space-y-4">
-                                <WordImport
-                                    onFileReady={(f) => {
-                                        setFile(f);
-                                        setContent('');
-                                    }}
-                                    onError={(msg) => setError(msg)}
-                                />
-
-                                <div className="relative">
-                                    <div className="absolute inset-x-0 top-0 flex items-center" aria-hidden="true">
-                                        <div className="w-full border-t border-border"></div>
-                                    </div>
-                                    <div className="relative flex justify-center text-sm">
-                                        <span className="bg-card px-4 text-muted-foreground font-bold uppercase tracking-widest text-[10px]">Ou collez le texte</span>
-                                    </div>
-                                </div>
-
-                                <textarea
-                                    value={content}
-                                    onChange={(e) => { setContent(e.target.value); setFile(null); }}
-                                    placeholder="Collez ici le contenu de votre cours si vous n'avez pas de fichier..."
-                                    className="w-full h-48 px-5 py-4 rounded-2xl border border-input bg-background focus:ring-2 focus:ring-ring outline-none resize-none font-sans text-sm leading-relaxed placeholder:text-muted-foreground transition-all"
-                                />
-                            </div>
-                        </div>
-
-                        {error && (
-                            <motion.div
-                                initial={{ opacity: 0, x: -10 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                className="text-destructive bg-destructive/10 px-5 py-4 rounded-xl text-sm font-bold flex items-center gap-3 border border-destructive/20"
-                            >
-                                <X size={18} className="bg-destructive text-white rounded-full p-0.5" />
-                                {error}
-                            </motion.div>
-                        )}
-
-                        <button
-                            type="submit"
-                            disabled={(!file && !content) || !title || isUploading}
-                            className={`w-full py-5 rounded-2xl text-lg font-extrabold shadow-eisf flex items-center justify-center gap-3 transition-all transform active:scale-[0.98]
-                                ${(!file && !content) || !title || isUploading
-                                    ? 'bg-secondary text-muted-foreground cursor-not-allowed shadow-none'
-                                    : 'eisf-gradient text-primary-foreground hover:opacity-90 hover:shadow-xl'
-                                }
-                            `}
+                    <div className="px-8 py-7 space-y-5">
+                        {/* Drop Zone */}
+                        <div
+                            onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                            onDragLeave={() => setIsDragging(false)}
+                            onDrop={handleDrop}
+                            onClick={() => !file && inputRef.current?.click()}
+                            className={`relative flex flex-col items-center justify-center rounded-xl border-2 border-dashed transition-all cursor-pointer py-10 px-6 ${
+                                isDragging
+                                    ? 'border-[#D6475B] bg-[#D6475B]/[0.04]'
+                                    : file
+                                    ? 'border-[#BDD145] bg-[#BDD145]/[0.04] cursor-default'
+                                    : 'border-[#D4D0D4] bg-[#F8F7F8] hover:border-[#D6475B]/50 hover:bg-[#D6475B]/[0.02]'
+                            }`}
                         >
-                            {isUploading ? (
+                            <input
+                                ref={inputRef}
+                                type="file"
+                                accept=".docx"
+                                onChange={handleFileInput}
+                                className="hidden"
+                            />
+
+                            {isParsing ? (
                                 <>
-                                    <Loader2 className="animate-spin" size={24} />
-                                    <span>Création du projet en cours...</span>
+                                    <Loader2 className="h-10 w-10 text-[#6BB8CD] animate-spin mb-3" />
+                                    <p className="text-sm text-muted-foreground">Analyse du document…</p>
+                                </>
+                            ) : file ? (
+                                <>
+                                    <FileText className="h-10 w-10 text-[#BDD145] mb-3" />
+                                    <p className="text-sm font-semibold text-foreground">{stats?.fileName}</p>
+                                    <p className="text-xs text-muted-foreground mt-0.5">
+                                        {stats ? `${(stats.fileSize / 1024).toFixed(0)} Ko` : ''}
+                                    </p>
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); resetFile(); }}
+                                        className="mt-3 text-xs text-[#D6475B] hover:underline flex items-center gap-1"
+                                    >
+                                        <X className="h-3 w-3" /> Changer de fichier
+                                    </button>
                                 </>
                             ) : (
                                 <>
-                                    <Wand2 size={24} />
-                                    <span>Générer le Podcast</span>
+                                    <UploadCloud className="h-10 w-10 text-muted-foreground mb-3" />
+                                    <p className="text-sm font-semibold text-foreground">Glissez-déposez votre document ici</p>
+                                    <p className="text-xs text-muted-foreground mt-0.5">
+                                        Ou cliquez pour parcourir vos fichiers locaux
+                                    </p>
+                                    <div className="flex items-center gap-1 mt-3 text-[11px] text-muted-foreground/70">
+                                        <Info className="h-3 w-3" />
+                                        FORMAT SUPPORTÉ : .DOCX (MAX 25 MB)
+                                    </div>
+                                </>
+                            )}
+                        </div>
+
+                        {/* Stats — visible only after analysis */}
+                        <AnimatePresence>
+                            {stats && (
+                                <motion.div
+                                    initial={{ opacity: 0, y: 8 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0 }}
+                                    className="grid grid-cols-3 gap-3"
+                                >
+                                    <StatCard icon={FileText} value={stats.wordCount.toLocaleString('fr-FR')} label="Mots détectés" />
+                                    <StatCard icon={BookOpen} value={String(stats.estimatedChapters)} label="Chapitres estimés" />
+                                    <StatCard icon={Hash} value={String(stats.contentBlocks)} label="Blocs de contenu" />
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+
+                        {/* Processing notice */}
+                        {isParsing && (
+                            <p className="text-xs text-muted-foreground text-center italic">
+                                L'analyse automatique peut prendre quelques secondes…
+                            </p>
+                        )}
+
+                        {/* Error */}
+                        {error && (
+                            <div className="flex items-center gap-2 text-sm text-[#D6475B] bg-[#D6475B]/[0.06] border border-[#D6475B]/20 rounded-lg px-4 py-3">
+                                <X className="h-4 w-4 flex-shrink-0" />
+                                {error}
+                            </div>
+                        )}
+
+                        {/* CTA */}
+                        <button
+                            onClick={handleContinue}
+                            disabled={!file || isParsing || isUploading}
+                            className="flex w-full items-center justify-center gap-2 bg-[#D6475B] text-white font-semibold py-3 rounded-lg text-sm transition-all hover:bg-[#c03d50] disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.99]"
+                        >
+                            {isUploading ? (
+                                <>
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                    Création du projet…
+                                </>
+                            ) : (
+                                <>
+                                    Continuer
+                                    <ArrowRight className="h-4 w-4" />
                                 </>
                             )}
                         </button>
-                    </form>
+                    </div>
                 </motion.div>
+
+                {/* Step indicator */}
+                <div className="flex items-center justify-center gap-3 mt-6">
+                    <div className="h-0.5 w-16 bg-[#D6475B] rounded-full" />
+                    <span className="text-xs font-semibold text-muted-foreground tracking-widest uppercase">
+                        Étape 1 / 3
+                    </span>
+                    <div className="h-0.5 w-16 bg-[#E0DCE0] rounded-full" />
+                </div>
             </div>
-        </AppLayout >
+        </AppLayout>
     );
 }
 
+function StatCard({ icon: Icon, value, label }: { icon: React.ElementType; value: string; label: string }) {
+    return (
+        <div className="flex flex-col items-center justify-center bg-[#F8F7F8] border border-[#E0DCE0] rounded-xl py-4 px-3 text-center">
+            <Icon className="h-5 w-5 text-[#6BB8CD] mb-2" />
+            <p className="text-xl font-extrabold text-foreground">{value}</p>
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wider mt-0.5">{label}</p>
+        </div>
+    );
+}
