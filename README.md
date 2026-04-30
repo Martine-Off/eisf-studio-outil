@@ -2,7 +2,7 @@
 
 Transforme les exports Articulate Storyline (.docx) en podcasts pédagogiques audio via IA.
 
-**Version :** 1.3 — Avril 2026  
+**Version :** 1.4 — Avril 2026  
 **Chef de projet :** Martine  
 **Organisation :** EISF (École Internationale du Savoir-Faire Français)
 
@@ -66,9 +66,19 @@ Studio EISF prend un cours Articulate Storyline exporté en `.docx` et génère 
 
 ### IA
 
-Tous les appels de génération transitent par un **webhook n8n** (variable `N8N_WEBHOOK_URL`) qui relaie vers ChatGPT.
+**Toutes** les opérations IA (génération, vérification, correction) transitent par un unique **webhook Make** (variable `MAKE_WEBHOOK_URL`). Le champ `type` de chaque payload permet à Make de router vers le bon scénario via `{{1.type}}` :
 
-La **vérification et correction de fidélité** utilisent directement l'API Anthropic (`ANTHROPIC_API_KEY`) — modèle **claude-opus-4-7** — via un pipeline déterministe en deux étapes (extraction de concepts + vérification binaire).
+| `type` | Usage |
+|---|---|
+| `generate` | Génération d'un dialogue Inès/Yannick |
+| `extract-chapters` | Découpage du .docx en chapitres |
+| `regenerate-line` | Reformulation d'une réplique |
+| `verify-extract-concepts` | Extraction des concepts du source |
+| `verify-check-concepts` | Vérification présent/absent dans le script |
+| `fix-missing-concepts` | Injection de concepts manquants |
+| `fix-script` | Correction boucle auto-verify |
+| `auto-correct` | Auto-correction podcast |
+| `macro-evaluate` | Évaluation globale du projet |
 
 Un mode mock (`USE_MOCK_AI=true`) court-circuite tous les appels IA avec des réponses prédéfinies, pour développer sans coût.
 
@@ -91,7 +101,7 @@ Un mode mock (`USE_MOCK_AI=true`) court-circuite tous les appels IA avec des ré
         │
         ├── PostgreSQL (pool pg)  ou  Mock DB en mémoire
         ├── uploads/              → .docx uploadés (25 MB max)
-        └── n8n webhook           → ChatGPT
+        └── Make webhook          → IA (génération, vérification, correction)
 ```
 
 ---
@@ -102,7 +112,7 @@ Un mode mock (`USE_MOCK_AI=true`) court-circuite tous les appels IA avec des ré
 
 - Node.js 18+
 - PostgreSQL 15 (ou `USE_MOCK_DB=true` pour développer sans BDD)
-- Instance n8n avec workflow ChatGPT configuré (ou `USE_MOCK_AI=true`)
+- Webhook Make configuré avec les scénarios IA (ou `USE_MOCK_AI=true`)
 
 ### Backend
 
@@ -139,8 +149,8 @@ USE_MOCK_DB=false
 # Auth
 JWT_SECRET=votre_secret_jwt_long_et_aleatoire
 
-# IA (webhook n8n → ChatGPT)
-N8N_WEBHOOK_URL=https://votre-instance-n8n.com/webhook/xxxxx
+# IA (webhook Make — un seul point d'entrée)
+MAKE_WEBHOOK_URL=https://hook.eu1.make.com/xxxxxxxxxxxxxxxxxxxxxxxx
 USE_MOCK_AI=false
 
 # Serveur
@@ -184,7 +194,7 @@ studio-eisf/
     │   ├── dialogues.js              — CRUD répliques
     │   └── export.js                 — Exports Word/PDF/JSON
     ├── utils/
-    │   ├── callGPT.js                — Appel webhook n8n → ChatGPT
+    │   ├── callWebhook.js            — Appel webhook Make (toute l'IA)
     │   ├── storylineParser.js        — Parser export Storyline .docx
     │   └── ownershipChecks.js        — Vérifications de propriété
     ├── models/
@@ -207,11 +217,11 @@ studio-eisf/
                      → cleaned_text Markdown structuré stocké en BDD
 
 2. PRÉVISUALISATION  /ai/preview affiche le contenu extrait
-                     → rebalanceSegments() fusionne les sections < 350 mots,
-                       découpe celles > 1200 mots à la phrase la plus proche
+                     → rebalanceSegments() fusionne les sections < 780 mots,
+                       découpe celles > 1300 mots à la phrase la plus proche
 
 3. CHAPITRES         L'utilisateur voit le découpage proposé, peut modifier les titres
-                     Durée cible sélectionnable (4 / 5 / 6 / 7 min)
+                     Durée fixe : 7 min — targetWords = 7 × 130 = 910 mots
                      Génération individuelle par chapitre ou globale ("Tout générer")
 
 4. GÉNÉRATION        /ai/generate-single-chapter par chapitre
@@ -432,16 +442,26 @@ Les balises de pause `<break time="0.8s" />` / `<break time="1.5s" />` sont touj
 
 ## Roadmap
 
-### V1.3 (actuel — Avril 2026)
+### V1.4 (actuel — Avril 2026)
+
+- [x] Architecture IA unifiée : tout via `MAKE_WEBHOOK_URL` (`callWebhook`), n8n et Anthropic supprimés
+- [x] Routage Make par `{{1.type}}` — un seul webhook entrant, 9 types d'opérations
+- [x] Rééquilibrage segments : fusion < **780** mots (était 350), split > **1300** mots (était 1200)
+- [x] Durée fixe **7 min** côté serveur — `targetWords = 7 × 130 = 910` (n'est plus configurable par l'utilisateur)
+- [x] Interface : pills de sélection durée supprimées → badge "~7 min estimées" en lecture seule
+- [x] Suppression de réplique dans PodcastEditor (corbeille + confirmation inline)
+- [x] Bouton "← Chapitres" permanent dans PodcastEditor et ProjectPodcasts
+- [x] Stepper cliquable avec navigation React Router `state` (compatible HashRouter)
+- [x] Correction boucle infinie `/api/ai/preview` (`useCallback` + `useRef` garde-fou)
+
+### V1.3
 
 - [x] Tags expressifs ElevenLabs dans le prompt (`[vocal smile]`, `[newscaster]`, `[empathetic]`, `[laughs]`)
 - [x] Export TXT Speaker 1/2 (format Google AI Studio)
-- [x] Vérification IA réécrite : pipeline déterministe Anthropic claude-opus-4-7 (extraction + binaire)
-- [x] Score de fidélité corrigé : `concepts présents / total` en % (plus de formule arbitraire)
+- [x] Vérification IA : pipeline déterministe extraction + vérification binaire
+- [x] Score de fidélité corrigé : `concepts présents / total` en %
 - [x] `auto-verify-and-fix` accepte `{ podcastId }` et sauvegarde les corrections en BDD
-- [x] Bouton "Corriger" masqué tant que l'analyse n'est pas faite
-- [x] Helper `anthropicText()` : gestion propre des erreurs API Anthropic
-- [x] Typographie : Verdana (police système) remplace Open Sans et Sora — imports Google Fonts supprimés
+- [x] Typographie : Verdana (police système) remplace Open Sans et Sora
 
 ### V1.2
 
