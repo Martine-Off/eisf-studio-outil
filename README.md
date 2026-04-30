@@ -47,6 +47,7 @@ Studio EISF prend un cours Articulate Storyline exporté en `.docx` et génère 
 | React Router | 7.x | Navigation SPA |
 | Axios | 1.x | Requêtes HTTP |
 | Lucide React | 0.5x | Icônes |
+| **Verdana** | système | Typographie — police système, sans import externe |
 
 ### Backend
 
@@ -440,6 +441,7 @@ Les balises de pause `<break time="0.8s" />` / `<break time="1.5s" />` sont touj
 - [x] `auto-verify-and-fix` accepte `{ podcastId }` et sauvegarde les corrections en BDD
 - [x] Bouton "Corriger" masqué tant que l'analyse n'est pas faite
 - [x] Helper `anthropicText()` : gestion propre des erreurs API Anthropic
+- [x] Typographie : Verdana (police système) remplace Open Sans et Sora — imports Google Fonts supprimés
 
 ### V1.2
 

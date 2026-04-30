@@ -1,4 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,400;0,600;0,700;0,800;1,400&display=swap');
 @import "tailwindcss";
 
 @theme {
@@ -52,8 +51,8 @@
   --color-eisf-text: #000000;
 
   /* Typography */
-  --font-sans: "Open Sans", sans-serif;
-  --font-display: "Open Sans", sans-serif;
+  --font-sans: Verdana, Geneva, sans-serif;
+  --font-display: Verdana, Geneva, sans-serif;
 
   /* Border radius — style Notion/Linear */
   --radius: 0.75rem;
