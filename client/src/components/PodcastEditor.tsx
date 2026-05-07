@@ -635,26 +635,7 @@ export default function PodcastEditor() {
                                 {podcastInfo.project_title && (
                                     <><Link to={`/project/${projectId}/podcasts`} className="hover:text-foreground">{podcastInfo.project_title}</Link><span>/</span></>
                                 )}
-                                {isEditingTitle ? (
-                                    <input
-                                        autoFocus
-                                        value={titleDraft}
-                                        onChange={e => setTitleDraft(e.target.value)}
-                                        onBlur={handleRenameTitle}
-                                        onKeyDown={e => {
-                                            if (e.key === 'Enter') handleRenameTitle();
-                                            if (e.key === 'Escape') setIsEditingTitle(false);
-                                        }}
-                                        className="text-xs font-medium border border-[#D6475B]/40 rounded px-1.5 py-0 focus:outline-none focus:ring-1 focus:ring-[#D6475B]/30 bg-white text-foreground max-w-[200px]"
-                                    />
-                                ) : (
-                                    <span
-                                        className="text-foreground font-medium truncate max-w-[180px] cursor-text hover:underline"
-                                        onClick={() => { setTitleDraft(podcastInfo.title); setIsEditingTitle(true); }}
-                                    >
-                                        {podcastInfo.title}
-                                    </span>
-                                )}
+                                <span className="text-foreground font-medium truncate max-w-[180px]">{podcastInfo.title}</span>
                             </nav>
                             <div className="flex items-center gap-2">
                                 <h1 className="text-lg font-bold text-foreground">Éditeur de Dialogue</h1>
@@ -668,7 +649,26 @@ export default function PodcastEditor() {
                                     </span>
                                 )}
                             </div>
-                            <p className="text-xs text-muted-foreground">Révisez et ajustez les répliques générées par l'IA.</p>
+                            {isEditingTitle ? (
+                                <input
+                                    autoFocus
+                                    value={titleDraft}
+                                    onChange={e => setTitleDraft(e.target.value)}
+                                    onBlur={handleRenameTitle}
+                                    onKeyDown={e => {
+                                        if (e.key === 'Enter') handleRenameTitle();
+                                        if (e.key === 'Escape') setIsEditingTitle(false);
+                                    }}
+                                    className="text-sm font-semibold border border-[#D6475B]/40 rounded px-2 py-0.5 focus:outline-none focus:ring-2 focus:ring-[#D6475B]/30 bg-white text-foreground w-full max-w-xs"
+                                />
+                            ) : (
+                                <p
+                                    className="text-sm font-semibold text-foreground cursor-text hover:text-[#D6475B] transition-colors truncate max-w-xs"
+                                    onClick={() => { setTitleDraft(podcastInfo.title); setIsEditingTitle(true); }}
+                                >
+                                    {podcastInfo.title}
+                                </p>
+                            )}
                         </div>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">

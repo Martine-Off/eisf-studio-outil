@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../utils/api';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Plus, Clock, Trash2, FileText, BookOpen, Search, SlidersHorizontal, CalendarDays, CheckCircle, Loader2 } from 'lucide-react';
 import AppLayout from '../components/AppLayout';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -65,6 +65,7 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 export default function Dashboard() {
+    const navigate = useNavigate();
     const [projects, setProjects] = useState<Project[]>([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
@@ -110,7 +111,9 @@ export default function Dashboard() {
         if (!trimmed) return;
         try {
             await api.patch(`/projects/${id}/title`, { title: trimmed });
-            setProjects(prev => prev.map(p => p.id === id ? { ...p, title: trimmed } : p));
+            setProjects(prev => prev.map(p =>
+                p.id === id ? { ...p, title: trimmed, updated_at: new Date().toISOString() } : p
+            ));
         } catch (error) {
             console.error('Erreur renommage projet:', error);
         }
@@ -176,9 +179,9 @@ export default function Dashboard() {
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: index * 0.04 }}
                         >
-                            <Link
-                                to={`/project/${project.id}/podcasts`}
-                                className="group relative flex flex-col bg-white border border-[#E0DCE0] rounded-xl p-5 shadow-sm hover:shadow-[0_4px_20px_0_rgb(0,0,0,0.09)] hover:border-[#D6475B]/30 transition-all duration-200 h-full"
+                            <div
+                                className="group relative flex flex-col bg-white border border-[#E0DCE0] rounded-xl p-5 shadow-sm hover:shadow-[0_4px_20px_0_rgb(0,0,0,0.09)] hover:border-[#D6475B]/30 transition-all duration-200 h-full cursor-pointer"
+                                onClick={() => { if (editingProjectId !== project.id) navigate(`/project/${project.id}/podcasts`); }}
                             >
                                 {/* Title + Date */}
                                 <div className="flex-1 mb-4">
@@ -241,7 +244,7 @@ export default function Dashboard() {
                                 >
                                     <Trash2 className="h-3.5 w-3.5" />
                                 </button>
-                            </Link>
+                            </div>
                         </motion.div>
                     ))}
 

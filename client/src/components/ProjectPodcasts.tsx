@@ -38,6 +38,8 @@ export default function ProjectPodcasts() {
     const [loading, setLoading] = useState(true);
     const [editingPodcastId, setEditingPodcastId] = useState<number | null>(null);
     const [editPodcastTitle, setEditPodcastTitle] = useState('');
+    const [editingProjectTitle, setEditingProjectTitle] = useState(false);
+    const [projectTitleDraft, setProjectTitleDraft] = useState('');
 
     useEffect(() => {
         const fetchProjectAndPodcasts = async () => {
@@ -53,6 +55,18 @@ export default function ProjectPodcasts() {
         };
         fetchProjectAndPodcasts();
     }, [projectId]);
+
+    const handleRenameProjectTitle = async () => {
+        const trimmed = projectTitleDraft.trim();
+        setEditingProjectTitle(false);
+        if (!trimmed || trimmed === projectData?.title) return;
+        try {
+            await api.patch(`/projects/${projectId}/title`, { title: trimmed });
+            setProjectData(prev => prev ? { ...prev, title: trimmed } : prev);
+        } catch (error) {
+            console.error('Erreur renommage projet:', error);
+        }
+    };
 
     const handleRenamePodcast = async (id: number, newTitle: string) => {
         const trimmed = newTitle.trim();
@@ -129,9 +143,26 @@ export default function ProjectPodcasts() {
                             <span>/</span>
                             <span className="text-foreground font-medium">Podcasts</span>
                         </nav>
-                        <h1 className="text-xl font-extrabold text-foreground tracking-tight font-display">
-                            {projectData?.title || 'Liste des Podcasts'}
-                        </h1>
+                        {editingProjectTitle ? (
+                            <input
+                                autoFocus
+                                value={projectTitleDraft}
+                                onChange={e => setProjectTitleDraft(e.target.value)}
+                                onBlur={handleRenameProjectTitle}
+                                onKeyDown={e => {
+                                    if (e.key === 'Enter') handleRenameProjectTitle();
+                                    if (e.key === 'Escape') setEditingProjectTitle(false);
+                                }}
+                                className="text-xl font-extrabold border border-[#D6475B]/40 rounded px-2 py-0.5 focus:outline-none focus:ring-2 focus:ring-[#D6475B]/30 bg-white text-foreground tracking-tight w-full"
+                            />
+                        ) : (
+                            <h1
+                                className="text-xl font-extrabold text-foreground tracking-tight font-display cursor-text hover:text-[#D6475B] transition-colors"
+                                onClick={() => { setProjectTitleDraft(projectData?.title || ''); setEditingProjectTitle(true); }}
+                            >
+                                {projectData?.title || 'Liste des Podcasts'}
+                            </h1>
+                        )}
                     </div>
                 </div>
 
