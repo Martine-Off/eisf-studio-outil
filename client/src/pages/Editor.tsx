@@ -240,6 +240,7 @@ export default function Editor() {
     const [generatingChapters, setGeneratingChapters] = useState<Set<number>>(new Set());
     const [generatedChapters, setGeneratedChapters] = useState<Set<number>>(new Set());
     const [generatedIdMap, setGeneratedIdMap] = useState<Record<number, number>>({});
+    const [chapterScores, setChapterScores] = useState<Record<number, number>>({});
     const [isGeneratingAll, setIsGeneratingAll] = useState(false);
     const [selectedChapterIndex, setSelectedChapterIndex] = useState<number>(0);
 
@@ -519,7 +520,15 @@ export default function Editor() {
             const newPodcastId = res.data.podcastId;
             setGeneratedChapters(prev => new Set(prev).add(index));
             setGeneratedIdMap(prev => ({ ...prev, [index]: newPodcastId }));
-            
+
+            try {
+                const podcastRes = await api.get(`/podcasts/${newPodcastId}`);
+                const score: number | undefined = podcastRes.data.fidelity_score;
+                if (score != null && score > 0) {
+                    setChapterScores(prev => ({ ...prev, [index]: score }));
+                }
+            } catch {}
+
             // Notification succès
             if (!isGeneratingAll) {
                 setSaveStatus('saved');
@@ -707,8 +716,8 @@ export default function Editor() {
 
                     <div className="flex items-center gap-4">
                         {step === 'editor' && availablePodcasts.length > 1 && (
-                            <select 
-                                value={selectedPodcastId || ''} 
+                            <select
+                                value={selectedPodcastId || ''}
                                 onChange={(e) => { setSelectedPodcastId(Number(e.target.value)); setAudioUrl(null); }}
                                 className="bg-secondary text-foreground text-sm font-bold px-4 py-2 rounded-xl focus:ring-0 outline-none border border-border"
                             >
@@ -717,6 +726,26 @@ export default function Editor() {
                                 ))}
                             </select>
                         )}
+                        {step === 'editor' && (() => {
+                            const scoreFromReport = verificationReport?.fidelityScore;
+                            const scoreFromChapters = scoreFromReport == null
+                                ? (() => {
+                                    const entry = Object.entries(generatedIdMap).find(([, pid]) => pid === selectedPodcastId);
+                                    return entry != null ? chapterScores[Number(entry[0])] : undefined;
+                                })()
+                                : undefined;
+                            const displayScore = scoreFromReport ?? scoreFromChapters;
+                            if (displayScore == null || displayScore === 0) return null;
+                            return (
+                                <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${
+                                    displayScore >= 95 ? 'bg-[#BDD145]/20 text-[#5a6e00]' :
+                                    displayScore >= 70 ? 'bg-[#E6A440]/20 text-[#b37a00]' :
+                                    'bg-[#D6475B]/15 text-[#D6475B]'
+                                }`}>
+                                    Fidélité : {displayScore}%
+                                </span>
+                            );
+                        })()}
                         {step === 'editor' && (
                             <div className="flex items-center gap-3">
                                 <button
@@ -876,6 +905,15 @@ export default function Editor() {
                                                 </div>
                                             </div>
                                             {isGenerated && <CheckCircle className="h-3.5 w-3.5 text-[#BDD145] flex-shrink-0" />}
+                                            {isGenerated && chapterScores[i] != null && chapterScores[i] > 0 && (
+                                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0 ${
+                                                    chapterScores[i] >= 95 ? 'bg-[#BDD145]/20 text-[#5a6e00]' :
+                                                    chapterScores[i] >= 70 ? 'bg-[#E6A440]/20 text-[#b37a00]' :
+                                                    'bg-[#D6475B]/15 text-[#D6475B]'
+                                                }`}>
+                                                    {chapterScores[i]}%
+                                                </span>
+                                            )}
                                             {isGenerating && <Loader2 className="h-3.5 w-3.5 text-[#D6475B] animate-spin flex-shrink-0" />}
                                         </div>
                                     );

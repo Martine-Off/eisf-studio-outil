@@ -25,7 +25,7 @@ interface AutoFixResult {
 
 interface AIVerificationPanelProps {
     podcastId: string | number;
-    onCorrectionDone?: () => void;
+    onCorrectionDone?: (score: number) => void;
 }
 
 function ScoreGauge({ score }: { score: number }) {
@@ -85,6 +85,7 @@ export const AIVerificationPanel: React.FC<AIVerificationPanelProps> = ({
             const s = data.fidelity_score ?? 0;
             setScore(s);
             setStatus(s >= 95 ? 'success' : 'insufficient');
+            if (onCorrectionDone) onCorrectionDone(s);
         } catch {
             setError("Impossible de joindre le serveur de vérification.");
             setStatus('idle');
@@ -103,7 +104,7 @@ export const AIVerificationPanel: React.FC<AIVerificationPanelProps> = ({
             setScore(data.finalScore);
             setFeedback(null);
             setStatus(data.targetReached ? 'success' : 'insufficient');
-            if (onCorrectionDone) onCorrectionDone();
+            if (onCorrectionDone) onCorrectionDone(data.finalScore);
         } catch {
             setError("Erreur lors de la correction automatique.");
             setStatus('insufficient');

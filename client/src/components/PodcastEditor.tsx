@@ -271,6 +271,7 @@ export default function PodcastEditor() {
     const [verification, setVerification] = useState<VerificationState>({
         status: 'idle', score: null, missingConcepts: [], confusingElements: [], passCount: 0
     });
+    const [fidelityScore, setFidelityScore] = useState<number | null>(null);
 
     // Proposition navigation
     const [currentPropIdx, setCurrentPropIdx] = useState(0);
@@ -298,6 +299,7 @@ export default function PodcastEditor() {
                 api.get(`/podcasts/${podcastId}/dialogues`),
             ]);
             setPodcastInfo(infoRes.data);
+            setFidelityScore(infoRes.data.fidelity_score ?? null);
             if (infoRes.data.audio_url) {
                 const base = import.meta.env.VITE_API_URL || 'http://localhost:3001';
                 setAudioUrl(`${base}${infoRes.data.audio_url}`);
@@ -421,6 +423,7 @@ export default function PodcastEditor() {
                 status: score >= 95 ? 'success' : 'insufficient',
                 score, missingConcepts: missing, confusingElements: confusing, passCount: 0
             });
+            setFidelityScore(score);
         } catch (e) { console.error('Erreur vérification:', e); setVerification(v => ({ ...v, status: 'idle' })); }
     };
 
@@ -433,6 +436,7 @@ export default function PodcastEditor() {
                 status: finalScore >= 95 ? 'success' : 'insufficient',
                 score: finalScore, missingConcepts: [], confusingElements: [], passCount
             });
+            setFidelityScore(finalScore);
             await loadData();
         } catch (e) { console.error('Erreur correction:', e); setVerification(v => ({ ...v, status: 'idle' })); }
     };
@@ -618,7 +622,18 @@ export default function PodcastEditor() {
                                 )}
                                 <span className="text-foreground font-medium truncate max-w-[180px]">{podcastInfo.title}</span>
                             </nav>
-                            <h1 className="text-lg font-bold text-foreground">Éditeur de Dialogue</h1>
+                            <div className="flex items-center gap-2">
+                                <h1 className="text-lg font-bold text-foreground">Éditeur de Dialogue</h1>
+                                {fidelityScore !== null && (
+                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold ${
+                                        fidelityScore >= 95 ? 'bg-[#BDD145]/20 text-[#5a6e00]' :
+                                        fidelityScore >= 70 ? 'bg-[#E6A440]/20 text-[#b37a00]' :
+                                        'bg-[#D6475B]/15 text-[#D6475B]'
+                                    }`}>
+                                        {fidelityScore}%
+                                    </span>
+                                )}
+                            </div>
                             <p className="text-xs text-muted-foreground">Révisez et ajustez les répliques générées par l'IA.</p>
                         </div>
                     </div>
