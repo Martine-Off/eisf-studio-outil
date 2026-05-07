@@ -15,6 +15,7 @@ import api from '../utils/api';
 import { useKeyboardNav } from '../hooks/useKeyboardNav';
 import AppLayout from '../components/AppLayout';
 import GenerateAudioModal, { type AudioSettings } from '../components/GenerateAudioModal';
+import { AIVerificationPanel } from './AIVerificationPanel';
 import { motion, AnimatePresence } from 'framer-motion';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -774,94 +775,10 @@ export default function PodcastEditor() {
                     {/* Right — fidelity panel */}
                     <div className="space-y-4">
                         {/* Score card */}
-                        <div className="bg-white rounded-xl border border-[#E0DCE0] shadow-sm p-5">
-                            <h3 className="text-sm font-bold text-foreground mb-4 flex items-center gap-1.5">
-                                <ShieldCheck className="h-4 w-4 text-[#6BB8CD]" />
-                                {verification.status === 'idle' ? 'Analyse de Fidélité' : 'Score de Fidélité'}
-                            </h3>
-
-                            <div className="flex justify-center mb-4">
-                                <ScoreGauge score={verification.score} />
-                            </div>
-
-                            {verification.status === 'success' && (
-                                <p className="text-xs text-center text-muted-foreground mb-3">
-                                    Votre script couvre l'intégralité des concepts clés du document source.
-                                </p>
-                            )}
-
-                            {/* Stats */}
-                            {verification.status === 'success' && (
-                                <div className="grid grid-cols-2 gap-2 mb-4">
-                                    <div className="bg-[#F8F7F8] rounded-lg p-2.5 text-center">
-                                        <p className="text-lg font-bold text-foreground">0</p>
-                                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Omissions</p>
-                                    </div>
-                                    <div className="bg-[#BDD145]/10 rounded-lg p-2.5 text-center">
-                                        <p className="text-sm font-bold text-[#5a6e00] flex items-center justify-center gap-1">
-                                            <CheckCircle className="h-3.5 w-3.5" /> OK
-                                        </p>
-                                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Cohérence</p>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Missing concepts */}
-                            {verification.status === 'insufficient' && verification.missingConcepts.length > 0 && (
-                                <div className="mb-4 space-y-1.5">
-                                    <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-2">
-                                        Concepts manquants ({verification.missingConcepts.length})
-                                    </p>
-                                    {verification.missingConcepts.map((c, i) => (
-                                        <div key={i} className="flex items-start gap-1.5 text-xs text-amber-800">
-                                            <span className="mt-0.5 flex-shrink-0 h-1.5 w-1.5 rounded-full bg-[#E6A440] mt-1.5" />
-                                            {c}
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-
-                            {/* Verify / re-verify button */}
-                            {verification.status === 'idle' && (
-                                <button
-                                    onClick={handleVerify}
-                                    disabled={hasPendingPropositions}
-                                    className="w-full flex items-center justify-center gap-1.5 bg-[#D6475B] text-white text-xs font-semibold py-2.5 rounded-lg hover:bg-[#c03d50] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                                >
-                                    <ShieldCheck className="h-3.5 w-3.5" />Lancer la vérification
-                                </button>
-                            )}
-                            {verification.status === 'insufficient' && verification.passCount < 2 && (
-                                <button
-                                    onClick={handleAutoFix}
-                                    disabled={hasPendingPropositions}
-                                    className="w-full flex items-center justify-center gap-1.5 bg-[#D6475B] text-white text-xs font-semibold py-2.5 rounded-lg hover:bg-[#c03d50] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                                >
-                                    <RotateCcw className="h-3.5 w-3.5" />Relancer la correction
-                                </button>
-                            )}
-                            {verification.status === 'insufficient' && verification.passCount >= 2 && (
-                                <div className="flex items-start gap-2 text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5">
-                                    <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />
-                                    <span>Les 2 passes de correction automatique ont été épuisées. Modifiez les répliques manuellement, puis relancez l'analyse.</span>
-                                </div>
-                            )}
-                            {verification.status === 'insufficient' && verification.passCount >= 2 && (
-                                <button
-                                    onClick={handleVerify}
-                                    className="w-full flex items-center justify-center gap-1.5 text-xs font-semibold py-2 rounded-lg border border-[#E0DCE0] text-muted-foreground hover:text-foreground hover:border-[#D6475B]/30 transition-colors"
-                                >
-                                    <ShieldCheck className="h-3.5 w-3.5" />Relancer l'analyse
-                                </button>
-                            )}
-
-                            {verification.status === 'running' && (
-                                <div className="flex items-center justify-center gap-2 py-2 text-sm text-[#6BB8CD] font-medium">
-                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                    Analyse en cours…
-                                </div>
-                            )}
-                        </div>
+                        <AIVerificationPanel
+                            podcastId={podcastId!}
+                            onCorrectionDone={(score) => setFidelityScore(score)}
+                        />
 
                         {/* Project details */}
                         <div className="bg-white rounded-xl border border-[#E0DCE0] shadow-sm p-5 space-y-3">
