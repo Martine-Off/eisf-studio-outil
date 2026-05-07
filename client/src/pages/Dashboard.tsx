@@ -69,6 +69,8 @@ export default function Dashboard() {
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
     const [deleteCandidate, setDeleteCandidate] = useState<number | null>(null);
+    const [editingProjectId, setEditingProjectId] = useState<number | null>(null);
+    const [editTitle, setEditTitle] = useState('');
 
     useEffect(() => {
         fetchProjects();
@@ -99,6 +101,18 @@ export default function Dashboard() {
             setDeleteCandidate(null);
         } catch (error) {
             console.error('Erreur suppression:', error);
+        }
+    };
+
+    const handleRenameProject = async (id: number, newTitle: string) => {
+        const trimmed = newTitle.trim();
+        setEditingProjectId(null);
+        if (!trimmed) return;
+        try {
+            await api.patch(`/projects/${id}/title`, { title: trimmed });
+            setProjects(prev => prev.map(p => p.id === id ? { ...p, title: trimmed } : p));
+        } catch (error) {
+            console.error('Erreur renommage projet:', error);
         }
     };
 
@@ -168,9 +182,32 @@ export default function Dashboard() {
                             >
                                 {/* Title + Date */}
                                 <div className="flex-1 mb-4">
-                                    <h3 className="font-bold text-sm text-foreground line-clamp-2 mb-1.5 group-hover:text-[#D6475B] transition-colors leading-snug">
-                                        {project.title}
-                                    </h3>
+                                    {editingProjectId === project.id ? (
+                                        <input
+                                            autoFocus
+                                            value={editTitle}
+                                            onChange={e => setEditTitle(e.target.value)}
+                                            onBlur={() => handleRenameProject(project.id, editTitle)}
+                                            onKeyDown={e => {
+                                                if (e.key === 'Enter') handleRenameProject(project.id, editTitle);
+                                                if (e.key === 'Escape') setEditingProjectId(null);
+                                            }}
+                                            onClick={e => { e.preventDefault(); e.stopPropagation(); }}
+                                            className="w-full text-sm font-bold border border-[#D6475B]/40 rounded px-1.5 py-0.5 mb-1.5 focus:outline-none focus:ring-2 focus:ring-[#D6475B]/30 bg-white text-foreground"
+                                        />
+                                    ) : (
+                                        <h3
+                                            className="font-bold text-sm text-foreground line-clamp-2 mb-1.5 group-hover:text-[#D6475B] transition-colors leading-snug cursor-text"
+                                            onClick={e => {
+                                                e.preventDefault();
+                                                e.stopPropagation();
+                                                setEditingProjectId(project.id);
+                                                setEditTitle(project.title);
+                                            }}
+                                        >
+                                            {project.title}
+                                        </h3>
+                                    )}
                                     <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
                                         <CalendarDays className="h-3 w-3" />
                                         {formatUpdatedAt(project.updated_at)}

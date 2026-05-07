@@ -273,6 +273,8 @@ export default function PodcastEditor() {
         status: 'idle', score: null, missingConcepts: [], confusingElements: [], passCount: 0
     });
     const [fidelityScore, setFidelityScore] = useState<number | null>(null);
+    const [isEditingTitle, setIsEditingTitle] = useState(false);
+    const [titleDraft, setTitleDraft] = useState('');
 
     // Proposition navigation
     const [currentPropIdx, setCurrentPropIdx] = useState(0);
@@ -440,6 +442,18 @@ export default function PodcastEditor() {
             setFidelityScore(finalScore);
             await loadData();
         } catch (e) { console.error('Erreur correction:', e); setVerification(v => ({ ...v, status: 'idle' })); }
+    };
+
+    const handleRenameTitle = async () => {
+        const trimmed = titleDraft.trim();
+        setIsEditingTitle(false);
+        if (!trimmed || trimmed === podcastInfo.title) return;
+        try {
+            await api.patch(`/podcasts/${podcastId}/title`, { title: trimmed });
+            setPodcastInfo(prev => ({ ...prev, title: trimmed }));
+        } catch (e) {
+            console.error('Erreur renommage podcast:', e);
+        }
     };
 
     const handleGenerateAudio = async (settings: AudioSettings) => {
@@ -621,7 +635,26 @@ export default function PodcastEditor() {
                                 {podcastInfo.project_title && (
                                     <><Link to={`/project/${projectId}/podcasts`} className="hover:text-foreground">{podcastInfo.project_title}</Link><span>/</span></>
                                 )}
-                                <span className="text-foreground font-medium truncate max-w-[180px]">{podcastInfo.title}</span>
+                                {isEditingTitle ? (
+                                    <input
+                                        autoFocus
+                                        value={titleDraft}
+                                        onChange={e => setTitleDraft(e.target.value)}
+                                        onBlur={handleRenameTitle}
+                                        onKeyDown={e => {
+                                            if (e.key === 'Enter') handleRenameTitle();
+                                            if (e.key === 'Escape') setIsEditingTitle(false);
+                                        }}
+                                        className="text-xs font-medium border border-[#D6475B]/40 rounded px-1.5 py-0 focus:outline-none focus:ring-1 focus:ring-[#D6475B]/30 bg-white text-foreground max-w-[200px]"
+                                    />
+                                ) : (
+                                    <span
+                                        className="text-foreground font-medium truncate max-w-[180px] cursor-text hover:underline"
+                                        onClick={() => { setTitleDraft(podcastInfo.title); setIsEditingTitle(true); }}
+                                    >
+                                        {podcastInfo.title}
+                                    </span>
+                                )}
                             </nav>
                             <div className="flex items-center gap-2">
                                 <h1 className="text-lg font-bold text-foreground">Éditeur de Dialogue</h1>

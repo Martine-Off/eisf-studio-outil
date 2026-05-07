@@ -36,6 +36,8 @@ export default function ProjectPodcasts() {
     const [podcasts, setPodcasts] = useState<Podcast[]>([]);
     const [projectData, setProjectData] = useState<Project | null>(null);
     const [loading, setLoading] = useState(true);
+    const [editingPodcastId, setEditingPodcastId] = useState<number | null>(null);
+    const [editPodcastTitle, setEditPodcastTitle] = useState('');
 
     useEffect(() => {
         const fetchProjectAndPodcasts = async () => {
@@ -51,6 +53,18 @@ export default function ProjectPodcasts() {
         };
         fetchProjectAndPodcasts();
     }, [projectId]);
+
+    const handleRenamePodcast = async (id: number, newTitle: string) => {
+        const trimmed = newTitle.trim();
+        setEditingPodcastId(null);
+        if (!trimmed) return;
+        try {
+            await api.patch(`/podcasts/${id}/title`, { title: trimmed });
+            setPodcasts(prev => prev.map(p => p.id === id ? { ...p, title: trimmed } : p));
+        } catch (error) {
+            console.error('Erreur renommage podcast:', error);
+        }
+    };
 
     return (
         <AppLayout>
@@ -158,9 +172,30 @@ export default function ProjectPodcasts() {
                                     </div>
 
                                     <div className="w-full flex items-start justify-between gap-2 mb-1">
-                                        <h3 className={`font-semibold text-sm leading-snug ${isGenerated ? 'text-foreground' : 'text-muted-foreground'}`}>
-                                            {displayTitle}
-                                        </h3>
+                                        {editingPodcastId === podcast.id ? (
+                                            <input
+                                                autoFocus
+                                                value={editPodcastTitle}
+                                                onChange={e => setEditPodcastTitle(e.target.value)}
+                                                onBlur={() => handleRenamePodcast(podcast.id, editPodcastTitle)}
+                                                onKeyDown={e => {
+                                                    if (e.key === 'Enter') handleRenamePodcast(podcast.id, editPodcastTitle);
+                                                    if (e.key === 'Escape') setEditingPodcastId(null);
+                                                }}
+                                                className="flex-1 text-sm font-semibold border border-[#D6475B]/40 rounded px-1.5 py-0.5 focus:outline-none focus:ring-2 focus:ring-[#D6475B]/30 bg-white text-foreground"
+                                            />
+                                        ) : (
+                                            <h3
+                                                className={`font-semibold text-sm leading-snug cursor-text ${isGenerated ? 'text-foreground' : 'text-muted-foreground'}`}
+                                                onClick={() => {
+                                                    if (!isGenerated) return;
+                                                    setEditingPodcastId(podcast.id);
+                                                    setEditPodcastTitle(displayTitle);
+                                                }}
+                                            >
+                                                {displayTitle}
+                                            </h3>
+                                        )}
                                         {!isGenerated ? (
                                             <span className="flex-shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-full border bg-white text-muted-foreground border-[#D4D0D4] whitespace-nowrap">
                                                 À générer

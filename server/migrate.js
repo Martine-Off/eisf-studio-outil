@@ -46,6 +46,15 @@ async function run() {
               EXECUTE FUNCTION update_updated_at_column();
         `);
 
+        console.log("Creating updated_at trigger for projects...");
+        await pool.query(`
+            DROP TRIGGER IF EXISTS update_projects_updated_at ON projects;
+            CREATE TRIGGER update_projects_updated_at
+              BEFORE UPDATE ON projects
+              FOR EACH ROW
+              EXECUTE FUNCTION update_updated_at_column();
+        `);
+
         console.log("All migrations OK!");
     } catch (e) {
         console.error("Error:", e);

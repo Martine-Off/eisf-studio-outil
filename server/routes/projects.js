@@ -205,6 +205,28 @@ router.delete('/:projectId', authMiddleware, async (req, res) => {
     }
 });
 
+// PATCH /api/projects/:projectId/title
+router.patch('/:projectId/title', authMiddleware, async (req, res) => {
+    try {
+        const { projectId } = req.params;
+        const { title } = req.body;
+        if (!title || !title.trim()) {
+            return res.status(400).json({ error: 'Titre requis' });
+        }
+        const result = await pool.query(
+            'UPDATE projects SET title = $1, updated_at = NOW() WHERE id = $2 AND user_id = $3 RETURNING title',
+            [title.trim(), projectId, req.userId]
+        );
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Projet non trouvé' });
+        }
+        res.json({ success: true, title: result.rows[0].title });
+    } catch (error) {
+        console.error('Erreur renommage projet:', error);
+        res.status(500).json({ error: 'Erreur serveur' });
+    }
+});
+
 // POST /api/projects/:id/macro-verify
 router.post('/:id/macro-verify', authMiddleware, async (req, res) => {
     try {

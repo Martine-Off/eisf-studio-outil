@@ -162,6 +162,29 @@ router.get('/:podcastId', authMiddleware, async (req, res) => {
     }
 });
 
+// Renommer un podcast
+router.patch('/:podcastId/title', authMiddleware, async (req, res) => {
+    try {
+        const { podcastId } = req.params;
+        const { title } = req.body;
+        if (!title || !title.trim()) {
+            return res.status(400).json({ error: 'Titre requis' });
+        }
+        await assertPodcastOwner(podcastId, req.userId);
+        const result = await pool.query(
+            'UPDATE podcasts SET title = $1 WHERE id = $2 RETURNING title',
+            [title.trim(), podcastId]
+        );
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Podcast non trouvé' });
+        }
+        res.json({ success: true, title: result.rows[0].title });
+    } catch (error) {
+        console.error('Erreur renommage podcast:', error);
+        res.status(500).json({ error: 'Erreur serveur' });
+    }
+});
+
 // Export PDF d'un podcast (Placeholder pour l'instant)
 router.get('/:id/export/pdf', authMiddleware, async (req, res) => {
     try {
