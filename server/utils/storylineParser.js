@@ -122,7 +122,7 @@ function parseStorylineHtml(html) {
             title: meaningfulTitle,
             content,
             wordCount: wc,
-            estimatedMinutes: Math.round(wc / 150),
+            estimatedMinutes: Math.round((wc * 1.2) / 150),
             thematic_note: `Chapitre : ${meaningfulTitle}`
         };
     });
@@ -133,7 +133,7 @@ function parseStorylineHtml(html) {
     while (i < chapterObjects.length) {
         const ch = { ...chapterObjects[i] };
         // Continuer à fusionner tant que trop court ET qu'il reste un chapitre suivant
-        while (ch.wordCount < 350 && i + 1 < chapterObjects.length) {
+        while (ch.wordCount < 875 && i + 1 < chapterObjects.length) {
             i++;
             const next = chapterObjects[i];
             const mergedContent = ch.content + '\n\n' + next.content;
@@ -141,7 +141,7 @@ function parseStorylineHtml(html) {
             ch.title = ch.title + ' / ' + next.title;
             ch.content = mergedContent;
             ch.wordCount = mergedWc;
-            ch.estimatedMinutes = Math.round(mergedWc / 150);
+            ch.estimatedMinutes = Math.round((mergedWc * 1.2) / 150);
             ch.thematic_note = `Chapitre : ${ch.title}`;
         }
         balanced.push(ch);

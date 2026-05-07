@@ -54,13 +54,19 @@ function extractSourceSectionLocal(cleanedText, orderIndex) {
   return cleanedText;
 }
 
+function toTextString(result) {
+  if (typeof result === 'string') return result;
+  return result?.text || result?.output || JSON.stringify(result);
+}
+
 async function verifyScriptAgainstSource(segmentContent, scriptText) {
   // ─── Appel 1 : extraction des concepts du source ──────────────────────────
-  const conceptsText = await callWebhook({
+  const conceptsRaw = await callWebhook({
     type: 'verify-extract-concepts',
     prompt: `Tu es un extracteur de concepts pédagogiques.\nListe UNIQUEMENT les concepts, faits, chiffres présents dans ce texte.\nFormat : une ligne par concept, commençant par "- ". Sois atomique et exhaustif.\n\nExtrais TOUS les concepts de ce contenu source :\n\n${segmentContent}`
   });
-  if (!conceptsText) throw new Error('Extraction des concepts impossible (Make n\'a pas répondu)');
+  if (!conceptsRaw) throw new Error('Extraction des concepts impossible (Make n\'a pas répondu)');
+  const conceptsText = toTextString(conceptsRaw);
 
   const concepts = conceptsText
     .split('\n')
@@ -71,11 +77,12 @@ async function verifyScriptAgainstSource(segmentContent, scriptText) {
   if (concepts.length === 0) throw new Error('Aucun concept extrait du source');
 
   // ─── Appel 2 : vérification binaire présent/absent dans le script ─────────
-  const verificationText = await callWebhook({
+  const verificationRaw = await callWebhook({
     type: 'verify-check-concepts',
     prompt: `Pour chaque concept, réponds UNIQUEMENT "present" ou "absent" selon qu'il est couvert (même reformulé) dans le script.\nFormat strict par ligne : concept | present   ou   concept | absent\n\nCONCEPTS:\n${concepts.map(c => `- ${c}`).join('\n')}\n\nSCRIPT:\n${scriptText}`
   });
-  if (!verificationText) throw new Error('Vérification des concepts impossible (Make n\'a pas répondu)');
+  if (!verificationRaw) throw new Error('Vérification des concepts impossible (Make n\'a pas répondu)');
+  const verificationText = toTextString(verificationRaw);
 
   // ─── Score calculé mathématiquement par l'app (présents / total × 100) ────
   const lines = verificationText.split('\n').filter(l => l.includes('|'));
@@ -155,7 +162,7 @@ function splitByHeadings(markdown) {
                 const content = currentLines.join('\n').trim();
                 if (content) {
                     const wordCount = content.split(/\s+/).filter(w => w).length;
-                    segments.push({ title: currentTitle, content, wordCount, estimatedMinutes: Math.round(wordCount / 150), thematic_note: `Chapitre : ${currentTitle}` });
+                    segments.push({ title: currentTitle, content, wordCount, estimatedMinutes: Math.round((wordCount * 1.2) / 150), thematic_note: `Chapitre : ${currentTitle}` });
                 }
             }
             currentTitle = m[2].trim();
@@ -168,7 +175,7 @@ function splitByHeadings(markdown) {
         const content = currentLines.join('\n').trim();
         if (content) {
             const wordCount = content.split(/\s+/).filter(w => w).length;
-            segments.push({ title: currentTitle, content, wordCount, estimatedMinutes: Math.round(wordCount / 150), thematic_note: `Chapitre : ${currentTitle}` });
+            segments.push({ title: currentTitle, content, wordCount, estimatedMinutes: Math.round((wordCount * 1.2) / 150), thematic_note: `Chapitre : ${currentTitle}` });
         }
     }
     return segments;
@@ -192,8 +199,8 @@ function findSentenceBoundary(text, nearChar) {
     return best !== null ? best : nearChar;
 }
 
-function rebalanceSegments(segments, minWords = 780, maxWords = 1300) {
-    // Fusion des segments trop courts
+function rebalanceSegments(segments, minWords = 875, maxWords = 1250) {
+    // Fusion des segments trop courts (vers le suivant)
     const merged = [];
     let i = 0;
     while (i < segments.length) {
@@ -203,11 +210,22 @@ function rebalanceSegments(segments, minWords = 780, maxWords = 1300) {
             const next = segments[i];
             seg.content = seg.content + '\n\n' + next.content;
             seg.wordCount += next.wordCount;
-            seg.estimatedMinutes = Math.round(seg.wordCount / 150);
+            seg.estimatedMinutes = Math.round((seg.wordCount * 1.2) / 150);
             seg.thematic_note = seg.thematic_note + ' + ' + next.thematic_note;
         }
         merged.push(seg);
         i++;
+    }
+
+    // Si le dernier segment est encore trop court (cas dernier chapitre), fusionner avec l'avant-dernier
+    if (merged.length >= 2 && merged[merged.length - 1].wordCount < minWords) {
+        const last = merged.pop();
+        const prev = merged[merged.length - 1];
+        console.log(`[rebalance] Dernier segment trop court (${last.wordCount} mots) → fusionné avec "${prev.title}"`);
+        prev.content = prev.content + '\n\n' + last.content;
+        prev.wordCount += last.wordCount;
+        prev.estimatedMinutes = Math.round((prev.wordCount * 1.2) / 150);
+        prev.thematic_note = prev.thematic_note + ' + ' + last.thematic_note;
     }
 
     // Split des segments trop longs
@@ -224,8 +242,8 @@ function rebalanceSegments(segments, minWords = 780, maxWords = 1300) {
         const part2 = seg.content.substring(cutPoint).trim();
         const wc1 = part1.split(/\s+/).filter(w => w).length;
         const wc2 = part2.split(/\s+/).filter(w => w).length;
-        result.push({ ...seg, content: part1, wordCount: wc1, estimatedMinutes: Math.round(wc1 / 150), title: seg.title + ' (1/2)' });
-        if (part2) result.push({ ...seg, content: part2, wordCount: wc2, estimatedMinutes: Math.round(wc2 / 150), title: seg.title + ' (2/2)' });
+        result.push({ ...seg, content: part1, wordCount: wc1, estimatedMinutes: Math.round((wc1 * 1.2) / 150), title: seg.title + ' (1/2)' });
+        if (part2) result.push({ ...seg, content: part2, wordCount: wc2, estimatedMinutes: Math.round((wc2 * 1.2) / 150), title: seg.title + ' (2/2)' });
     }
     return result;
 }
@@ -258,7 +276,7 @@ async function extractStorylineChapters(rawText, projectId = null) {
     const headings = (rawText.match(/^#{1,3} .+/gm) || []);
     if (headings.length >= 2) {
         const rawSegments = splitByHeadings(rawText);
-        const segments = rebalanceSegments(rawSegments);
+        const segments = rebalanceSegments(rawSegments, 875, 1250);
         const avgWords = segments.reduce((s, seg) => s + seg.wordCount, 0) / (segments.length || 1);
         console.log(`[CHAPTERS] ${headings.length} titres Markdown → ${segments.length} segments après rééquilibrage, moy. ${Math.round(avgWords)} mots.`);
         return { cleanedText: rawText, segments };
@@ -297,7 +315,7 @@ async function extractStorylineChapters(rawText, projectId = null) {
             cleanedText, 
             segments: mockSegments.map(seg => ({
                 ...seg,
-                estimatedMinutes: Math.round(seg.wordCount / 150)
+                estimatedMinutes: Math.round((seg.wordCount * 1.2) / 150)
             })) 
         };
     }
@@ -330,9 +348,8 @@ Réponds UNIQUEMENT en JSON valide, sans texte avant ni après :
   ]
 }`;
 
-    const aiResult = await callWebhook({ type: 'extract-chapters', cleanedText });
-    if (!aiResult) throw new Error('MAKE_WEBHOOK_URL non configurée — découpage impossible');
-    const parsed = parseJSON(aiResult);
+    const parsed = await callWebhook({ type: 'extract-chapters', cleanedText });
+    if (!parsed) throw new Error('MAKE_WEBHOOK_URL non configurée — découpage impossible');
     
     let segments = parsed.segments || [];
     segments = segments.map(seg => {
@@ -430,10 +447,10 @@ VÉRIFIE AVANT D'ENVOYER :
                 nextChapter: null
             });
             if (!generatedText) throw new Error('Génération impossible : Make n\'a pas renvoyé de contenu valide (réponse vide, non-JSON, ou JSON invalide). Consulte les logs [callWebhook] pour le détail.');
-            console.log('[AI] Réponse Make reçue, longueur:', generatedText.length);
+            console.log('[AI] Réponse Make reçue.');
         }
 
-        const dialogue = parseJSON(generatedText);
+        const dialogue = generatedText;
 
         const normalized = dialogue.dialogues.map(line => ({
             ...line,
@@ -587,7 +604,7 @@ Réponds UNIQUEMENT en JSON valide :
             if (!rawText) throw new Error('Génération impossible : Make n\'a pas renvoyé de contenu valide (réponse vide, non-JSON, ou JSON invalide). Consulte les logs [callWebhook] pour le détail.');
             console.log(`[GENERATE-PROJECT] Make répondu pour segment ${idx + 1}`);
 
-            const dialogue = parseJSON(rawText);
+            const dialogue = rawText;
             const dialoguesNorm = (dialogue.dialogues || []).map(line => ({
                 ...line,
                 text_studio: normalizeText(line.text_studio || line.text || ''),
@@ -756,9 +773,9 @@ Réponds UNIQUEMENT en JSON valide :
             nextChapter: nextChapter || null
         });
         if (!rawText) throw new Error('Génération impossible : Make n\'a pas renvoyé de contenu valide (réponse vide, non-JSON, ou JSON invalide). Consulte les logs [callWebhook] pour le détail.');
-        
-        const dialogue = parseJSON(rawText);
-        
+
+        const dialogue = rawText;
+
         const dialoguesNormalized = (dialogue.dialogues || []).map(line => ({
             ...line,
             text_studio: normalizeText(line.text_studio || line.text || ''),
@@ -887,9 +904,8 @@ Génère UNIQUEMENT ce JSON :
   "text_reading": "La nouvelle réplique"
 }`;
 
-        const rawText = await callWebhook({ type: 'regenerate-line', currentText, style, contextBefore, contextAfter });
-        if (!rawText) throw new Error('MAKE_WEBHOOK_URL non configurée');
-        const dialogue = parseJSON(rawText);
+        const dialogue = await callWebhook({ type: 'regenerate-line', currentText, style, contextBefore, contextAfter });
+        if (!dialogue) throw new Error('MAKE_WEBHOOK_URL non configurée');
 
         await pool.query(
             'UPDATE dialogues SET text_studio = $1, text_reading = $2 WHERE id = $3',
@@ -961,8 +977,7 @@ router.post('/fix-missing-concepts', authMiddleware, async (req, res) => {
             return res.status(502).json({ error: 'Make n\'a pas répondu pour la correction des concepts' });
         }
 
-        const resultJson = parseJSON(correctedScript.replace(/```json|```/g, '').trim());
-        const corrected = Array.isArray(resultJson) ? resultJson : (resultJson.dialogues || []);
+        const corrected = Array.isArray(correctedScript) ? correctedScript : (correctedScript.dialogues || []);
 
         const client = await pool.connect();
         const updatedDialogues = [];
@@ -1034,6 +1049,8 @@ router.post("/auto-verify-and-fix", async (req, res) => {
         .map(d => `${d.character}: ${d.text_reading || d.text_studio}`)
         .join("\n");
 
+      console.log('[DEBUG] segmentContent length:', segmentContent?.length);
+      console.log('[DEBUG] scriptText length:', currentScriptText?.length);
       const verif = await verifyScriptAgainstSource(segmentContent, currentScriptText);
       lastScore = verif.fidelityScore;
 
@@ -1055,9 +1072,7 @@ router.post("/auto-verify-and-fix", async (req, res) => {
       if (!fixText) break;
 
       try {
-        const clean = fixText.replace(/```json|```/g, "").trim();
-        const parsed = JSON.parse(clean);
-        const corrected = Array.isArray(parsed) ? parsed : (parsed.dialogues || []);
+        const corrected = Array.isArray(fixText) ? fixText : (fixText.dialogues || []);
 
         // ─── SAUVEGARDER EN BDD ─────────────────────────────────────────
         for (const d of corrected) {
