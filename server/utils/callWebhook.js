@@ -7,6 +7,9 @@ async function callWebhook(payload) {
     return null;
   }
 
+  console.log(`[callWebhook] → ${url}`);
+  console.log(`[callWebhook] type=${payload.type} | keys=${Object.keys(payload).join(', ')} | sourceText length=${payload.sourceText ? payload.sourceText.length : 'n/a'}`);
+
   const response = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -17,39 +20,13 @@ async function callWebhook(payload) {
     throw new Error(`Make webhook a répondu ${response.status}: ${await response.text()}`);
   }
 
-  // ↓ CHANGEMENT : on lit en texte brut d'abord, plus en .json() directement
-  const rawText = await response.text();
-
-  // Cas 1 : réponse vide (Make a timeout silencieusement)
-  if (!rawText || rawText.trim() === '') {
-    console.warn('[callWebhook] Réponse vide de Make → timeout probable.');
-    return null;
-  }
-
-  // Cas 2 : Make répond "Accepted" ou un texte simple (pas du JSON)
-  if (!rawText.trim().startsWith('{') && !rawText.trim().startsWith('[')) {
-    console.warn(`[callWebhook] Réponse non-JSON de Make : "${rawText.slice(0, 80)}"`);
-    return null;
-  }
-
-  // Cas 3 : JSON potentiellement tronqué
-  let data;
+  let text = await response.text()
+  text = text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim()
   try {
-    data = JSON.parse(rawText);
-  } catch (err) {
-    console.error(`[callWebhook] JSON invalide reçu (${rawText.length} chars) : ${err.message}`);
-    console.error(`[callWebhook] Début de la réponse : ${rawText.slice(0, 300)}`);
-    return null;
+    return JSON.parse(text);
+  } catch {
+    return text;
   }
-
-  // Extraction du texte — inchangée par rapport à avant
-  const text = data.choices?.[0]?.message?.content
-    || data.output?.[0]?.content?.[0]?.text
-    || data.message?.content
-    || data.text
-    || (typeof data === 'string' ? data : JSON.stringify(data));
-
-  return text.replace(/```json\n?|```/g, '').trim();
 }
 
 module.exports = { callWebhook };
