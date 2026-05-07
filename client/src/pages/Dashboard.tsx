@@ -110,9 +110,9 @@ export default function Dashboard() {
         setEditingProjectId(null);
         if (!trimmed) return;
         try {
-            await api.patch(`/projects/${id}/title`, { title: trimmed });
+            const res = await api.patch(`/projects/${id}/title`, { title: trimmed });
             setProjects(prev => prev.map(p =>
-                p.id === id ? { ...p, title: trimmed, updated_at: new Date().toISOString() } : p
+                p.id === id ? { ...p, title: trimmed, updated_at: res.data.updated_at ?? p.updated_at } : p
             ));
         } catch (error) {
             console.error('Erreur renommage projet:', error);

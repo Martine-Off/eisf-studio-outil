@@ -649,6 +649,11 @@ export default function PodcastEditor() {
                                     </span>
                                 )}
                             </div>
+                            {podcastInfo.project_title && (
+                                <p className="text-[11px] text-muted-foreground mt-0.5 leading-none">
+                                    {podcastInfo.project_title}
+                                </p>
+                            )}
                             {isEditingTitle ? (
                                 <input
                                     autoFocus
