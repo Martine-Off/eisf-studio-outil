@@ -37,6 +37,14 @@ const STATUS_MAP: Record<string, { label: string; className: string }> = {
     },
 };
 
+function formatUpdatedAt(dateStr: string): string {
+    const d = new Date(dateStr);
+    const date = d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    const h = String(d.getHours()).padStart(2, '0');
+    const m = String(d.getMinutes()).padStart(2, '0');
+    return `Modifié le ${date} à ${h}h${m}`;
+}
+
 function getStatus(status: StatusKey) {
     return STATUS_MAP[status] ?? STATUS_MAP['in_progress'];
 }
@@ -165,9 +173,7 @@ export default function Dashboard() {
                                     </h3>
                                     <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
                                         <CalendarDays className="h-3 w-3" />
-                                        {new Date(project.created_at).toLocaleDateString('fr-FR', {
-                                            day: '2-digit', month: '2-digit', year: 'numeric'
-                                        })}
+                                        {formatUpdatedAt(project.updated_at)}
                                     </div>
                                 </div>
 
