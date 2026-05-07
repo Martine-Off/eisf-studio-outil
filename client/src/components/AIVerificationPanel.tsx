@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle2, AlertTriangle, Loader2, RefreshCw, Zap, X } from 'lucide-react';
 import api from '../utils/api';
@@ -70,6 +70,20 @@ export const AIVerificationPanel: React.FC<AIVerificationPanelProps> = ({
 }) => {
     const [feedback, setFeedback] = useState<VerificationResult | null>(null);
     const [score, setScore] = useState<number | null>(null);
+
+    useEffect(() => {
+        const loadExistingScore = async () => {
+            try {
+                const res = await api.get(`/podcasts/${podcastId}`);
+                if (res.data.fidelity_score != null && res.data.fidelity_score > 0) {
+                    setScore(res.data.fidelity_score);
+                }
+            } catch {
+                // silencieux
+            }
+        };
+        loadExistingScore();
+    }, [podcastId]);
     const [status, setStatus] = useState<'idle' | 'running' | 'fixing' | 'success' | 'insufficient'>('idle');
     const [autoFixResult, setAutoFixResult] = useState<AutoFixResult | null>(null);
     const [error, setError] = useState<string | null>(null);
