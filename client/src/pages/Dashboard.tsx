@@ -137,6 +137,7 @@ export default function Dashboard() {
 
     return (
         <AppLayout>
+        <div className="min-h-screen bg-[#E6E2E6]">
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-6">
                 <div>
@@ -202,7 +203,7 @@ export default function Dashboard() {
                     ))}
                 </div>
             ) : (
-                <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
+                <div className="bg-white rounded-2xl overflow-hidden">
                     <table className="w-full border-collapse">
                         <thead>
                             <tr className="border-b border-[#F0EEF0]">
@@ -220,15 +221,7 @@ export default function Dashboard() {
                             {filtered.map(project => (
                                 <tr
                                     key={project.id}
-                                    className="border-b border-[#F0EEF0] cursor-pointer transition-colors last:border-0"
-                                    onMouseEnter={e => {
-                                        e.currentTarget.style.backgroundColor = '#EBF2FA';
-                                        e.currentTarget.style.boxShadow = 'inset 4px 0 0 #3465AE';
-                                    }}
-                                    onMouseLeave={e => {
-                                        e.currentTarget.style.backgroundColor = '';
-                                        e.currentTarget.style.boxShadow = '';
-                                    }}
+                                    className="border-b border-[#F0EEF0] last:border-0 cursor-pointer transition-colors hover:bg-[#EBF2FA] hover:shadow-[inset_4px_0_0_#3465AE]"
                                     onClick={() => {
                                         if (editingProjectId !== project.id) {
                                             navigate(`/project/${project.id}/podcasts`);
@@ -312,10 +305,8 @@ export default function Dashboard() {
                                         <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#F0EEF0] group-hover:bg-[#EBF2FA] mb-2 transition-colors">
                                             <Plus className="h-5 w-5 text-muted-foreground group-hover:text-[#3465AE] transition-colors" />
                                         </div>
-                                        <p className="text-sm font-semibold text-foreground">Créer un nouveau projet</p>
-                                        <p className="text-xs italic text-muted-foreground mt-0.5">
-                                            Importez votre fichier .docx pour commencer
-                                        </p>
+                                        <p className="font-semibold mt-2">Créer un nouveau projet</p>
+                                        <p className="text-sm text-gray-400 italic">Importez votre fichier .docx pour commencer</p>
                                     </div>
                                 </td>
                             </tr>
@@ -366,6 +357,7 @@ export default function Dashboard() {
                     </motion.div>
                 )}
             </AnimatePresence>
+        </div>
         </AppLayout>
     );
 }
