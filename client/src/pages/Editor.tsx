@@ -18,7 +18,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import {
-    FileDown, Loader2, CheckCircle, ArrowUp, ArrowDown, ChevronLeft, RefreshCw, ChevronRight, GripVertical
+    FileDown, FileText, Clock, LayoutGrid, Loader2, CheckCircle, ArrowUp, ArrowDown, ChevronLeft, RefreshCw, ChevronRight, GripVertical
 } from 'lucide-react';
 import api from '../utils/api';
 import { useKeyboardNav } from '../hooks/useKeyboardNav';
@@ -684,8 +684,8 @@ export default function Editor() {
                                     }`}
                                 >
                                     <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold ${
-                                        isCurrent ? 'bg-white/25 text-white' : isDone ? 'bg-[#BDD145]/20 text-[#5a6e00]' : 'bg-[#E6E2E6] text-muted-foreground'
-                                    }`}>{i + 1}</span>
+                                        isCurrent ? 'bg-white/25 text-white' : isDone ? 'bg-green-100 text-green-600' : 'bg-[#E6E2E6] text-muted-foreground'
+                                    }`}>{isDone ? '✓' : i + 1}</span>
                                     {s.label}
                                 </button>
                                 {i < 2 && <div className={`w-8 h-px ${isDone ? 'bg-[#D6475B]/40' : 'bg-[#E0DCE0]'}`} />}
@@ -796,58 +796,83 @@ export default function Editor() {
                 {/* ============================================================ */}
                 {step === 'preview' && (
                     <div className="space-y-6">
+                        <p className="text-sm text-muted-foreground -mt-2">
+                            Vérifiez l'extraction des données avant de générer la structure pédagogique du podcast.
+                        </p>
+
                         {previewing ? (
-                            <div className="bg-card border border-dashed border-border rounded-3xl p-20 text-center">
-                                <Loader2 className="animate-spin text-primary mx-auto mb-4" size={32} />
+                            <div className="bg-white rounded-2xl border border-[#E0DCE0] p-20 text-center shadow-sm">
+                                <Loader2 className="animate-spin text-[#D6475B] mx-auto mb-4" size={32} />
                                 <p className="text-muted-foreground font-medium">Lecture du fichier Word en cours...</p>
                             </div>
                         ) : previewData ? (
                             <>
-                                {/* Stats du fichier */}
+                                {/* 3 stat cards */}
                                 <div className="grid grid-cols-3 gap-4">
-                                    <div className="bg-card border border-border rounded-2xl p-5 text-center">
-                                        <p className="text-3xl font-extrabold text-primary">{previewData.wordCount.toLocaleString()}</p>
-                                        <p className="text-sm text-muted-foreground mt-1">mots extraits</p>
-                                    </div>
-                                    <div className="bg-card border border-border rounded-2xl p-5 text-center">
-                                        <p className="text-3xl font-extrabold text-primary">{previewData.lineCount}</p>
-                                        <p className="text-sm text-muted-foreground mt-1">blocs pédagogiques</p>
-                                    </div>
-                                    <div className="bg-card border border-border rounded-2xl p-5 text-center">
-                                        <p className="text-3xl font-extrabold text-primary">{previewData.chapters.length}</p>
-                                        <p className="text-sm text-muted-foreground mt-1">chapitres détectés</p>
-                                    </div>
+                                    {([
+                                        { value: previewData.wordCount.toLocaleString('fr-FR'), label: 'MOTS EXTRAITS' },
+                                        { value: previewData.lineCount, label: 'BLOCS PÉDAGOGIQUES' },
+                                        { value: previewData.chapters.length, label: 'CHAPITRES DÉTECTÉS' },
+                                    ] as { value: string | number; label: string }[]).map(({ value, label }) => (
+                                        <div key={label} className="bg-white rounded-2xl p-6 text-center shadow-sm">
+                                            <p className="text-4xl font-extrabold" style={{ color: '#E63337' }}>{value}</p>
+                                            <p className="text-xs font-semibold text-muted-foreground mt-2 tracking-wide">{label}</p>
+                                        </div>
+                                    ))}
                                 </div>
 
-                                {/* Aperçu du texte extrait */}
-                                <div className="bg-card border border-border rounded-2xl p-6">
-                                    <h3 className="font-bold text-foreground mb-3">📄 Aperçu du contenu extrait</h3>
-                                    <div className="bg-secondary rounded-xl p-4 max-h-64 overflow-y-auto">
-                                        {previewData.rawLinesPreview.map((line, i) => (
-                                            <p key={i} className="text-sm text-foreground/80 mb-1 leading-relaxed">{line}</p>
-                                        ))}
-                                        {previewData.lineCount > 30 && (
-                                            <p className="text-xs text-muted-foreground mt-2 italic">
-                                                ... et {previewData.lineCount - 30} blocs supplémentaires
-                                            </p>
-                                        )}
+                                {/* Card aperçu */}
+                                <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+                                    <div className="flex items-center justify-between px-5 py-4 border-b border-[#F0EEF0]">
+                                        <div className="flex items-center gap-2.5">
+                                            <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center">
+                                                <FileText className="h-4 w-4 text-blue-500" />
+                                            </div>
+                                            <span className="font-semibold text-sm text-foreground">Aperçu du contenu extrait</span>
+                                        </div>
+                                        <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground bg-[#F4F6FA] border border-[#E0DCE0] px-3 py-1 rounded-full">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-blue-400 flex-shrink-0" />
+                                            Format Markdown détecté
+                                        </span>
                                     </div>
-                                </div>
-
-                                {/* Bouton continuer */}
-                                <div className="flex justify-end">
-                                    <button
-                                        onClick={() => saveAndGoTo('chapters')}
-                                        className="flex items-center gap-2 bg-[#D6475B] text-white hover:bg-[#c03d50] px-8 py-3 rounded-xl font-bold shadow-eisf hover:opacity-90 transition-all"
-                                    >
-                                        Voir le découpage des chapitres →
-                                    </button>
+                                    <div className="p-4">
+                                        <div className="bg-[#F6F7F9] rounded-xl max-h-[400px] overflow-y-auto p-4">
+                                            <pre className="font-mono text-xs text-foreground/75 whitespace-pre-wrap leading-relaxed">
+                                                {previewData.cleanedText}
+                                            </pre>
+                                        </div>
+                                    </div>
                                 </div>
                             </>
                         ) : (
-                            <div className="bg-card border border-dashed border-border rounded-3xl p-20 text-center">
+                            <div className="bg-white rounded-2xl border border-dashed border-[#E0DCE0] p-20 text-center shadow-sm">
                                 <p className="text-muted-foreground font-medium">Impossible de lire le fichier.</p>
-                                <button onClick={handlePreview} className="mt-4 text-primary underline text-sm">Réessayer</button>
+                                <button onClick={handlePreview} className="mt-4 text-[#D6475B] underline text-sm">Réessayer</button>
+                            </div>
+                        )}
+
+                        {/* Sticky bottom bar */}
+                        {previewData && !previewing && (
+                            <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-[#E0DCE0] z-30 flex items-center justify-between px-10 py-4 shadow-[0_-2px_12px_0_rgba(0,0,0,0.06)]">
+                                <div className="flex items-center gap-2">
+                                    {[1, 2, 3].map(n => (
+                                        <span
+                                            key={n}
+                                            className="w-7 h-7 rounded-full bg-[#E6E2E6] text-foreground text-xs font-bold flex items-center justify-center"
+                                        >
+                                            {n}
+                                        </span>
+                                    ))}
+                                    <span className="text-sm font-medium text-foreground ml-3">
+                                        Prêt pour la découpe des chapitres
+                                    </span>
+                                </div>
+                                <button
+                                    onClick={() => saveAndGoTo('chapters')}
+                                    className="flex items-center gap-2 bg-[#D6475B] text-white hover:bg-[#c03d50] px-6 py-3 rounded-xl font-bold shadow-sm transition-all"
+                                >
+                                    Voir le découpage des chapitres →
+                                </button>
                             </div>
                         )}
                     </div>
@@ -858,27 +883,28 @@ export default function Editor() {
                 {/* ============================================================ */}
                 {step === 'chapters' && (!previewData || previewing) && (
                     <div className="flex flex-col items-center justify-center py-20 gap-3">
-                        <Loader2 className="animate-spin text-primary" size={28} />
+                        <Loader2 className="animate-spin text-[#E63337]" size={28} />
                         <p className="text-sm text-muted-foreground">Chargement du découpage...</p>
                     </div>
                 )}
 
                 {step === 'chapters' && previewData && !previewing && (
-                    <div className="grid lg:grid-cols-[320px_1fr] gap-5">
+                    <div className="grid lg:grid-cols-[35%_65%] gap-5 items-start">
                         {/* Left — chapter list */}
                         <div className="bg-white rounded-2xl border border-[#E0DCE0] shadow-sm overflow-hidden">
-                            <div className="px-5 py-4 border-b border-[#E0DCE0]">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <h3 className="font-bold text-sm text-foreground">Structure du cours</h3>
-                                        <p className="text-[11px] text-muted-foreground mt-0.5">{editableChapters.length} chapitre{editableChapters.length > 1 ? 's' : ''} détecté{editableChapters.length > 1 ? 's' : ''}</p>
-                                    </div>
-                                    <span className="text-[10px] font-bold tracking-widest uppercase bg-[#E6E2E6] text-muted-foreground px-2 py-1 rounded-full">
-                                        Étape 2 / 3
-                                    </span>
+                            {/* Header */}
+                            <div className="px-5 py-4 border-b border-[#E0DCE0] flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <LayoutGrid className="h-4 w-4 text-muted-foreground" />
+                                    <h3 className="font-bold text-sm text-foreground">Structure du cours</h3>
                                 </div>
+                                <span className="text-[10px] font-bold tracking-widest uppercase bg-[#E6E2E6] text-muted-foreground px-2.5 py-1 rounded-full">
+                                    ÉTAPE 2/3
+                                </span>
                             </div>
-                            <div className="p-3 space-y-1.5 max-h-[520px] overflow-y-auto">
+
+                            {/* Chapter list */}
+                            <div className="p-3 space-y-1 max-h-[520px] overflow-y-auto">
                                 {editableChapters.map((chapter, i) => {
                                     const isGenerating = generatingChapters.has(i);
                                     const isGenerated = generatedChapters.has(i);
@@ -888,36 +914,39 @@ export default function Editor() {
                                             key={i}
                                             ref={focusChapterIndex === i ? focusChapterRef : null}
                                             onClick={() => setSelectedChapterIndex(i)}
-                                            className={`flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-all border ${
+                                            style={isSelected ? { boxShadow: 'inset 4px 0 0 #E63337' } : undefined}
+                                            className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl cursor-pointer transition-all ${
                                                 isSelected
-                                                    ? 'bg-[#D6475B]/[0.06] border-[#D6475B]/30'
+                                                    ? 'bg-[#FFF0F0]'
                                                     : isGenerated
-                                                    ? 'bg-[#BDD145]/[0.06] border-[#BDD145]/20 hover:bg-[#BDD145]/[0.1]'
-                                                    : 'bg-[#F8F7F8] border-transparent hover:bg-[#F0EEF0]'
+                                                    ? 'bg-[#F5FBE8] hover:bg-[#EDF6D4]'
+                                                    : 'bg-[#F8F7F8] hover:bg-[#F0EEF0]'
                                             }`}
                                         >
                                             <GripVertical className="h-3.5 w-3.5 text-muted-foreground/40 flex-shrink-0" />
                                             <div className="flex-1 min-w-0">
                                                 <p className="text-xs font-semibold text-foreground truncate">{chapter.title}</p>
-                                                <div className="flex items-center gap-2 mt-0.5">
-                                                    <span className="text-[10px] text-muted-foreground">{chapter.wordCount} mots</span>
-                                                    <span className="text-[10px] text-[#6BB8CD]">~{chapter.estimatedMinutes} min</span>
+                                                <div className="flex items-center gap-3 mt-0.5">
+                                                    <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                                                        <FileText className="h-3 w-3" />{chapter.wordCount} mots
+                                                    </span>
+                                                    <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                                                        <Clock className="h-3 w-3" />~{chapter.estimatedMinutes} min
+                                                    </span>
                                                 </div>
                                             </div>
-                                            {isGenerated && <CheckCircle className="h-3.5 w-3.5 text-[#BDD145] flex-shrink-0" />}
-                                            {isGenerated && chapterScores[i] != null && chapterScores[i] > 0 && (
-                                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0 ${
-                                                    chapterScores[i] >= 95 ? 'bg-[#BDD145]/20 text-[#5a6e00]' :
-                                                    chapterScores[i] >= 70 ? 'bg-[#E6A440]/20 text-[#b37a00]' :
-                                                    'bg-[#D6475B]/15 text-[#D6475B]'
-                                                }`}>
-                                                    {chapterScores[i]}%
-                                                </span>
-                                            )}
-                                            {isGenerating && <Loader2 className="h-3.5 w-3.5 text-[#D6475B] animate-spin flex-shrink-0" />}
+                                            {isGenerating && <Loader2 className="h-3.5 w-3.5 text-[#E63337] animate-spin flex-shrink-0" />}
+                                            {isGenerated && !isGenerating && <CheckCircle className="h-3.5 w-3.5 text-green-500 flex-shrink-0" />}
                                         </div>
                                     );
                                 })}
+                            </div>
+
+                            {/* Footer hint */}
+                            <div className="px-4 py-3 border-t border-[#F0EEF0]">
+                                <p className="text-[11px] italic text-muted-foreground text-center">
+                                    Glissez-déposez pour réorganiser l'ordre des épisodes
+                                </p>
                             </div>
                         </div>
 
@@ -929,43 +958,44 @@ export default function Editor() {
                             const isGenerated = generatedChapters.has(i);
                             return (
                                 <div className="bg-white rounded-2xl border border-[#E0DCE0] shadow-sm overflow-hidden flex flex-col">
-                                    <div className="px-6 py-4 border-b border-[#E0DCE0] flex items-start justify-between gap-4">
-                                        <div className="flex-1">
+                                    {/* Header */}
+                                    <div className="px-6 py-5 border-b border-[#E0DCE0]">
+                                        <div className="flex items-start justify-between gap-4 mb-1">
                                             <input
                                                 type="text"
                                                 value={ch.title}
                                                 onChange={(e) => updateChapterTitle(i, e.target.value)}
-                                                className="w-full font-bold text-sm text-foreground bg-transparent border-none p-0 focus:ring-0 outline-none"
+                                                className="flex-1 font-bold text-lg text-foreground bg-transparent border-none p-0 focus:ring-0 outline-none"
                                                 placeholder="Titre du chapitre…"
                                             />
-                                            <p className="text-[11px] text-muted-foreground mt-0.5">
-                                                {ch.wordCount} mots · Lecture estimée : ~{ch.estimatedMinutes}:{String(Math.round((ch.estimatedMinutes % 1) * 60)).padStart(2, '0')} min
-                                            </p>
+                                            <span className="flex-shrink-0 text-xs font-semibold text-blue-600 bg-blue-50 border border-blue-100 px-3 py-1 rounded-full">
+                                                ~{ch.estimatedMinutes} min estimées
+                                            </span>
                                         </div>
-                                        <span className="flex-shrink-0 text-xs font-semibold text-muted-foreground bg-[#F0EEF0] px-2.5 py-1 rounded-lg">
-                                            ~7 min estimées
-                                        </span>
+                                        <p className="text-xs text-muted-foreground">
+                                            {ch.wordCount} mots · Lecture estimée {ch.estimatedMinutes} min
+                                        </p>
                                     </div>
 
                                     {/* Source extract */}
-                                    <div className="px-6 py-4 flex-1 overflow-hidden">
+                                    <div className="px-6 py-5 flex-1">
                                         <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">
                                             Extrait du document source (.docx)
                                         </p>
-                                        <div className="text-sm text-muted-foreground leading-relaxed max-h-72 overflow-y-auto pr-1">
-                                            {(ch.lines ?? []).slice(0, 8).map((line, j) => (
-                                                <p key={j} className="mb-2">{line}</p>
-                                            ))}
-                                            {(ch.lines ?? []).length > 8 && (
-                                                <p className="text-xs text-muted-foreground/60 italic">
-                                                    […] Suite du contenu analysé par l'IA pour la conversion en dialogue podcast.
-                                                </p>
-                                            )}
+                                        <div className="bg-[#F6F7F9] rounded-xl max-h-[350px] overflow-y-auto p-4">
+                                            <pre className="font-mono text-xs text-foreground/75 whitespace-pre-wrap leading-relaxed">
+                                                {(ch.lines?.length ?? 0) > 0
+                                                    ? ch.lines!.join('\n')
+                                                    : <span className="italic text-muted-foreground font-sans">Contenu source non disponible pour ce projet.</span>}
+                                            </pre>
                                         </div>
                                     </div>
 
-                                    {/* Generate button */}
-                                    <div className="px-6 pb-5 pt-2">
+                                    {/* Bottom action bar */}
+                                    <div className="px-6 pb-5 pt-3 border-t border-[#F0EEF0] flex items-center gap-4">
+                                        <p className="text-xs italic text-muted-foreground flex-shrink-0">
+                                            Extraction validée par l'IA
+                                        </p>
                                         <button
                                             onClick={() => {
                                                 if (isGenerated) {
@@ -977,14 +1007,10 @@ export default function Editor() {
                                                 }
                                             }}
                                             disabled={isGenerating}
-                                            className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all ${
-                                                isGenerated
-                                                    ? 'bg-[#BDD145]/15 text-[#5a6e00] border border-[#BDD145]/30 hover:bg-[#BDD145]/25'
-                                                    : 'bg-[#D6475B] text-white hover:bg-[#c03d50] disabled:opacity-50'
-                                            }`}
+                                            className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold bg-[#E63337] text-white hover:bg-[#c92d31] disabled:opacity-60 transition-all"
                                         >
                                             {isGenerating && <Loader2 className="h-4 w-4 animate-spin" />}
-                                            {isGenerated ? 'Ouvrir dans l\'éditeur →' : isGenerating ? 'Génération en cours…' : 'Générer ce chapitre'}
+                                            {isGenerating ? 'Génération en cours…' : 'Ouvrir dans l\'éditeur →'}
                                         </button>
                                     </div>
                                 </div>
