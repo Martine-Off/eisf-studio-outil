@@ -3,7 +3,7 @@ import api from '../utils/api';
 import { useNavigate } from 'react-router-dom';
 import {
     Plus, Trash2, FileText, Search,
-    ExternalLink, Pencil, ChevronDown, ArrowUpDown,
+    ExternalLink, Pencil, ChevronDown,
 } from 'lucide-react';
 import AppLayout from '../components/AppLayout';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -167,31 +167,32 @@ export default function Dashboard() {
                     />
                 </div>
 
-                <div className="relative">
-                    <select
-                        value={statusFilter}
-                        onChange={e => setStatusFilter(e.target.value as StatusFilter)}
-                        className="appearance-none bg-white border border-[#E0DCE0] rounded-lg pl-4 pr-8 py-2 text-sm font-medium text-muted-foreground focus:outline-none focus:ring-2 focus:ring-[#D6475B]/30 focus:border-[#D6475B] transition-all cursor-pointer"
-                    >
-                        <option value="all">Tous les statuts</option>
-                        <option value="draft">Brouillon</option>
-                        <option value="published">Publié</option>
-                    </select>
-                    <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-                </div>
+                <div className="flex gap-3">
+                    <div className="relative">
+                        <select
+                            value={statusFilter}
+                            onChange={e => setStatusFilter(e.target.value as StatusFilter)}
+                            className="appearance-none bg-white border border-gray-200 rounded-xl px-4 py-2 pr-8 text-sm font-medium text-gray-700 hover:border-gray-300 hover:bg-gray-50 focus:outline-none cursor-pointer transition-all min-w-[160px]"
+                        >
+                            <option value="all">Tous les statuts</option>
+                            <option value="draft">Brouillon</option>
+                            <option value="published">Publié</option>
+                        </select>
+                        <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+                    </div>
 
-                <div className="relative">
-                    <ArrowUpDown className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-                    <select
-                        value={sortOrder}
-                        onChange={e => setSortOrder(e.target.value as SortOrder)}
-                        className="appearance-none bg-white border border-[#E0DCE0] rounded-lg pl-9 pr-8 py-2 text-sm font-medium text-muted-foreground focus:outline-none focus:ring-2 focus:ring-[#D6475B]/30 focus:border-[#D6475B] transition-all cursor-pointer"
-                    >
-                        <option value="recent">Plus récent</option>
-                        <option value="oldest">Plus ancien</option>
-                        <option value="name_asc">Nom A→Z</option>
-                    </select>
-                    <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                    <div className="relative">
+                        <select
+                            value={sortOrder}
+                            onChange={e => setSortOrder(e.target.value as SortOrder)}
+                            className="appearance-none bg-white border border-gray-200 rounded-xl px-4 py-2 pr-8 text-sm font-medium text-gray-700 hover:border-gray-300 hover:bg-gray-50 focus:outline-none cursor-pointer transition-all min-w-[160px]"
+                        >
+                            <option value="recent">Plus récent</option>
+                            <option value="oldest">Plus ancien</option>
+                            <option value="name_asc">Nom A→Z</option>
+                        </select>
+                        <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+                    </div>
                 </div>
             </div>
 
