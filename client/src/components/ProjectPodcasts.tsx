@@ -17,7 +17,7 @@ function cleanTitle(podcast: Podcast, idx: number): string {
 }
 
 function formatUpdatedAt(dateStr: string): string {
-    const d = new Date(dateStr);
+    const d = new Date(dateStr.endsWith('Z') ? dateStr : dateStr + 'Z');
     const date = d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
     const h = String(d.getHours()).padStart(2, '0');
     const m = String(d.getMinutes()).padStart(2, '0');
