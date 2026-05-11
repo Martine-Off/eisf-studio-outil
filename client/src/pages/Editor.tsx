@@ -986,7 +986,7 @@ export default function Editor() {
                                             <pre className="font-mono text-xs text-foreground/75 whitespace-pre-wrap leading-relaxed">
                                                 {(ch.lines?.length ?? 0) > 0
                                                     ? ch.lines!.join('\n')
-                                                    : ch.title}
+                                                    : <span className="italic text-muted-foreground font-sans">Contenu source non disponible pour ce projet.</span>}
                                             </pre>
                                         </div>
                                     </div>

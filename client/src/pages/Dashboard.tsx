@@ -196,13 +196,13 @@ export default function Dashboard() {
 
             {/* Table */}
             {loading ? (
-                <div className="bg-white rounded-xl overflow-hidden shadow-sm">
+                <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
                     {[1, 2, 3, 4].map(i => (
                         <div key={i} className="h-14 border-b border-[#F0EEF0] animate-pulse bg-gray-50 last:border-0" />
                     ))}
                 </div>
             ) : (
-                <div className="bg-white rounded-xl overflow-hidden shadow-sm">
+                <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
                     <table className="w-full border-collapse">
                         <thead>
                             <tr className="border-b border-[#F0EEF0]">

@@ -672,7 +672,7 @@ export default function PodcastEditor() {
                             disabled={saveStatus === 'saving'}
                             className="flex items-center gap-1.5 bg-white border border-[#E0DCE0] rounded-lg px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground transition-all"
                         >
-                            {saveStatus === 'saving' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle className="h-3.5 w-3.5 text-green-500" />}
+                            {saveStatus === 'saved' && <CheckCircle className="h-3.5 w-3.5 text-green-500" />}
                             Sauvegarder
                         </button>
                     </div>
