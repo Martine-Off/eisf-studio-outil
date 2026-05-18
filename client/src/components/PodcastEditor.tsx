@@ -622,18 +622,20 @@ export default function PodcastEditor() {
 
                 {/* ── Header ── */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-                    <div className="flex items-center gap-3 min-w-0 overflow-hidden">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, overflow: 'hidden' }}>
                         <button
                             onClick={() => { handleSaveAction(dialogues); navigate(`/project/${projectId}/podcasts`); }}
                             className="p-2 bg-white border border-[#E0DCE0] rounded-lg text-muted-foreground hover:text-foreground hover:border-[#E63337]/30 transition-all flex-shrink-0"
                         >
                             <ChevronLeft className="h-4 w-4" />
                         </button>
-                        <div className="flex-1 min-w-0 overflow-hidden">
-                            <div className="flex items-center gap-2 min-w-0">
-                                <h1 className="text-xl font-bold text-foreground truncate">Éditeur de Dialogue</h1>
+                        <div style={{ overflow: 'hidden', minWidth: 0, flex: 1 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                                <h1 style={{ fontSize: '1.25rem', fontWeight: 'bold', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: '100%' }}>
+                                    Éditeur de Dialogue
+                                </h1>
                                 {fidelityScore !== null && (
-                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold ${
+                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold flex-shrink-0 ${
                                         fidelityScore >= 95 ? 'bg-[#BDD145]/20 text-[#5a6e00]' :
                                         fidelityScore >= 70 ? 'bg-[#E6A440]/20 text-[#b37a00]' :
                                         'bg-[#E63337]/15 text-[#E63337]'
@@ -648,7 +650,7 @@ export default function PodcastEditor() {
                                     className="text-sm border border-[#E63337]/40 rounded px-2 py-0.5 focus:outline-none focus:ring-2 focus:ring-[#E63337]/30 bg-white text-muted-foreground w-full max-w-sm mt-0.5"
                                 />
                             ) : (
-                                <p className="text-sm text-muted-foreground mt-0.5 cursor-text hover:text-foreground transition-colors truncate whitespace-nowrap overflow-hidden"
+                                <p style={{ fontSize: '0.875rem', color: '#6b7280', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: '100%', marginTop: '2px', cursor: 'text' }}
                                     onClick={() => { setTitleDraft(podcastInfo.title); setIsEditingTitle(true); }}>
                                     {podcastInfo.project_title ? `${podcastInfo.project_title} — ${podcastInfo.title}` : podcastInfo.title}
                                 </p>
