@@ -229,6 +229,7 @@ export default function Dashboard() {
                                             <input
                                                 autoFocus
                                                 value={editTitle}
+                                                maxLength={60}
                                                 onChange={e => setEditTitle(e.target.value)}
                                                 onBlur={() => handleRenameProject(project.id, editTitle)}
                                                 onKeyDown={e => {
