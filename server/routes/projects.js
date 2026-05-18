@@ -214,7 +214,7 @@ router.patch('/:projectId/title', authMiddleware, async (req, res) => {
             return res.status(400).json({ error: 'Titre requis' });
         }
         const result = await pool.query(
-            'UPDATE projects SET title = $1, updated_at = NOW() WHERE id = $2 AND user_id = $3 RETURNING id, title, updated_at',
+            'UPDATE projects SET title = $1, updated_at = NOW() AT TIME ZONE \'UTC\' WHERE id = $2 AND user_id = $3 RETURNING id, title, updated_at',
             [title.trim(), projectId, req.userId]
         );
         if (result.rows.length === 0) {

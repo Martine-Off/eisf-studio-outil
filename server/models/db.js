@@ -9,6 +9,12 @@ if (process.env.USE_MOCK_DB === 'true') {
   pool = new Pool({
     connectionString: process.env.DATABASE_URL,
   });
+
+  // Force chaque connexion à interpréter les timestamps en UTC
+  // (évite le décalage de 2h quand Node.js tourne avec TZ=Europe/Paris)
+  pool.on('connect', (client) => {
+    client.query("SET timezone = 'UTC'");
+  });
 }
 
 module.exports = pool;
