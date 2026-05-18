@@ -1,6 +1,9 @@
-/** Formate une date ISO (avec ou sans 'Z') en heure Paris, format fr-FR. */
+/** Formate une date ISO en heure Paris (Europe/Paris), format fr-FR.
+ *  Normalise la chaîne en UTC si elle ne porte pas de suffixe timezone. */
 export function formatDateParis(dateStr: string): string {
-    const date = new Date(dateStr.endsWith('Z') ? dateStr : dateStr + 'Z');
+    const normalized = dateStr.endsWith('Z') || dateStr.includes('+')
+        ? dateStr
+        : dateStr + 'Z';
     return new Intl.DateTimeFormat('fr-FR', {
         timeZone: 'Europe/Paris',
         day: '2-digit',
@@ -8,5 +11,5 @@ export function formatDateParis(dateStr: string): string {
         year: 'numeric',
         hour: '2-digit',
         minute: '2-digit',
-    }).format(date);
+    }).format(new Date(normalized));
 }

@@ -179,7 +179,7 @@ router.patch('/:podcastId/title', authMiddleware, async (req, res) => {
             return res.status(404).json({ error: 'Podcast non trouvé' });
         }
         const row = result.rows[0];
-        res.json({ success: true, title: row.title, updated_at: row.updated_at });
+        res.json({ success: true, title: row.title, updated_at: new Date(row.updated_at).toISOString() });
     } catch (error) {
         console.error('Erreur renommage podcast:', error);
         res.status(500).json({ error: 'Erreur serveur' });

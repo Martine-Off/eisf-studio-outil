@@ -221,7 +221,7 @@ router.patch('/:projectId/title', authMiddleware, async (req, res) => {
             return res.status(404).json({ error: 'Projet non trouvé' });
         }
         const row = result.rows[0];
-        res.json({ success: true, title: row.title, updated_at: row.updated_at });
+        res.json({ success: true, title: row.title, updated_at: new Date(row.updated_at).toISOString() });
     } catch (error) {
         console.error('Erreur renommage projet:', error);
         res.status(500).json({ error: 'Erreur serveur' });
