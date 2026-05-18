@@ -622,16 +622,16 @@ export default function PodcastEditor() {
 
                 {/* ── Header ── */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
                         <button
                             onClick={() => { handleSaveAction(dialogues); navigate(`/project/${projectId}/podcasts`); }}
                             className="p-2 bg-white border border-[#E0DCE0] rounded-lg text-muted-foreground hover:text-foreground hover:border-[#E63337]/30 transition-all flex-shrink-0"
                         >
                             <ChevronLeft className="h-4 w-4" />
                         </button>
-                        <div>
+                        <div className="min-w-0 overflow-hidden max-w-[400px]">
                             <div className="flex items-center gap-2">
-                                <h1 className="text-xl font-bold text-foreground">Éditeur de Dialogue</h1>
+                                <h1 className="text-xl font-bold text-foreground truncate">Éditeur de Dialogue</h1>
                                 {fidelityScore !== null && (
                                     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold ${
                                         fidelityScore >= 95 ? 'bg-[#BDD145]/20 text-[#5a6e00]' :

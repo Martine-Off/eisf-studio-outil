@@ -81,13 +81,22 @@ export default function ProjectPodcasts() {
                             Récapitulatif des contenus audio générés pour ce projet
                         </p>
                     </div>
-                    <button
-                        onClick={() => navigate('/dashboard')}
-                        className="flex items-center gap-1.5 mt-1 px-4 py-2 border border-[#E0DCE0] rounded-lg text-sm font-semibold text-muted-foreground hover:text-foreground hover:border-[#3465AE]/30 bg-white transition-colors flex-shrink-0"
-                    >
-                        <ChevronLeft className="h-4 w-4" />
-                        Retour au tableau de bord
-                    </button>
+                    <div className="flex items-center gap-2 mt-1 flex-shrink-0">
+                        <button
+                            onClick={() => navigate(`/editor/${projectId}`)}
+                            className="flex items-center gap-1.5 px-4 py-2 border border-[#E0DCE0] rounded-lg text-sm font-semibold text-muted-foreground hover:text-foreground hover:border-[#E63337]/30 bg-white transition-colors"
+                        >
+                            <ChevronLeft className="h-4 w-4" />
+                            Aperçu source
+                        </button>
+                        <button
+                            onClick={() => navigate('/dashboard')}
+                            className="flex items-center gap-1.5 px-4 py-2 border border-[#E0DCE0] rounded-lg text-sm font-semibold text-muted-foreground hover:text-foreground hover:border-[#3465AE]/30 bg-white transition-colors"
+                        >
+                            <ChevronLeft className="h-4 w-4" />
+                            Tableau de bord
+                        </button>
+                    </div>
                 </div>
 
                 {/* ── Analyse globale banner ── */}
