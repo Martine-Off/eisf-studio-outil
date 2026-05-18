@@ -214,13 +214,15 @@ router.patch('/:projectId/title', authMiddleware, async (req, res) => {
             return res.status(400).json({ error: 'Titre requis' });
         }
         const result = await pool.query(
-            'UPDATE projects SET title = $1, updated_at = NOW() AT TIME ZONE \'UTC\' WHERE id = $2 AND user_id = $3 RETURNING id, title, updated_at',
+            "UPDATE projects SET title = $1, updated_at = (NOW() AT TIME ZONE 'Europe/Paris') AT TIME ZONE 'UTC' WHERE id = $2 AND user_id = $3 RETURNING id, title, updated_at",
             [title.trim(), projectId, req.userId]
         );
         if (result.rows.length === 0) {
             return res.status(404).json({ error: 'Projet non trouvé' });
         }
         const row = result.rows[0];
+        console.log('updated_at raw from DB:', row.updated_at);
+        console.log('updated_at toISOString:', new Date(row.updated_at).toISOString());
         res.json({ success: true, title: row.title, updated_at: new Date(row.updated_at).toISOString() });
     } catch (error) {
         console.error('Erreur renommage projet:', error);
