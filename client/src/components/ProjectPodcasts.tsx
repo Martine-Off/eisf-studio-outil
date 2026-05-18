@@ -238,7 +238,7 @@ export default function ProjectPodcasts() {
 
                     {/* + card — generate new chapter */}
                     <div
-                        onClick={() => navigate(`/editor/${projectId}`)}
+                        onClick={() => navigate(`/editor/${projectId}`, { state: { step: 2 } })}
                         className="bg-white rounded-xl border-2 border-dashed border-[#D4D0D4] p-4 flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-[#E63337]/50 hover:bg-[#FFF8F8] transition-all min-h-[180px]"
                     >
                         <div className="w-10 h-10 rounded-full bg-[#F0EEF0] flex items-center justify-center">

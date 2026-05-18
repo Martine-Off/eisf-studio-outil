@@ -3,7 +3,7 @@ import api from '../utils/api';
 import { useNavigate } from 'react-router-dom';
 import {
     Plus, Trash2, FileText, Search,
-    ExternalLink, Pencil, ChevronDown,
+    ChevronDown,
 } from 'lucide-react';
 import AppLayout from '../components/AppLayout';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -215,7 +215,16 @@ export default function Dashboard() {
                                         }
                                     }}
                                 >
-                                    <td className="px-5 py-4 font-semibold text-sm text-foreground max-w-[260px]">
+                                    <td
+                                        className="px-5 py-4 font-semibold text-sm text-foreground max-w-[260px]"
+                                        onClick={e => {
+                                            e.stopPropagation();
+                                            if (editingProjectId !== project.id) {
+                                                setEditingProjectId(project.id);
+                                                setEditTitle(project.title);
+                                            }
+                                        }}
+                                    >
                                         {editingProjectId === project.id ? (
                                             <input
                                                 autoFocus
@@ -226,11 +235,11 @@ export default function Dashboard() {
                                                     if (e.key === 'Enter') handleRenameProject(project.id, editTitle);
                                                     if (e.key === 'Escape') setEditingProjectId(null);
                                                 }}
-                                                onClick={e => { e.preventDefault(); e.stopPropagation(); }}
+                                                onClick={e => e.stopPropagation()}
                                                 className="w-full text-sm font-bold border border-[#D6475B]/40 rounded px-1.5 py-0.5 focus:outline-none focus:ring-2 focus:ring-[#D6475B]/30 bg-white text-foreground"
                                             />
                                         ) : (
-                                            <span className="line-clamp-2">{project.title}</span>
+                                            <span className="line-clamp-2 cursor-text hover:text-[#D6475B] transition-colors">{project.title}</span>
                                         )}
                                     </td>
                                     <td className="px-5 py-4">
@@ -253,23 +262,6 @@ export default function Dashboard() {
                                             className="flex items-center gap-1"
                                             onClick={e => e.stopPropagation()}
                                         >
-                                            <button
-                                                onClick={() => navigate(`/project/${project.id}`)}
-                                                className="p-1.5 rounded text-muted-foreground hover:text-[#3465AE] hover:bg-[#EBF2FA] transition-colors"
-                                                title="Ouvrir"
-                                            >
-                                                <ExternalLink className="h-4 w-4" />
-                                            </button>
-                                            <button
-                                                onClick={() => {
-                                                    setEditingProjectId(project.id);
-                                                    setEditTitle(project.title);
-                                                }}
-                                                className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-[#F0EEF0] transition-colors"
-                                                title="Renommer"
-                                            >
-                                                <Pencil className="h-4 w-4" />
-                                            </button>
                                             <button
                                                 onClick={e => handleDeleteClick(e, project.id)}
                                                 className="p-1.5 rounded text-muted-foreground hover:text-[#D6475B] hover:bg-[#D6475B]/10 transition-colors"
