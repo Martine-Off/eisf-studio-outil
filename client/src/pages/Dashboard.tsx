@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import AppLayout from '../components/AppLayout';
 import { motion, AnimatePresence } from 'framer-motion';
+import { formatDateParis } from '../lib/utils';
 
 interface Project {
     id: number;
@@ -21,21 +22,6 @@ interface Project {
 type StatusFilter = 'all' | 'draft' | 'published';
 type SortOrder = 'recent' | 'oldest' | 'name_asc';
 
-function formatDate(dateStr: string): string {
-    const d = new Date(dateStr.endsWith('Z') ? dateStr : dateStr + 'Z');
-    const day = String(d.getDate()).padStart(2, '0');
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    return `${day}/${month}/${d.getFullYear()}`;
-}
-
-function formatUpdatedAt(dateStr: string): string {
-    const d = new Date(dateStr.endsWith('Z') ? dateStr : dateStr + 'Z');
-    const day = String(d.getDate()).padStart(2, '0');
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const h = String(d.getHours()).padStart(2, '0');
-    const m = String(d.getMinutes()).padStart(2, '0');
-    return `${day}/${month}/${d.getFullYear()} ${h}:${m}`;
-}
 
 function isPublished(status: string): boolean {
     return status === 'published' || status === 'verified';
@@ -257,10 +243,10 @@ export default function Dashboard() {
                                         </span>
                                     </td>
                                     <td className="px-5 py-4 text-sm text-muted-foreground whitespace-nowrap">
-                                        {formatUpdatedAt(project.updated_at)}
+                                        {formatDateParis(project.updated_at)}
                                     </td>
                                     <td className="px-5 py-4 text-sm text-muted-foreground whitespace-nowrap">
-                                        {formatDate(project.created_at)}
+                                        {formatDateParis(project.created_at)}
                                     </td>
                                     <td className="px-5 py-4">
                                         <div

@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Loader2, ChevronLeft, Mic, Plus, CheckCircle, AlertTriangle } from 'lucide-react';
 import api from '../utils/api';
 import AppLayout from '../components/AppLayout';
+import { formatDateParis } from '../lib/utils';
 import type { Project, Podcast } from '../types';
 
 function cleanTitle(podcast: Podcast, idx: number): string {
@@ -12,13 +13,6 @@ function cleanTitle(podcast: Podcast, idx: number): string {
     return t;
 }
 
-function formatUpdatedAt(dateStr: string): string {
-    const d = new Date(dateStr.endsWith('Z') ? dateStr : dateStr + 'Z');
-    const date = d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
-    const h = String(d.getHours()).padStart(2, '0');
-    const m = String(d.getMinutes()).padStart(2, '0');
-    return `Modifié le ${date} à ${h}h${m}`;
-}
 
 function estimateMinutes(durationSeconds: number | null | undefined, wordCount: number | null | undefined): number {
     if (durationSeconds && durationSeconds > 60) return Math.ceil(durationSeconds / 60);
@@ -225,7 +219,7 @@ export default function ProjectPodcasts() {
                                 {/* Date */}
                                 {podcast.updated_at && (
                                     <p className="text-[10px] text-muted-foreground mb-3">
-                                        {formatUpdatedAt(podcast.updated_at)}
+                                        {formatDateParis(podcast.updated_at)}
                                     </p>
                                 )}
 

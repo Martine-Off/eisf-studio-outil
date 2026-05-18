@@ -74,6 +74,12 @@ const updateDialogueHandler = async (req, res) => {
             values
         );
 
+        // Bumper updated_at du podcast parent (le trigger podcasts ne se déclenche pas sur dialogues)
+        await pool.query(
+            'UPDATE podcasts SET updated_at = NOW() WHERE id = (SELECT podcast_id FROM dialogues WHERE id = $1)',
+            [dialogueId]
+        );
+
         res.json({ success: true });
     } catch (error) {
         console.error('Erreur mise à jour dialogue:', error);

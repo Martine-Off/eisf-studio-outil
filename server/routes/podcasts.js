@@ -172,13 +172,14 @@ router.patch('/:podcastId/title', authMiddleware, async (req, res) => {
         }
         await assertPodcastOwner(podcastId, req.userId);
         const result = await pool.query(
-            'UPDATE podcasts SET title = $1 WHERE id = $2 RETURNING title',
+            'UPDATE podcasts SET title = $1 WHERE id = $2 RETURNING title, updated_at',
             [title.trim(), podcastId]
         );
         if (result.rows.length === 0) {
             return res.status(404).json({ error: 'Podcast non trouvé' });
         }
-        res.json({ success: true, title: result.rows[0].title });
+        const row = result.rows[0];
+        res.json({ success: true, title: row.title, updated_at: row.updated_at });
     } catch (error) {
         console.error('Erreur renommage podcast:', error);
         res.status(500).json({ error: 'Erreur serveur' });
