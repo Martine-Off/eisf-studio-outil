@@ -76,7 +76,7 @@ const updateDialogueHandler = async (req, res) => {
 
         // Bumper updated_at du podcast parent (le trigger podcasts ne se déclenche pas sur dialogues)
         await pool.query(
-            "UPDATE podcasts SET updated_at = (NOW() AT TIME ZONE 'Europe/Paris') AT TIME ZONE 'UTC' WHERE id = (SELECT podcast_id FROM dialogues WHERE id = $1)",
+            'UPDATE podcasts SET updated_at = NOW() WHERE id = (SELECT podcast_id FROM dialogues WHERE id = $1)',
             [dialogueId]
         );
 

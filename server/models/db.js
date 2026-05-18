@@ -1,4 +1,10 @@
-const { Pool } = require('pg');
+const { Pool, types } = require('pg');
+
+// OID 1114 = timestamp without time zone
+// node-postgres lit ces valeurs sans suffixe timezone, donc new Date('2026-05-18T15:12:41')
+// est interprété avec process.env.TZ ('Europe/Paris') → décalage de 2h.
+// Ce parser force l'interprétation UTC en ajoutant 'Z' avant le parsing.
+types.setTypeParser(1114, (str) => new Date(str + 'Z'));
 
 let pool;
 
@@ -10,8 +16,6 @@ if (process.env.USE_MOCK_DB === 'true') {
     connectionString: process.env.DATABASE_URL,
   });
 
-  // Force chaque connexion à interpréter les timestamps en UTC
-  // (évite le décalage de 2h quand Node.js tourne avec TZ=Europe/Paris)
   pool.on('connect', (client) => {
     client.query("SET timezone = 'UTC'");
   });
