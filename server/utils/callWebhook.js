@@ -7,32 +7,48 @@ async function callWebhook(payload) {
     return null;
   }
 
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 60_000);
+
   console.log(`[callWebhook] → ${url}`);
   console.log(`[callWebhook] type=${payload.type} | keys=${Object.keys(payload).join(', ')} | sourceText length=${payload.sourceText ? payload.sourceText.length : 'n/a'}`);
 
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
-  });
-
-  if (response.status === 429) {
-    const err = new Error('quota_make_exceeded');
-    err.code = 'MAKE_QUOTA_EXCEEDED';
-    err.status = 429;
-    throw err;
-  }
-
-  if (!response.ok) {
-    throw new Error(`Make webhook a répondu ${response.status}: ${await response.text()}`);
-  }
-
-  let text = await response.text()
-  text = text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim()
   try {
-    return JSON.parse(text);
-  } catch {
-    return text;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: controller.signal
+    });
+
+    if (response.status === 429) {
+      const err = new Error('quota_make_exceeded');
+      err.code = 'MAKE_QUOTA_EXCEEDED';
+      err.status = 429;
+      throw err;
+    }
+
+    if (!response.ok) {
+      throw new Error(`Make webhook a répondu ${response.status}: ${await response.text()}`);
+    }
+
+    let text = await response.text();
+    text = text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
+    try {
+      return JSON.parse(text);
+    } catch {
+      return text;
+    }
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      const timeoutErr = new Error('Make n\'a pas répondu dans le délai imparti (60s)');
+      timeoutErr.code = 'MAKE_TIMEOUT';
+      timeoutErr.status = 504;
+      throw timeoutErr;
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 

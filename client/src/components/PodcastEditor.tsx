@@ -277,6 +277,7 @@ export default function PodcastEditor() {
     const [titleDraft, setTitleDraft] = useState('');
 
     const [currentPropIdx, setCurrentPropIdx] = useState(0);
+    const [verifyError, setVerifyError] = useState<string | null>(null);
     const dialogueElRefs = useRef<Map<number, HTMLDivElement>>(new Map());
 
     const sensors = useSensors(
@@ -431,6 +432,8 @@ export default function PodcastEditor() {
     };
 
     const handleVerify = async () => {
+        if (verification.status === 'running') return;
+        setVerifyError(null);
         setVerification(v => ({ ...v, status: 'running' }));
         try {
             const res = await api.post(`/podcasts/${podcastId}/verify`);
@@ -439,10 +442,21 @@ export default function PodcastEditor() {
             const confusing: string[] = res.data.ia_feedback?.informations_erronees ?? [];
             setVerification({ status: score >= 95 ? 'success' : 'insufficient', score, missingConcepts: missing, confusingElements: confusing, passCount: 0 });
             setFidelityScore(score);
-        } catch (e) { console.error('Erreur vérification:', e); setVerification(v => ({ ...v, status: 'idle' })); }
+        } catch (e: any) {
+            console.error('Erreur vérification:', e);
+            const msg = e?.response?.status === 429
+                ? 'Quota Make dépassé — réessayez dans quelques minutes.'
+                : e?.response?.status === 504 || e?.code === 'MAKE_TIMEOUT'
+                ? 'Make n\'a pas répondu (délai 60s dépassé). Réessayez.'
+                : 'Impossible de joindre le serveur de vérification.';
+            setVerifyError(msg);
+            setVerification(v => ({ ...v, status: 'idle' }));
+        }
     };
 
     const handleAutoFix = async () => {
+        if (verification.status === 'running') return;
+        setVerifyError(null);
         setVerification(v => ({ ...v, status: 'running' }));
         try {
             const res = await api.post('/ai/auto-verify-and-fix', { podcastId: Number(podcastId) }, { timeout: 300000 });
@@ -450,7 +464,16 @@ export default function PodcastEditor() {
             setVerification({ status: finalScore >= 95 ? 'success' : 'insufficient', score: finalScore, missingConcepts: [], confusingElements: [], passCount });
             setFidelityScore(finalScore);
             await loadData();
-        } catch (e) { console.error('Erreur correction:', e); setVerification(v => ({ ...v, status: 'idle' })); }
+        } catch (e: any) {
+            console.error('Erreur correction:', e);
+            const msg = e?.response?.status === 429
+                ? 'Quota Make dépassé — réessayez dans quelques minutes.'
+                : e?.response?.data?.message
+                ? e.response.data.message
+                : 'Erreur lors de la correction automatique — Make n\'a pas répondu.';
+            setVerifyError(msg);
+            setVerification(v => ({ ...v, status: 'idle' }));
+        }
     };
 
     const handleRenameTitle = async () => {
@@ -771,6 +794,13 @@ export default function PodcastEditor() {
                             <p className="text-xs text-muted-foreground mb-4">
                                 L'IA analyse votre script par rapport au contenu source (.docx) pour s'assurer qu'aucune information clé n'a été oubliée ou déformée.
                             </p>
+
+                            {verifyError && (
+                                <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2.5 mb-3">
+                                    <AlertTriangle className="h-3.5 w-3.5 text-red-500 flex-shrink-0 mt-0.5" />
+                                    <p className="text-xs text-red-700 leading-snug">{verifyError}</p>
+                                </div>
+                            )}
 
                             {verification.status === 'idle' && (
                                 <>
