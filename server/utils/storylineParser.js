@@ -122,7 +122,7 @@ function parseStorylineHtml(html) {
             title: meaningfulTitle,
             content,
             wordCount: wc,
-            estimatedMinutes: Math.round((wc * 1.2) / 150),
+            estimatedMinutes: Math.round((wc * 1.2) / 130),
             thematic_note: `Chapitre : ${meaningfulTitle}`
         };
     });
@@ -141,7 +141,7 @@ function parseStorylineHtml(html) {
             ch.title = ch.title + ' / ' + next.title;
             ch.content = mergedContent;
             ch.wordCount = mergedWc;
-            ch.estimatedMinutes = Math.round((mergedWc * 1.2) / 150);
+            ch.estimatedMinutes = Math.round((mergedWc * 1.2) / 130);
             ch.thematic_note = `Chapitre : ${ch.title}`;
         }
         balanced.push(ch);

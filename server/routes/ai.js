@@ -162,7 +162,7 @@ function splitByHeadings(markdown) {
                 const content = currentLines.join('\n').trim();
                 if (content) {
                     const wordCount = content.split(/\s+/).filter(w => w).length;
-                    segments.push({ title: currentTitle, content, wordCount, estimatedMinutes: Math.round((wordCount * 1.2) / 150), thematic_note: `Chapitre : ${currentTitle}` });
+                    segments.push({ title: currentTitle, content, wordCount, estimatedMinutes: Math.round((wordCount * 1.2) / 130), thematic_note: `Chapitre : ${currentTitle}` });
                 }
             }
             currentTitle = m[2].trim();
@@ -175,7 +175,7 @@ function splitByHeadings(markdown) {
         const content = currentLines.join('\n').trim();
         if (content) {
             const wordCount = content.split(/\s+/).filter(w => w).length;
-            segments.push({ title: currentTitle, content, wordCount, estimatedMinutes: Math.round((wordCount * 1.2) / 150), thematic_note: `Chapitre : ${currentTitle}` });
+            segments.push({ title: currentTitle, content, wordCount, estimatedMinutes: Math.round((wordCount * 1.2) / 130), thematic_note: `Chapitre : ${currentTitle}` });
         }
     }
     return segments;
@@ -210,7 +210,7 @@ function rebalanceSegments(segments, minWords = 875, maxWords = 780) {
             const next = segments[i];
             seg.content = seg.content + '\n\n' + next.content;
             seg.wordCount += next.wordCount;
-            seg.estimatedMinutes = Math.round((seg.wordCount * 1.2) / 150);
+            seg.estimatedMinutes = Math.round((seg.wordCount * 1.2) / 130);
             seg.thematic_note = seg.thematic_note + ' + ' + next.thematic_note;
         }
         merged.push(seg);
@@ -224,7 +224,7 @@ function rebalanceSegments(segments, minWords = 875, maxWords = 780) {
         console.log(`[rebalance] Dernier segment trop court (${last.wordCount} mots) → fusionné avec "${prev.title}"`);
         prev.content = prev.content + '\n\n' + last.content;
         prev.wordCount += last.wordCount;
-        prev.estimatedMinutes = Math.round((prev.wordCount * 1.2) / 150);
+        prev.estimatedMinutes = Math.round((prev.wordCount * 1.2) / 130);
         prev.thematic_note = prev.thematic_note + ' + ' + last.thematic_note;
     }
 
@@ -242,8 +242,8 @@ function rebalanceSegments(segments, minWords = 875, maxWords = 780) {
         const part2 = seg.content.substring(cutPoint).trim();
         const wc1 = part1.split(/\s+/).filter(w => w).length;
         const wc2 = part2.split(/\s+/).filter(w => w).length;
-        result.push({ ...seg, content: part1, wordCount: wc1, estimatedMinutes: Math.round((wc1 * 1.2) / 150), title: seg.title + ' (1/2)' });
-        if (part2) result.push({ ...seg, content: part2, wordCount: wc2, estimatedMinutes: Math.round((wc2 * 1.2) / 150), title: seg.title + ' (2/2)' });
+        result.push({ ...seg, content: part1, wordCount: wc1, estimatedMinutes: Math.round((wc1 * 1.2) / 130), title: seg.title + ' (1/2)' });
+        if (part2) result.push({ ...seg, content: part2, wordCount: wc2, estimatedMinutes: Math.round((wc2 * 1.2) / 130), title: seg.title + ' (2/2)' });
     }
     return result;
 }
@@ -276,7 +276,7 @@ async function extractStorylineChapters(rawText, projectId = null) {
     const headings = (rawText.match(/^#{1,3} .+/gm) || []);
     if (headings.length >= 2) {
         const rawSegments = splitByHeadings(rawText);
-        const segments = rebalanceSegments(rawSegments, 875, 780);
+        const segments = rebalanceSegments(rawSegments, 600, 780);
         const avgWords = segments.reduce((s, seg) => s + seg.wordCount, 0) / (segments.length || 1);
         console.log(`[CHAPTERS] ${headings.length} titres Markdown → ${segments.length} segments après rééquilibrage, moy. ${Math.round(avgWords)} mots.`);
         return { cleanedText: rawText, segments };
@@ -315,7 +315,7 @@ async function extractStorylineChapters(rawText, projectId = null) {
             cleanedText, 
             segments: mockSegments.map(seg => ({
                 ...seg,
-                estimatedMinutes: Math.round((seg.wordCount * 1.2) / 150)
+                estimatedMinutes: Math.round((seg.wordCount * 1.2) / 130)
             })) 
         };
     }
