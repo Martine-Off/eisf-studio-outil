@@ -58,17 +58,24 @@ function parseStorylineHtml(html) {
 
         // ── Limite de chapitre (Nom de la scène) ─────────────────────────────
         if (typeL === 'nom de la scène') {
-            if (currentTitle && currentLines.length > 0) {
-                chapters.push({ title: currentTitle, lines: [...currentLines] });
-            }
             const name = content.trim();
-            // Ignorer les scènes de navigation / module-level
-            if (name && !/^(EISF|homepage|introduction|quiz)/i.test(name)) {
+            const isNavScene = !name || /^(EISF|homepage|introduction|quiz)/i.test(name);
+
+            if (isNavScene) {
+                // Scène de navigation : flush et désactiver
+                if (currentTitle && currentLines.length > 0) {
+                    chapters.push({ title: currentTitle, lines: [...currentLines] });
+                }
+                currentTitle = null;
+            } else if (name !== currentTitle) {
+                // Nouvelle scène pédagogique : flush + démarrer
+                if (currentTitle && currentLines.length > 0) {
+                    chapters.push({ title: currentTitle, lines: [...currentLines] });
+                }
                 currentTitle = name;
                 currentLines = [];
                 seenLines = new Set();
-            } else {
-                currentTitle = null;
+                // Si même scène répétée (nouvelle diapositive) : on continue d'accumuler
             }
             continue;
         }
