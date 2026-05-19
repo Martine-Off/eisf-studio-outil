@@ -155,6 +155,22 @@ function parseStorylineHtml(html) {
         i++;
     }
 
+    // ── Dernier chapitre trop court : fusionner avec le précédent ────────────
+    if (balanced.length >= 2) {
+        const last = balanced[balanced.length - 1];
+        if (last.wordCount < 600) {
+            const prev = balanced[balanced.length - 2];
+            const mergedContent = prev.content + '\n\n' + last.content;
+            const mergedWc = mergedContent.split(/\s+/).filter(w => w).length;
+            prev.title = prev.title + ' / ' + last.title;
+            prev.content = mergedContent;
+            prev.wordCount = mergedWc;
+            prev.estimatedMinutes = Math.round((mergedWc * 1.2) / 130);
+            prev.thematic_note = `Chapitre : ${prev.title}`;
+            balanced.pop();
+        }
+    }
+
     const markdown = balanced
         .map(ch => `## ${ch.title}\n\n${ch.content}`)
         .join('\n\n---\n\n');
