@@ -66,6 +66,8 @@ interface Project {
     id: number;
     title: string;
     source_file_path: string;
+    character_1_name?: string;
+    character_2_name?: string;
 }
 
 // Sortable Item Component with SaaS Design
@@ -243,6 +245,8 @@ export default function Editor() {
     const [chapterScores, setChapterScores] = useState<Record<number, number>>({});
     const [isGeneratingAll, setIsGeneratingAll] = useState(false);
     const [selectedChapterIndex, setSelectedChapterIndex] = useState<number>(0);
+    const [char1Name, setChar1Name] = useState('Inès');
+    const [char2Name, setChar2Name] = useState('Yannick');
 
     const sensors = useSensors(
         useSensor(PointerSensor),
@@ -313,6 +317,8 @@ export default function Editor() {
         try {
             const projRes = await api.get(`/projects/${projectId}`);
             setProject(projRes.data.project);
+            setChar1Name(projRes.data.project.character_1_name || 'Inès');
+            setChar2Name(projRes.data.project.character_2_name || 'Yannick');
 
             // Reconstruire l'état des chapitres déjà générés depuis les podcasts existants
             const existingPodcasts: any[] = projRes.data.podcasts || [];
@@ -496,6 +502,20 @@ export default function Editor() {
         } finally {
             setGenerating(false);
             setIsGeneratingAll(false);
+        }
+    };
+
+    const handleSaveCharacterNames = async () => {
+        try {
+            await api.patch(`/projects/${projectId}/character-names`, {
+                character_1_name: char1Name.trim() || 'Inès',
+                character_2_name: char2Name.trim() || 'Yannick',
+            });
+        } catch (e: any) {
+            if (e?.response?.status === 409) {
+                setChar1Name(project?.character_1_name || 'Inès');
+                setChar2Name(project?.character_2_name || 'Yannick');
+            }
         }
     };
 
@@ -901,6 +921,36 @@ export default function Editor() {
                                 <span className="text-[10px] font-bold tracking-widest uppercase bg-[#E6E2E6] text-muted-foreground px-2.5 py-1 rounded-full">
                                     ÉTAPE 2/3
                                 </span>
+                            </div>
+
+                            {/* Character names */}
+                            <div className={`px-4 py-3 border-b border-[#F0EEF0] flex flex-col gap-2 ${generatedChapters.size > 0 ? 'opacity-50' : ''}`}>
+                                <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                                    Prénoms des personnages
+                                </p>
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        value={char1Name}
+                                        disabled={generatedChapters.size > 0}
+                                        onChange={(e) => setChar1Name(e.target.value)}
+                                        onBlur={handleSaveCharacterNames}
+                                        placeholder="Inès"
+                                        className="flex-1 text-xs font-semibold border border-[#E0DCE0] rounded-lg px-3 py-2 bg-white focus:outline-none focus:border-[#D6475B] disabled:cursor-not-allowed"
+                                    />
+                                    <input
+                                        type="text"
+                                        value={char2Name}
+                                        disabled={generatedChapters.size > 0}
+                                        onChange={(e) => setChar2Name(e.target.value)}
+                                        onBlur={handleSaveCharacterNames}
+                                        placeholder="Yannick"
+                                        className="flex-1 text-xs font-semibold border border-[#E0DCE0] rounded-lg px-3 py-2 bg-white focus:outline-none focus:border-[#D6475B] disabled:cursor-not-allowed"
+                                    />
+                                </div>
+                                {generatedChapters.size > 0 && (
+                                    <p className="text-[10px] text-muted-foreground italic">Non modifiable après génération.</p>
+                                )}
                             </div>
 
                             {/* Chapter list */}

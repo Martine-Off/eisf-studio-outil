@@ -379,6 +379,12 @@ router.post('/generate', authMiddleware, async (req, res) => {
             return res.status(400).json({ error: 'Contenu requis' });
         }
 
+        const charRow = projectId
+            ? await pool.query('SELECT character_1_name, character_2_name FROM projects WHERE id = $1', [projectId])
+            : { rows: [] };
+        const char1 = charRow.rows[0]?.character_1_name || 'Inès';
+        const char2 = charRow.rows[0]?.character_2_name || 'Yannick';
+
         const targetDuration = 7;
         const targetWords = targetDuration * 130;
         const prompt = `
@@ -394,9 +400,9 @@ RÈGLE DE FIDÉLITÉ AU SOURCE :
 
 CONTRAINTES STRICTES :
 - Durée : ${targetDuration} minutes (${targetWords} mots)
-- Personnages : Inès (70%) et Yannick (30%)
-- Inès = experte, ton posé, professionnel. Explique les concepts clairement.
-- Yannick = apprenant curieux, spontané. Pose des questions, reformule, fait des liens concrets.
+- Personnages : ${char1} (70%) et ${char2} (30%)
+- ${char1} = experte, ton posé, professionnel. Explique les concepts clairement.
+- ${char2} = apprenant curieux, spontané. Pose des questions, reformule, fait des liens concrets.
 - Structure : Intro (accroche sur le sujet, 30s) + Contenu avec quiz intégré (3-5min) + Conclusion (résumé sur le sujet, 30s)
 - ATTENTION : L'introduction officielle et la conclusion légale seront ajoutées automatiquement. Commence directement le dialogue par l'accroche sur le cours.
 - Quiz : Intégré naturellement dans le dialogue, pas de section séparée
@@ -415,7 +421,7 @@ GÉNÈRE LE DIALOGUE AU FORMAT JSON UNIQUEMENT (pas de texte avant/après) :
 }
 VÉRIFIE AVANT D'ENVOYER :
 ✅ Pas de jingle artificiel à générer, l'introduction est ajoutée en dur.
-✅ Ratio Inès/Yannick ≈ 70/30
+✅ Ratio ${char1}/${char2} ≈ 70/30
 ✅ Durée totale = ${targetDuration} min (±30 secondes OK)
 ✅ Ton conversationnel, quiz intégré
 ✅ JSON valide avec text_studio ET text_reading`;
@@ -444,7 +450,9 @@ VÉRIFIE AVANT D'ENVOYER :
                 targetDuration,
                 targetWords: targetWords,
                 previousChapter: null,
-                nextChapter: null
+                nextChapter: null,
+                character_1_name: char1,
+                character_2_name: char2,
             });
             if (!generatedText) throw new Error('Génération impossible : Make n\'a pas renvoyé de contenu valide (réponse vide, non-JSON, ou JSON invalide). Consulte les logs [callWebhook] pour le détail.');
             console.log('[AI] Réponse Make reçue.');
@@ -509,11 +517,14 @@ router.post('/generate-from-project', authMiddleware, async (req, res) => {
         console.log('[GENERATE-PROJECT] Début');
         const { projectId, segments } = req.body;
 
+        const projectRow = await pool.query('SELECT cleaned_text, character_1_name, character_2_name FROM projects WHERE id = $1', [projectId]);
+        if (projectRow.rows.length === 0) return res.status(404).json({ error: 'Projet non trouvé' });
+        const char1 = projectRow.rows[0].character_1_name || 'Inès';
+        const char2 = projectRow.rows[0].character_2_name || 'Yannick';
+
         let segmentsToGenerate = segments;
         if (!segmentsToGenerate || segmentsToGenerate.length === 0) {
-            const projectResult = await pool.query('SELECT cleaned_text FROM projects WHERE id = $1', [projectId]);
-            if (projectResult.rows.length === 0) return res.status(404).json({ error: 'Projet non trouvé' });
-            segmentsToGenerate = [{ title: 'Podcast Pédagogique', content: projectResult.rows[0].cleaned_text }];
+            segmentsToGenerate = [{ title: 'Podcast Pédagogique', content: projectRow.rows[0].cleaned_text }];
         }
 
         if (useMock()) {
@@ -555,7 +566,7 @@ router.post('/generate-from-project', authMiddleware, async (req, res) => {
             if (!segment.content || segment.content.trim().length < 20) continue;
 
             const prompt = `Tu es un scénariste de podcast pédagogique pour l'EISF (École Internationale du Savoir-Faire Français).
-Génère un dialogue naturel entre Inès (experte, 70% du temps) et Yannick (apprenant, 30%).
+Génère un dialogue naturel entre ${char1} (experte, 70% du temps) et ${char2} (apprenant, 30%).
 
 RÈGLE DE FIDÉLITÉ AU SOURCE :
 - Reformuler le contenu source = AUTORISÉ (paraphrase, analogies tirées du domaine)
@@ -569,8 +580,8 @@ RÈGLES DE TRANSFORMATION AUDIO (obligatoires) :
 - Reformuler tout le jargon technique en langage parlé
   Exemple : "Le taux de cendres, c'est simplement un indicateur pour savoir si ta farine est plutôt blanche ou complète"
 - Ajouter systématiquement : exemples concrets, analogies visuelles, liens avec une pâte ou une recette réelle
-- Yannick pose les questions qu'un apprenti se pose vraiment (pas des questions génériques)
-- Inès répond avec des exemples tirés du métier
+- ${char2} pose les questions qu'un apprenti se pose vraiment (pas des questions génériques)
+- ${char1} répond avec des exemples tirés du métier
 - Prévoir des micro-reformulations ("donc si je résume...", "attends, tu veux dire que...")
   pour ancrer la mémorisation
 - Structure obligatoire :
@@ -602,7 +613,9 @@ Réponds UNIQUEMENT en JSON valide :
                 targetDuration: 7,
                 targetWords: Math.round(7 * 130),
                 previousChapter: null,
-                nextChapter: null
+                nextChapter: null,
+                character_1_name: char1,
+                character_2_name: char2,
             });
             if (!rawText) throw new Error('Génération impossible : Make n\'a pas renvoyé de contenu valide (réponse vide, non-JSON, ou JSON invalide). Consulte les logs [callWebhook] pour le détail.');
             console.log(`[GENERATE-PROJECT] Make répondu pour segment ${idx + 1}`);
@@ -685,9 +698,11 @@ router.post('/generate-single-chapter', authMiddleware, async (req, res) => {
             return res.status(400).json({ error: 'Segment content is required' });
         }
 
-        // Récupérer le titre du projet pour le nommage slug
-        const projTitleRes = await pool.query('SELECT title FROM projects WHERE id = $1', [projectId]);
+        // Récupérer le titre et les prénoms du projet
+        const projTitleRes = await pool.query('SELECT title, character_1_name, character_2_name FROM projects WHERE id = $1', [projectId]);
         const projectTitle = projTitleRes.rows[0]?.title || '';
+        const char1 = projTitleRes.rows[0]?.character_1_name || 'Inès';
+        const char2 = projTitleRes.rows[0]?.character_2_name || 'Yannick';
 
         if (useMock()) {
             console.log('[GENERATE-SINGLE] ⚠️ Mock AI');
@@ -726,7 +741,7 @@ router.post('/generate-single-chapter', authMiddleware, async (req, res) => {
         }
 
         const prompt = `Tu es un scénariste de podcast pédagogique pour l'EISF (École Internationale du Savoir-Faire Français).
-Génère un dialogue naturel entre Inès (experte, 70% du temps) et Yannick (apprenant, 30%).
+Génère un dialogue naturel entre ${char1} (experte, 70% du temps) et ${char2} (apprenant, 30%).
 
 RÈGLE ABSOLUE — FIDÉLITÉ AU SOURCE :
 - Reformuler le contenu source = AUTORISÉ (paraphrase, analogies tirées du domaine)
@@ -738,8 +753,8 @@ RÈGLE ABSOLUE — FIDÉLITÉ AU SOURCE :
 
 RÈGLES DE TRANSFORMATION AUDIO (obligatoires) :
 - Reformuler tout le jargon technique en langage parlé et accessible
-- Yannick pose les questions qu'un apprenant se pose vraiment (pas des questions génériques)
-- Inès répond en s'appuyant sur le contenu source uniquement (ou propose via [PROPOSITION: ...])
+- ${char2} pose les questions qu'un apprenant se pose vraiment (pas des questions génériques)
+- ${char1} répond en s'appuyant sur le contenu source uniquement (ou propose via [PROPOSITION: ...])
 - Prévoir des micro-reformulations ("donc si je résume...", "attends, tu veux dire que...")
   pour ancrer la mémorisation
 - Structure obligatoire :
@@ -773,7 +788,9 @@ Réponds UNIQUEMENT en JSON valide :
             targetDuration,
             targetWords: Math.round(targetDuration * 130),
             previousChapter: previousChapter || null,
-            nextChapter: nextChapter || null
+            nextChapter: nextChapter || null,
+            character_1_name: char1,
+            character_2_name: char2,
         });
         if (!rawText) throw new Error('Génération impossible : Make n\'a pas renvoyé de contenu valide (réponse vide, non-JSON, ou JSON invalide). Consulte les logs [callWebhook] pour le détail.');
 

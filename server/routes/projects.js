@@ -228,6 +228,40 @@ router.patch('/:projectId/title', authMiddleware, async (req, res) => {
     }
 });
 
+// PATCH /api/projects/:projectId/character-names
+router.patch('/:projectId/character-names', authMiddleware, async (req, res) => {
+    try {
+        const { projectId } = req.params;
+        const { character_1_name, character_2_name } = req.body;
+
+        // Guard : refus si des dialogues existent déjà pour ce projet
+        const dialogueCheck = await pool.query(
+            `SELECT COUNT(*) FROM dialogues d
+             JOIN podcasts p ON d.podcast_id = p.id
+             WHERE p.project_id = $1`,
+            [projectId]
+        );
+        if (parseInt(dialogueCheck.rows[0].count) > 0) {
+            return res.status(409).json({ error: 'Les prénoms ne peuvent pas être modifiés après génération.' });
+        }
+
+        const name1 = ((character_1_name || '').trim().substring(0, 50)) || 'Inès';
+        const name2 = ((character_2_name || '').trim().substring(0, 50)) || 'Yannick';
+
+        const result = await pool.query(
+            'UPDATE projects SET character_1_name = $1, character_2_name = $2, updated_at = NOW() WHERE id = $3 AND user_id = $4 RETURNING character_1_name, character_2_name',
+            [name1, name2, projectId, req.userId]
+        );
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Projet non trouvé' });
+        }
+        res.json({ success: true, character_1_name: result.rows[0].character_1_name, character_2_name: result.rows[0].character_2_name });
+    } catch (error) {
+        console.error('Erreur mise à jour prénoms:', error);
+        res.status(500).json({ error: 'Erreur serveur' });
+    }
+});
+
 // POST /api/projects/:id/macro-verify
 router.post('/:id/macro-verify', authMiddleware, async (req, res) => {
     try {
