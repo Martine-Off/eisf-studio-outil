@@ -30,6 +30,8 @@ export default function ProjectPodcasts() {
     const [podcasts, setPodcasts] = useState<Podcast[]>([]);
     const [projectData, setProjectData] = useState<Project | null>(null);
     const [loading, setLoading] = useState(true);
+    const [char1Name, setChar1Name] = useState('Inès');
+    const [char2Name, setChar2Name] = useState('Yannick');
 
     useEffect(() => {
         const fetchData = async () => {
@@ -37,6 +39,8 @@ export default function ProjectPodcasts() {
                 const res = await api.get(`/projects/${projectId}`);
                 setProjectData(res.data.project);
                 setPodcasts(res.data.podcasts || []);
+                setChar1Name(res.data.project.character_1_name || 'Inès');
+                setChar2Name(res.data.project.character_2_name || 'Yannick');
             } catch (e) {
                 console.error('Erreur récupération projet:', e);
             } finally {
@@ -45,6 +49,22 @@ export default function ProjectPodcasts() {
         };
         fetchData();
     }, [projectId]);
+
+    const locked = podcasts.some(p => (p.word_count ?? 0) > 0);
+
+    const handleSaveCharacterNames = async () => {
+        try {
+            await api.patch(`/projects/${projectId}/character-names`, {
+                character_1_name: char1Name.trim() || 'Inès',
+                character_2_name: char2Name.trim() || 'Yannick',
+            });
+        } catch (e: any) {
+            if (e?.response?.status === 409) {
+                setChar1Name(projectData?.character_1_name || 'Inès');
+                setChar2Name(projectData?.character_2_name || 'Yannick');
+            }
+        }
+    };
 
     const scoredPodcasts = podcasts.filter(p => p.fidelity_score != null);
     const meanScore = scoredPodcasts.length > 0
@@ -170,6 +190,37 @@ export default function ProjectPodcasts() {
                             </span>
                         )}
                     </div>
+                </div>
+
+                {/* ── Prénoms des personnages ── */}
+                <div className={`bg-white rounded-xl border border-[#E0DCE0] shadow-sm p-5 mb-6 ${locked ? 'opacity-60' : ''}`}>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">
+                        Prénoms des personnages
+                    </p>
+                    <div className="flex gap-3">
+                        <input
+                            type="text"
+                            value={char1Name}
+                            disabled={locked}
+                            onChange={(e) => setChar1Name(e.target.value)}
+                            onBlur={handleSaveCharacterNames}
+                            placeholder="Inès"
+                            className="flex-1 text-sm font-semibold border border-[#E0DCE0] rounded-lg px-3 py-2 bg-white focus:outline-none focus:border-[#E63337] disabled:cursor-not-allowed"
+                        />
+                        <input
+                            type="text"
+                            value={char2Name}
+                            disabled={locked}
+                            onChange={(e) => setChar2Name(e.target.value)}
+                            onBlur={handleSaveCharacterNames}
+                            placeholder="Yannick"
+                            className="flex-1 text-sm font-semibold border border-[#E0DCE0] rounded-lg px-3 py-2 bg-white focus:outline-none focus:border-[#E63337] disabled:cursor-not-allowed"
+                        />
+                    </div>
+                    {locked
+                        ? <p className="text-[11px] text-muted-foreground italic mt-2">Non modifiable — des podcasts ont déjà été générés.</p>
+                        : <p className="text-[11px] text-muted-foreground mt-2">Ces prénoms seront utilisés dans tous les dialogues générés pour ce projet.</p>
+                    }
                 </div>
 
                 {/* ── Podcasts grid ── */}

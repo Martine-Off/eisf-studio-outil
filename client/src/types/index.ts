@@ -27,6 +27,8 @@ export interface Project {
   cleaned_text?: string;
   macro_score?: number | null;
   macro_feedback?: string[] | null;
+  character_1_name?: string;
+  character_2_name?: string;
   created_at?: string;
   updated_at?: string;
   podcast_count?: number;
