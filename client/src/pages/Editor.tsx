@@ -243,6 +243,7 @@ export default function Editor() {
     const [generatedChapters, setGeneratedChapters] = useState<Set<number>>(new Set());
     const [generatedIdMap, setGeneratedIdMap] = useState<Record<number, number>>({});
     const [chapterScores, setChapterScores] = useState<Record<number, number>>({});
+    const [chapterWordCounts, setChapterWordCounts] = useState<Record<number, number>>({});
     const [isGeneratingAll, setIsGeneratingAll] = useState(false);
     const [selectedChapterIndex, setSelectedChapterIndex] = useState<number>(0);
 
@@ -321,14 +322,17 @@ export default function Editor() {
             if (existingPodcasts.length > 0) {
                 const genChapters = new Set<number>();
                 const genIdMap: Record<number, number> = {};
+                const genWc: Record<number, number> = {};
                 existingPodcasts.forEach((p: any) => {
                     if ((p.word_count ?? 0) > 0 && p.order_index != null) {
                         genChapters.add(p.order_index);
                         genIdMap[p.order_index] = p.id;
+                        genWc[p.order_index] = p.word_count;
                     }
                 });
                 setGeneratedChapters(genChapters);
                 setGeneratedIdMap(genIdMap);
+                setChapterWordCounts(genWc);
             }
 
             let allDialogues: Dialogue[] = [];
@@ -528,6 +532,9 @@ export default function Editor() {
                 const score: number | undefined = podcastRes.data.fidelity_score;
                 if (score != null && score > 0) {
                     setChapterScores(prev => ({ ...prev, [index]: score }));
+                }
+                if (podcastRes.data.word_count) {
+                    setChapterWordCounts(prev => ({ ...prev, [index]: podcastRes.data.word_count }));
                 }
             } catch {}
 
@@ -933,7 +940,10 @@ export default function Editor() {
                                                         <FileText className="h-3 w-3" />{chapter.wordCount} mots
                                                     </span>
                                                     <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
-                                                        <Clock className="h-3 w-3" />~{chapter.estimatedMinutes} min
+                                                        <Clock className="h-3 w-3" />
+                                                        {chapterWordCounts[i]
+                                                            ? `${Math.ceil(chapterWordCounts[i] / 140)} min`
+                                                            : '–'}
                                                     </span>
                                                 </div>
                                             </div>
@@ -970,12 +980,21 @@ export default function Editor() {
                                                 className="flex-1 font-bold text-lg text-foreground bg-transparent border-none p-0 focus:ring-0 outline-none"
                                                 placeholder="Titre du chapitre…"
                                             />
-                                            <span className="flex-shrink-0 text-xs font-semibold text-blue-600 bg-blue-50 border border-blue-100 px-3 py-1 rounded-full">
-                                                ~{ch.estimatedMinutes} min estimées
-                                            </span>
+                                            {chapterWordCounts[i] ? (
+                                                <span className="flex-shrink-0 text-xs font-semibold text-green-700 bg-green-50 border border-green-200 px-3 py-1 rounded-full">
+                                                    {Math.ceil(chapterWordCounts[i] / 140)} min réelles
+                                                </span>
+                                            ) : (
+                                                <span className="flex-shrink-0 text-xs font-semibold text-muted-foreground bg-[#F4F6FA] border border-[#E0DCE0] px-3 py-1 rounded-full">
+                                                    durée : –
+                                                </span>
+                                            )}
                                         </div>
                                         <p className="text-xs text-muted-foreground">
-                                            {ch.wordCount} mots · Lecture estimée {ch.estimatedMinutes} min
+                                            {ch.wordCount} mots source
+                                            {chapterWordCounts[i]
+                                                ? ` · ${chapterWordCounts[i].toLocaleString('fr-FR')} mots générés`
+                                                : ` · ~${ch.estimatedMinutes} min estimées`}
                                         </p>
                                     </div>
 
