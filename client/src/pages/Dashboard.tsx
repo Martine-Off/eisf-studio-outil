@@ -280,7 +280,7 @@ export default function Dashboard() {
                                 <td colSpan={6} className="px-5 py-4">
                                     <div
                                         className="flex flex-col items-center justify-center border-2 border-dashed border-[#D4D0D4] rounded-xl py-6 cursor-pointer hover:border-[#3465AE] hover:bg-[#EBF2FA]/40 transition-all group"
-                                        onClick={() => navigate('/create')}
+                                        onClick={() => navigate('/new-project')}
                                     >
                                         <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#F0EEF0] group-hover:bg-[#EBF2FA] mb-2 transition-colors">
                                             <Plus className="h-5 w-5 text-muted-foreground group-hover:text-[#3465AE] transition-colors" />
