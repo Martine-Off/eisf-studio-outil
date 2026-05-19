@@ -323,7 +323,13 @@ export default function PodcastEditor() {
     const scrollToProp = useCallback((idx: number) => {
         const prop = allPropositions[idx];
         if (!prop) return;
-        dialogueElRefs.current.get(prop.dialogueId)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        const el = dialogueElRefs.current.get(prop.dialogueId);
+        if (!el) return;
+        // Décalage pour les bandeaux fixes (AppLayout nav ~56px + bandeau PROPOSITION ~48px + marge)
+        const FIXED_OFFSET = 120;
+        const rect = el.getBoundingClientRect();
+        const targetTop = rect.top + window.scrollY - FIXED_OFFSET;
+        window.scrollTo({ top: targetTop, behavior: 'smooth' });
     }, [allPropositions]);
 
     const handleUpdate = (id: number, _field: 'studio', text: string) => {
