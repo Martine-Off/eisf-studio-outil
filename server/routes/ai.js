@@ -276,7 +276,7 @@ async function extractStorylineChapters(rawText, projectId = null) {
     const headings = (rawText.match(/^#{1,3} .+/gm) || []);
     if (headings.length >= 2) {
         const rawSegments = splitByHeadings(rawText);
-        const segments = rebalanceSegments(rawSegments, 875, 1250);
+        const segments = rebalanceSegments(rawSegments, 875, 780);
         const avgWords = segments.reduce((s, seg) => s + seg.wordCount, 0) / (segments.length || 1);
         console.log(`[CHAPTERS] ${headings.length} titres Markdown → ${segments.length} segments après rééquilibrage, moy. ${Math.round(avgWords)} mots.`);
         return { cleanedText: rawText, segments };
