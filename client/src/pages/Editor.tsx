@@ -512,6 +512,7 @@ export default function Editor() {
     const handleGenerateSingle = async (index: number) => {
         const chapter = editableChapters[index];
         if (!chapter) return;
+        if (generatingChapters.has(index)) return;
 
         setGeneratingChapters(prev => new Set(prev).add(index));
         try {

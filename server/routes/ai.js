@@ -802,8 +802,8 @@ Réponds UNIQUEMENT en JSON valide :
             chapterTitle: segment.title,
             targetDuration,
             targetWords: Math.round(targetDuration * 130),
-            previousChapter: previousChapter || null,
-            nextChapter: nextChapter || null,
+            previousChapter: previousChapter ? { title: previousChapter.title, wordCount: previousChapter.wordCount } : null,
+            nextChapter: nextChapter ? { title: nextChapter.title, wordCount: nextChapter.wordCount } : null,
             character_1_name: char1,
             character_2_name: char2,
         });
