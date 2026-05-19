@@ -468,9 +468,11 @@ export default function PodcastEditor() {
             console.error('Erreur correction:', e);
             const msg = e?.response?.status === 429
                 ? 'Quota Make dépassé — réessayez dans quelques minutes.'
+                : e?.response?.status === 504 || e?.code === 'MAKE_TIMEOUT'
+                ? 'Make n\'a pas répondu (délai 60s dépassé). Réessayez.'
                 : e?.response?.data?.message
                 ? e.response.data.message
-                : 'Erreur lors de la correction automatique — Make n\'a pas répondu.';
+                : 'Impossible de joindre le serveur de vérification.';
             setVerifyError(msg);
             setVerification(v => ({ ...v, status: 'idle' }));
         }
