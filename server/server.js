@@ -5,6 +5,7 @@ const cors = require('cors');
 const path = require('path');
 require('dotenv').config();
 
+const { generalLimiter, authLimiter, aiLimiter } = require('./middleware/rateLimiter');
 const apiRoutes = require('./routes');
 
 const app = express();
@@ -31,9 +32,24 @@ app.use(cors({
         callback(new Error(`CORS : origine non autorisée (${origin})`));
     },
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Security headers
+app.use((req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('X-XSS-Protection', '1; mode=block');
+    next();
+});
+
+// Rate limiting (avant les routes, /health exclu)
+app.use('/api/auth', authLimiter);
+app.use('/api/ai', aiLimiter);
+app.use('/api', generalLimiter);
 
 // Logging Middleware
 app.use((req, res, next) => {
