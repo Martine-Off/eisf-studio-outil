@@ -16,6 +16,13 @@ async function callWebhook(payload) {
     body: JSON.stringify(payload)
   });
 
+  if (response.status === 429) {
+    const err = new Error('quota_make_exceeded');
+    err.code = 'MAKE_QUOTA_EXCEEDED';
+    err.status = 429;
+    throw err;
+  }
+
   if (!response.ok) {
     throw new Error(`Make webhook a répondu ${response.status}: ${await response.text()}`);
   }

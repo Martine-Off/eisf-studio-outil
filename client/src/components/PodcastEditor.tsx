@@ -468,6 +468,7 @@ export default function PodcastEditor() {
             setAudioUrl(`${base}${res.data.audio_url}`);
         } catch (e: any) {
             if (e?.response?.data?.error === 'tts_not_configured') alert('La génération audio sera disponible prochainement.');
+            else if (e?.response?.status === 429) alert('Quota Make dépassé. Réessayez dans quelques minutes.');
             else { console.error('Erreur TTS:', e); alert('Erreur lors de la génération audio.'); }
         } finally { setIsGeneratingAudio(false); }
     };

@@ -100,8 +100,12 @@ export const AIVerificationPanel: React.FC<AIVerificationPanelProps> = ({
             setScore(s);
             setStatus(s >= 95 ? 'success' : 'insufficient');
             if (onCorrectionDone) onCorrectionDone(s);
-        } catch {
-            setError("Impossible de joindre le serveur de vérification.");
+        } catch (err: any) {
+            if (err?.response?.status === 429) {
+                setError("Le quota Make est dépassé. Patientez quelques minutes avant de réessayer.");
+            } else {
+                setError("Impossible de joindre le serveur de vérification.");
+            }
             setStatus('idle');
         }
     };
@@ -119,8 +123,12 @@ export const AIVerificationPanel: React.FC<AIVerificationPanelProps> = ({
             setFeedback(null);
             setStatus(data.targetReached ? 'success' : 'insufficient');
             if (onCorrectionDone) onCorrectionDone(data.finalScore);
-        } catch {
-            setError("Erreur lors de la correction automatique.");
+        } catch (err: any) {
+            if (err?.response?.status === 429) {
+                setError("Le quota Make est dépassé. Patientez quelques minutes avant de réessayer.");
+            } else {
+                setError("Erreur lors de la correction automatique.");
+            }
             setStatus('insufficient');
         }
     };

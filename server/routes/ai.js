@@ -494,6 +494,9 @@ VÉRIFIE AVANT D'ENVOYER :
 
     } catch (error) {
         console.error('[GENERATE] Erreur:', error);
+        if (error.code === 'MAKE_QUOTA_EXCEEDED') {
+            return res.status(429).json({ error: 'quota_make_exceeded', message: 'Le quota Make est temporairement dépassé. Réessayez dans quelques minutes.' });
+        }
         res.status(500).json({ error: 'Erreur lors de la génération', details: error.message });
     }
 });
@@ -817,6 +820,9 @@ Réponds UNIQUEMENT en JSON valide :
 
     } catch (error) {
         console.error('[GENERATE-SINGLE] Erreur:', error);
+        if (error.code === 'MAKE_QUOTA_EXCEEDED') {
+            return res.status(429).json({ error: 'quota_make_exceeded', message: 'Le quota Make est temporairement dépassé. Réessayez dans quelques minutes.' });
+        }
         res.status(500).json({ error: 'Erreur génération podcast', details: error.message });
     }
 });
@@ -946,6 +952,9 @@ router.post("/verify", async (req, res) => {
 
   } catch (error) {
     console.error("Erreur /verify :", error);
+    if (error.code === 'MAKE_QUOTA_EXCEEDED') {
+        return res.status(429).json({ error: 'quota_make_exceeded', message: 'Le quota Make est temporairement dépassé. Réessayez dans quelques minutes.' });
+    }
     return res.status(500).json({ error: error.message });
   }
 });
@@ -1003,6 +1012,9 @@ router.post('/fix-missing-concepts', authMiddleware, async (req, res) => {
 
     } catch (error) {
         console.error('[FIX] Erreur:', error);
+        if (error.code === 'MAKE_QUOTA_EXCEEDED') {
+            return res.status(429).json({ error: 'quota_make_exceeded', message: 'Le quota Make est temporairement dépassé. Réessayez dans quelques minutes.' });
+        }
         res.status(500).json({ error: 'Erreur lors de la correction', details: error.message });
     }
 });
@@ -1105,6 +1117,9 @@ router.post("/auto-verify-and-fix", async (req, res) => {
 
   } catch (error) {
     console.error("Erreur /auto-verify-and-fix :", error);
+    if (error.code === 'MAKE_QUOTA_EXCEEDED') {
+        return res.status(429).json({ error: 'quota_make_exceeded', message: 'Le quota Make est temporairement dépassé. Réessayez dans quelques minutes.' });
+    }
     return res.status(500).json({ error: error.message });
   }
 });
