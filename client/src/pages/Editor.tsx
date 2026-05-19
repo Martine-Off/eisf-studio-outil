@@ -870,10 +870,10 @@ export default function Editor() {
                                     </span>
                                 </div>
                                 <button
-                                    onClick={() => saveAndGoTo('chapters')}
+                                    onClick={() => navigate(`/project/${projectId}/podcasts`)}
                                     className="flex items-center gap-2 bg-[#D6475B] text-white hover:bg-[#c03d50] px-6 py-3 rounded-xl font-bold shadow-sm transition-all"
                                 >
-                                    Voir le découpage des chapitres →
+                                    Configurer et générer les podcasts →
                                 </button>
                             </div>
                         )}
