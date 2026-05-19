@@ -1110,13 +1110,18 @@ router.post("/auto-verify-and-fix", async (req, res) => {
 
       // ─── APPEL DE CORRECTION (Make) ──────────────────────────────────────
       const fixText = await callWebhook({
-        type: 'fix-script',
+        type: 'fix-missing-concepts',
         prompt: `Tu es un correcteur de script de podcast pédagogique.\nOn te donne un script existant (JSON) et une liste de concepts manquants tirés du contenu source.\nRÈGLES STRICTES :\n- Intégrer les concepts manquants naturellement dans le dialogue entre Inès et Yannick\n- Ne jamais supprimer ni modifier les répliques existantes — seulement en ajouter ou les enrichir\n- Respecter le style oral (tics de langage, balises <break>, hésitations)\n- Réponds UNIQUEMENT avec le tableau JSON complet des dialogues corrigés, sans markdown\n\nCONCEPTS MANQUANTS À INTÉGRER :\n${verif.missingConcepts.map((c, i) => `${i + 1}. ${c}`).join("\n")}\n\nSOURCE :\n${segmentContent}\n\nSCRIPT ACTUEL (JSON) :\n${JSON.stringify(currentDialogues, null, 2)}`
       }, 120_000);
       if (!fixText) break;
 
       try {
         const corrected = Array.isArray(fixText) ? fixText : (fixText.dialogues || []);
+
+        if (!Array.isArray(corrected) || corrected.length === 0) {
+          console.error(`[auto-verify-and-fix] Pass ${passCount + 1} : réponse Make invalide ou vide — currentDialogues conservé`, fixText);
+          break;
+        }
 
         // ─── SAUVEGARDER EN BDD ─────────────────────────────────────────
         for (const d of corrected) {
