@@ -460,8 +460,10 @@ export default function PodcastEditor() {
         setVerification(v => ({ ...v, status: 'running' }));
         try {
             const res = await api.post('/ai/auto-verify-and-fix', { podcastId: Number(podcastId) }, { timeout: 300000 });
-            const { finalScore, passCount } = res.data;
-            setVerification({ status: finalScore >= 95 ? 'success' : 'insufficient', score: finalScore, missingConcepts: [], confusingElements: [], passCount });
+            const { finalScore, passCount, passHistory } = res.data;
+            const lastPass = passHistory?.[passHistory.length - 1];
+            const finalMissing: string[] = lastPass?.missing ?? [];
+            setVerification({ status: finalScore >= 95 ? 'success' : 'insufficient', score: finalScore, missingConcepts: finalMissing, confusingElements: [], passCount });
             setFidelityScore(finalScore);
             await loadData();
         } catch (e: any) {
