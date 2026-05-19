@@ -140,7 +140,7 @@ function parseStorylineHtml(html) {
     while (i < chapterObjects.length) {
         const ch = { ...chapterObjects[i] };
         // Continuer à fusionner tant que trop court ET qu'il reste un chapitre suivant
-        while (ch.wordCount < 875 && i + 1 < chapterObjects.length) {
+        while (ch.wordCount < 150 && i + 1 < chapterObjects.length) {
             i++;
             const next = chapterObjects[i];
             const mergedContent = ch.content + '\n\n' + next.content;
