@@ -199,7 +199,7 @@ function findSentenceBoundary(text, nearChar) {
     return best !== null ? best : nearChar;
 }
 
-function rebalanceSegments(segments, minWords = 875, maxWords = 1250) {
+function rebalanceSegments(segments, minWords = 875, maxWords = 780) {
     // Fusion des segments trop courts (vers le suivant)
     const merged = [];
     let i = 0;
@@ -385,7 +385,7 @@ router.post('/generate', authMiddleware, async (req, res) => {
         const char1 = charRow.rows[0]?.character_1_name || 'Inès';
         const char2 = charRow.rows[0]?.character_2_name || 'Yannick';
 
-        const targetDuration = 7;
+        const targetDuration = 6;
         const targetWords = targetDuration * 130;
         const prompt = `
 Tu es un générateur de podcasts pédagogiques EISF (École Internationale du Savoir-Faire Français).
@@ -610,8 +610,8 @@ Réponds UNIQUEMENT en JSON valide :
                 type: 'generate',
                 sourceText: segment.content,
                 chapterTitle: segment.title,
-                targetDuration: 7,
-                targetWords: Math.round(7 * 130),
+                targetDuration: 6,
+                targetWords: Math.round(6 * 130),
                 previousChapter: null,
                 nextChapter: null,
                 character_1_name: char1,
@@ -692,7 +692,7 @@ router.post('/generate-single-chapter', authMiddleware, async (req, res) => {
     try {
         console.log('[GENERATE-SINGLE] Début');
         const { projectId, segment, orderIndex, previousChapter, nextChapter } = req.body;
-        const targetDuration = 7;
+        const targetDuration = 6;
 
         if (!segment || !segment.content) {
             return res.status(400).json({ error: 'Segment content is required' });
