@@ -24,6 +24,21 @@ function parseJSON(text) {
     }
 }
 
+// ─── Helper : normaliser les <break time="..."> générés en français ───────────
+function sanitizeBreakTimes(text) {
+    if (!text) return text;
+    return text.replace(/<break\s+time="([^"]+)"\s*\/>/gi, (_match, timeValue) => {
+        const v = timeValue.trim().toLowerCase();
+        if (/^\d+(\.\d+)?s$/.test(v)) return _match; // déjà valide (ex: "1s", "0.5s")
+        if (/zéro.*(virgule|point).*cinq/i.test(v)) return '<break time="0.5s" />';
+        if (/^zéro/i.test(v) || /^zero/i.test(v)) return '';         // 0s → supprimer
+        if (/^une?\s*(seconde)?/i.test(v)) return '<break time="1s" />';
+        if (/^deux\s*(secondes?)?/i.test(v)) return '<break time="2s" />';
+        if (/^trois\s*(secondes?)?/i.test(v)) return '<break time="3s" />';
+        return _match; // inconnu : laisser tel quel
+    });
+}
+
 // ─── Helper : est-ce qu'on utilise le mock ? ─────────────────────────────────
 function useMock() {
     return process.env.USE_MOCK_AI === 'true';
@@ -494,7 +509,7 @@ VÉRIFIE AVANT D'ENVOYER :
             const estimatedDuration = Math.round((wordCount / 150) * 60);
             await pool.query(
                 'INSERT INTO dialogues (podcast_id, order_index, character, text_studio, text_reading, duration_seconds, section) VALUES ($1, $2, $3, $4, $5, $6, $7)',
-                [podcastId, i, d.character, d.text_studio, d.text_reading, estimatedDuration, d.section]
+                [podcastId, i, d.character, sanitizeBreakTimes(d.text_studio), d.text_reading, estimatedDuration, d.section]
             );
         }
 
@@ -647,7 +662,7 @@ Réponds UNIQUEMENT en JSON valide :
                 const eDuration = Math.round((wCount / 130) * 60);
                 await pool.query(
                     'INSERT INTO dialogues (podcast_id, order_index, character, text_studio, text_reading, duration_seconds, section) VALUES ($1, $2, $3, $4, $5, $6, $7)',
-                    [podcastId, i, d.character || 'ines', d.text_studio, d.text_reading || d.text_studio, eDuration, d.section || 'content']
+                    [podcastId, i, d.character || 'ines', sanitizeBreakTimes(d.text_studio), d.text_reading || d.text_studio, eDuration, d.section || 'content']
                 );
             }
 
@@ -822,7 +837,7 @@ Réponds UNIQUEMENT en JSON valide :
             const eDuration = Math.round((wCount / 130) * 60);
             await pool.query(
                 'INSERT INTO dialogues (podcast_id, order_index, character, text_studio, text_reading, duration_seconds, section) VALUES ($1, $2, $3, $4, $5, $6, $7)',
-                [podcastId, i, d.character || 'ines', d.text_studio, d.text_reading, eDuration, d.section || 'content']
+                [podcastId, i, d.character || 'ines', sanitizeBreakTimes(d.text_studio), d.text_reading, eDuration, d.section || 'content']
             );
         }
 
@@ -932,7 +947,7 @@ Génère UNIQUEMENT ce JSON :
 
         await pool.query(
             'UPDATE dialogues SET text_studio = $1, text_reading = $2 WHERE id = $3',
-            [dialogue.text_studio, dialogue.text_reading || dialogue.text_studio, dialogueId]
+            [sanitizeBreakTimes(dialogue.text_studio), dialogue.text_reading || dialogue.text_studio, dialogueId]
         );
 
         res.json({ text_studio: dialogue.text_studio, text_reading: dialogue.text_reading || dialogue.text_studio });
