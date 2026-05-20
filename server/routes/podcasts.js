@@ -178,7 +178,7 @@ router.post('/:id/verify', authMiddleware, async (req, res) => {
 
         // Récupérer le projet lié au podcast + order_index pour extraire la bonne section
         const podcastResult = await pool.query(
-          'SELECT project_id, order_index FROM podcasts WHERE id = $1',
+          'SELECT project_id, order_index, segment_content FROM podcasts WHERE id = $1',
           [id]
         );
         if (podcastResult.rows.length === 0) {
@@ -187,12 +187,14 @@ router.post('/:id/verify', authMiddleware, async (req, res) => {
         const projectId = podcastResult.rows[0].project_id;
         const orderIndex = podcastResult.rows[0].order_index ?? 0;
 
-        const projectResult = await pool.query(
-          'SELECT cleaned_text FROM projects WHERE id = $1',
-          [projectId]
-        );
-        const fullText = projectResult.rows[0]?.cleaned_text || '';
-        const cleanedText = extractSourceSection(fullText, orderIndex);
+        let cleanedText = podcastResult.rows[0].segment_content || null;
+        if (!cleanedText) {
+          const projectResult = await pool.query(
+            'SELECT cleaned_text FROM projects WHERE id = $1',
+            [projectId]
+          );
+          cleanedText = extractSourceSection(projectResult.rows[0]?.cleaned_text || '', orderIndex);
+        }
 
         // 1. Récupérer les dialogues
         const dialoguesResult = await pool.query(

@@ -511,8 +511,8 @@ VÉRIFIE AVANT D'ENVOYER :
         const actualWordCount = normalized.reduce((sum, d) => sum + d.text_reading.split(/\s+/).length, 0);
 
         const podcastResult = await pool.query(
-            'INSERT INTO podcasts (project_id, title, word_count, duration_seconds) VALUES ($1, $2, $3, $4) RETURNING id',
-            [projectId, dialogue.title, actualWordCount, targetDuration * 60]
+            'INSERT INTO podcasts (project_id, title, word_count, duration_seconds, segment_content) VALUES ($1, $2, $3, $4, $5) RETURNING id',
+            [projectId, dialogue.title, actualWordCount, targetDuration * 60, content]
         );
         const podcastId = podcastResult.rows[0].id;
 
@@ -569,8 +569,8 @@ router.post('/generate-from-project', authMiddleware, async (req, res) => {
                     { character: "yannick", text_studio: "Parfait, c'est très clair merci !", text_reading: "Parfait, c'est très clair merci !", section: "conclusion" }
                 ];
                 const podcastResult = await pool.query(
-                    'INSERT INTO podcasts (project_id, title, order_index, word_count, duration_seconds) VALUES ($1, $2, $3, $4, $5) RETURNING id',
-                    [projectId, segment.title, idx, 60, 120]
+                    'INSERT INTO podcasts (project_id, title, order_index, word_count, duration_seconds, segment_content) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id',
+                    [projectId, segment.title, idx, 60, 120, segment.content]
                 );
                 const podcastId = podcastResult.rows[0].id;
                 allPodcasts.push({ podcastId, title: segment.title });
@@ -663,8 +663,8 @@ Réponds UNIQUEMENT en JSON valide :
             const durationSecs = Math.round((actualWordCount / 130) * 60);
 
             const podcastResult = await pool.query(
-                'INSERT INTO podcasts (project_id, title, order_index, word_count, duration_seconds) VALUES ($1, $2, $3, $4, $5) RETURNING id',
-                [projectId, dialogue.title, idx, actualWordCount, durationSecs]
+                'INSERT INTO podcasts (project_id, title, order_index, word_count, duration_seconds, segment_content) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id',
+                [projectId, dialogue.title, idx, actualWordCount, durationSecs, segment.content]
             );
             const podcastId = podcastResult.rows[0].id;
             allPodcasts.push({ podcastId, title: dialogue.title });
@@ -1077,16 +1077,19 @@ router.post("/auto-verify-and-fix", async (req, res) => {
 
     // ─── Récupérer le contenu source depuis la BDD ─────────────────────────
     const podcastRow = await pool.query(
-      'SELECT project_id, order_index FROM podcasts WHERE id = $1',
+      'SELECT project_id, order_index, segment_content FROM podcasts WHERE id = $1',
       [podcastId]
     );
     if (podcastRow.rows.length === 0) {
       return res.status(404).json({ error: 'Podcast non trouvé' });
     }
-    const { project_id: projectId, order_index: orderIndex } = podcastRow.rows[0];
+    const { project_id: projectId, order_index: orderIndex, segment_content } = podcastRow.rows[0];
 
-    const projRow = await pool.query('SELECT cleaned_text FROM projects WHERE id = $1', [projectId]);
-    const segmentContent = extractSourceSection(projRow.rows[0]?.cleaned_text || '', orderIndex ?? 0);
+    let segmentContent = segment_content || null;
+    if (!segmentContent) {
+      const projRow = await pool.query('SELECT cleaned_text FROM projects WHERE id = $1', [projectId]);
+      segmentContent = extractSourceSection(projRow.rows[0]?.cleaned_text || '', orderIndex ?? 0);
+    }
 
     // ─── Récupérer les dialogues actuels ──────────────────────────────────
     const dlgRow = await pool.query(
