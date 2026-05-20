@@ -53,22 +53,24 @@ function toTextString(result) {
   return result?.text || result?.output || JSON.stringify(result);
 }
 
-async function verifyScriptAgainstSource(segmentContent, scriptText) {
-  // ─── Appel 1 : extraction des concepts du source ──────────────────────────
-  const conceptsRaw = await callWebhook({
-    type: 'verify-extract-concepts',
-    prompt: `Tu es un extracteur de concepts pédagogiques.\nListe UNIQUEMENT les concepts, faits, chiffres présents dans ce texte.\nFormat : une ligne par concept, commençant par "- ". Sois atomique et exhaustif.\n\nExtrais TOUS les concepts de ce contenu source :\n\n${segmentContent}`
-  });
-  if (!conceptsRaw) throw new Error('Extraction des concepts impossible (Make n\'a pas répondu)');
-  const conceptsText = toTextString(conceptsRaw);
+async function verifyScriptAgainstSource(segmentContent, scriptText, cachedConcepts = null) {
+  let concepts = cachedConcepts && cachedConcepts.length > 0 ? cachedConcepts : null;
 
-  const concepts = conceptsText
-    .split('\n')
-    .filter(l => l.startsWith('- '))
-    .map(l => l.slice(2).trim())
-    .filter(Boolean);
-
-  if (concepts.length === 0) throw new Error('Aucun concept extrait du source');
+  // ─── Appel 1 : extraction des concepts (sauté si cache présent) ──────────
+  if (!concepts) {
+    const conceptsRaw = await callWebhook({
+      type: 'verify-extract-concepts',
+      prompt: `Tu es un extracteur de concepts pédagogiques.\nListe UNIQUEMENT les concepts, faits, chiffres présents dans ce texte.\nFormat : une ligne par concept, commençant par "- ". Sois atomique et exhaustif.\n\nExtrais TOUS les concepts de ce contenu source :\n\n${segmentContent}`
+    });
+    if (!conceptsRaw) throw new Error('Extraction des concepts impossible (Make n\'a pas répondu)');
+    const conceptsText = toTextString(conceptsRaw);
+    concepts = conceptsText
+      .split('\n')
+      .filter(l => l.startsWith('- '))
+      .map(l => l.slice(2).trim())
+      .filter(Boolean);
+    if (concepts.length === 0) throw new Error('Aucun concept extrait du source');
+  }
 
   // ─── Appel 2 : vérification binaire présent/absent dans le script ─────────
   const verificationRaw = await callWebhook({
@@ -95,6 +97,7 @@ async function verifyScriptAgainstSource(segmentContent, scriptText) {
     totalConcepts: total,
     validatedConcepts: validated,
     missingConcepts: missing.map(l => l.split('|')[0].trim()),
+    extractedConcepts: concepts,
     allResults
   };
 }
@@ -1092,6 +1095,10 @@ router.post("/auto-verify-and-fix", async (req, res) => {
     );
     let currentDialogues = dlgRow.rows;
 
+    // ─── Lire le cache de concepts depuis ia_feedback ─────────────────────
+    const feedbackRow = await pool.query('SELECT ia_feedback FROM podcasts WHERE id = $1', [podcastId]);
+    let cachedConcepts = feedbackRow.rows[0]?.ia_feedback?.cached_concepts || null;
+
     let lastScore = 0;
     let passCount = 0;
     const maxPasses = 2;
@@ -1103,7 +1110,15 @@ router.post("/auto-verify-and-fix", async (req, res) => {
         .map(d => `${d.character}: ${d.text_reading || d.text_studio}`)
         .join("\n");
 
-      const verif = await verifyScriptAgainstSource(segmentContent, currentScriptText);
+      const verif = await verifyScriptAgainstSource(segmentContent, currentScriptText, cachedConcepts);
+
+      if (!cachedConcepts && verif.extractedConcepts?.length > 0) {
+        cachedConcepts = verif.extractedConcepts;
+        await pool.query(
+          "UPDATE podcasts SET ia_feedback = COALESCE(ia_feedback, '{}'::jsonb) || $1::jsonb WHERE id = $2",
+          [JSON.stringify({ cached_concepts: cachedConcepts }), podcastId]
+        );
+      }
       lastScore = verif.fidelityScore;
 
       passHistory.push({
@@ -1157,7 +1172,9 @@ router.post("/auto-verify-and-fix", async (req, res) => {
     await pool.query('UPDATE podcasts SET fidelity_score = $1 WHERE id = $2', [lastScore, podcastId]);
 
     if (lastScore >= targetScore) {
+      console.log('[groundingCheck] Déclenchement — lastScore:', lastScore, 'targetScore:', targetScore);
       await groundingCheck(podcastId, segmentContent);
+      console.log('[groundingCheck] Terminé');
     }
 
     return res.json({

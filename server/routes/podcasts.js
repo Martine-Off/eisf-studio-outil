@@ -210,11 +210,14 @@ router.post('/:id/verify', authMiddleware, async (req, res) => {
 
         // 2. Vérification déterministe via Anthropic (extraction + vérification binaire)
         console.log('[VERIFY] Lancement verifyScriptAgainstSource...');
-        const result = await verifyScriptAgainstSource(cleanedText, scriptText);
+        const existingFeedback = await pool.query('SELECT ia_feedback FROM podcasts WHERE id = $1', [id]);
+        const cachedConcepts = existingFeedback.rows[0]?.ia_feedback?.cached_concepts || null;
+        const result = await verifyScriptAgainstSource(cleanedText, scriptText, cachedConcepts);
         console.log(`[VERIFY] Score : ${result.fidelityScore}% (${result.validatedConcepts}/${result.totalConcepts})`);
 
         const iaFeedback = {
             concepts_manquants: result.missingConcepts,
+            cached_concepts: cachedConcepts || result.extractedConcepts,
             informations_erronees: [],
             suggestions: [`${result.validatedConcepts} / ${result.totalConcepts} concepts du cours sont présents dans le podcast.`]
         };
