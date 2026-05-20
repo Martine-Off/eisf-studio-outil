@@ -712,6 +712,14 @@ export default function Editor() {
                         >
                             <ChevronLeft size={16} />
                         </button>
+                        {step === 'editor' && (
+                            <button
+                                onClick={() => navigate(`/project/${projectId}/podcasts`)}
+                                className="flex items-center gap-1.5 px-3 py-2 bg-card border border-border rounded-lg text-sm font-semibold text-muted-foreground hover:text-foreground hover:border-[#E63337]/30 transition-all shadow-sm"
+                            >
+                                Voir les podcasts →
+                            </button>
+                        )}
                         <div>
                             <nav className="flex items-center gap-1 text-xs text-muted-foreground mb-0.5">
                                 <Link to="/dashboard" className="hover:text-foreground transition-colors">Projets</Link>
