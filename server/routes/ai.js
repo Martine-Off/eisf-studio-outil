@@ -3,6 +3,7 @@ const pool = require('../models/db');
 const authMiddleware = require('../middleware/auth');
 const mammoth = require('mammoth');
 const { callWebhook } = require('../utils/callWebhook');
+const { extractSourceSection } = require('../utils/extractSourceSection');
 
 const INTRO_TEXT = "<break time=\"2s\" /> Bonjour et bienvenue dans ce podcast de formation EISF — votre capsule audio pour comprendre, apprendre et progresser à votre rythme. Cet épisode, généré par intelligence artificielle à partir de contenus rédigés et validés par nos formateurs, vous accompagne dans vos apprentissages théoriques.";
 const OUTRO_TEXT = "Ce podcast est une création EISF. Il a été généré par intelligence artificielle à partir de contenus pédagogiques rédigés et validés par nos formateurs. Toute reproduction ou diffusion est interdite sans autorisation. <break time=\"2s\" />";
@@ -46,28 +47,6 @@ function useMock() {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-function extractSourceSectionLocal(cleanedText, orderIndex) {
-  if (!cleanedText) return '';
-  const sections = [];
-  let current = null;
-  for (const line of cleanedText.split('\n')) {
-    if (/^#{1,3}\s+/.test(line)) {
-      if (current !== null) sections.push(current.join('\n'));
-      current = [line];
-    } else if (current !== null) {
-      current.push(line);
-    }
-  }
-  if (current !== null) sections.push(current.join('\n'));
-  if (sections.length > 0) {
-    return sections[Math.max(0, Math.min(orderIndex, sections.length - 1))].trim();
-  }
-  const parts = cleanedText.split(/\n\n---\n\n|\n---\n/).map(s => s.trim());
-  if (parts.length > 1) {
-    return parts[Math.max(0, Math.min(orderIndex, parts.length - 1))];
-  }
-  return cleanedText;
-}
 
 function toTextString(result) {
   if (typeof result === 'string') return result;
@@ -1104,7 +1083,7 @@ router.post("/auto-verify-and-fix", async (req, res) => {
     const { project_id: projectId, order_index: orderIndex } = podcastRow.rows[0];
 
     const projRow = await pool.query('SELECT cleaned_text FROM projects WHERE id = $1', [projectId]);
-    const segmentContent = extractSourceSectionLocal(projRow.rows[0]?.cleaned_text || '', orderIndex ?? 0);
+    const segmentContent = extractSourceSection(projRow.rows[0]?.cleaned_text || '', orderIndex ?? 0);
 
     // ─── Récupérer les dialogues actuels ──────────────────────────────────
     const dlgRow = await pool.query(

@@ -8,36 +8,9 @@ const { callWebhook } = require('../utils/callWebhook');
 const { generateAudio } = require('../utils/callGeminiTTS');
 const { normalizeText, verifyScriptAgainstSource } = require('./ai');
 const { assertPodcastOwner } = require('../utils/ownershipChecks');
+const { extractSourceSection } = require('../utils/extractSourceSection');
 
 const router = express.Router();
-
-// ─── Helper : extrait une section du cleaned_text par index de chapitre ───────
-function extractSourceSection(cleanedText, orderIndex) {
-    if (!cleanedText) return '';
-    // Priorité : découpage par titres markdown ## / # / ###
-    const sections = [];
-    let current = null;
-    for (const line of cleanedText.split('\n')) {
-        if (/^#{1,3}\s+/.test(line)) {
-            if (current !== null) sections.push(current.join('\n'));
-            current = [line];
-        } else if (current !== null) {
-            current.push(line);
-        }
-    }
-    if (current !== null) sections.push(current.join('\n'));
-    if (sections.length > 0) {
-        const idx = Math.max(0, Math.min(orderIndex, sections.length - 1));
-        return sections[idx].trim();
-    }
-    // Fallback : découpage par séparateur ---
-    const parts = cleanedText.split(/\n\n---\n\n|\n---\n/).map(s => s.trim());
-    if (parts.length > 1) {
-        const idx = Math.max(0, Math.min(orderIndex, parts.length - 1));
-        return parts[idx];
-    }
-    return cleanedText;
-}
 
 // Récupérer tous les podcasts d'un projet
 router.get('/', authMiddleware, async (req, res) => {
