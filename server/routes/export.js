@@ -39,6 +39,11 @@ router.get('/word-studio/:podcastId', authMiddleware, async (req, res) => {
 
         const dialogues = result.rows;
 
+        const ungroundedCount = dialogues.filter(d => d.is_grounded === false).length;
+        if (ungroundedCount > 0) {
+            return res.status(403).json({ error: `Export bloqué : ${ungroundedCount} réplique${ungroundedCount > 1 ? 's' : ''} non vérifiée${ungroundedCount > 1 ? 's' : ''}. Corrigez-les dans l'éditeur avant d'exporter.` });
+        }
+
         // Bordures pour le tableau
         const borders = {
             top: { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' },
@@ -161,6 +166,11 @@ router.get('/word-lecture/:podcastId', authMiddleware, async (req, res) => {
 
         const dialogues = result.rows;
 
+        const ungroundedCount = dialogues.filter(d => d.is_grounded === false).length;
+        if (ungroundedCount > 0) {
+            return res.status(403).json({ error: `Export bloqué : ${ungroundedCount} réplique${ungroundedCount > 1 ? 's' : ''} non vérifiée${ungroundedCount > 1 ? 's' : ''}. Corrigez-les dans l'éditeur avant d'exporter.` });
+        }
+
         const doc = new Document({
             sections: [{
                 children: [
@@ -216,8 +226,13 @@ router.get('/pdf-studio/:podcastId', authMiddleware, async (req, res) => {
         const result = await pool.query('SELECT * FROM dialogues WHERE podcast_id = $1 ORDER BY order_index ASC', [podcastId]);
         const dialogues = result.rows;
 
+        const ungroundedCount = dialogues.filter(d => d.is_grounded === false).length;
+        if (ungroundedCount > 0) {
+            return res.status(403).json({ error: `Export bloqué : ${ungroundedCount} réplique${ungroundedCount > 1 ? 's' : ''} non vérifiée${ungroundedCount > 1 ? 's' : ''}. Corrigez-les dans l'éditeur avant d'exporter.` });
+        }
+
         const doc = new PDFDocument({ margin: 50 });
-        
+
         const filename = generateExportFilename(podcast.title, podcast.project_title, 'studio', 'pdf');
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
@@ -260,8 +275,13 @@ router.get('/pdf-lecture/:podcastId', authMiddleware, async (req, res) => {
         const result = await pool.query('SELECT * FROM dialogues WHERE podcast_id = $1 ORDER BY order_index ASC', [podcastId]);
         const dialogues = result.rows;
 
+        const ungroundedCount = dialogues.filter(d => d.is_grounded === false).length;
+        if (ungroundedCount > 0) {
+            return res.status(403).json({ error: `Export bloqué : ${ungroundedCount} réplique${ungroundedCount > 1 ? 's' : ''} non vérifiée${ungroundedCount > 1 ? 's' : ''}. Corrigez-les dans l'éditeur avant d'exporter.` });
+        }
+
         const doc = new PDFDocument({ margin: 50 });
-        
+
         const filename = generateExportFilename(podcast.title, podcast.project_title, 'lecture', 'pdf');
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
@@ -306,6 +326,11 @@ router.get('/json/:podcastId', authMiddleware, async (req, res) => {
 
         const podcast = podcastResult.rows[0];
         const dialogues = dialoguesResult.rows;
+
+        const ungroundedCount = dialogues.filter(d => d.is_grounded === false).length;
+        if (ungroundedCount > 0) {
+            return res.status(403).json({ error: `Export bloqué : ${ungroundedCount} réplique${ungroundedCount > 1 ? 's' : ''} non vérifiée${ungroundedCount > 1 ? 's' : ''}. Corrigez-les dans l'éditeur avant d'exporter.` });
+        }
 
         // Calculer stats
         const inesWords = dialogues
