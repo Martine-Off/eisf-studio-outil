@@ -838,13 +838,10 @@ export default function PodcastEditor() {
                                             <p className="text-[10px] font-bold uppercase tracking-wide text-amber-700 mb-1.5">
                                                 {verification.missingConcepts.length} concept{verification.missingConcepts.length > 1 ? 's' : ''} manquant{verification.missingConcepts.length > 1 ? 's' : ''}
                                             </p>
-                                            <ul className="space-y-1">
-                                                {verification.missingConcepts.slice(0, 3).map((c, i) => (
+                                            <ul className="space-y-1 max-h-48 overflow-y-auto">
+                                                {verification.missingConcepts.map((c, i) => (
                                                     <li key={i} className="text-xs text-amber-800">• {c}</li>
                                                 ))}
-                                                {verification.missingConcepts.length > 3 && (
-                                                    <li className="text-xs text-amber-600 italic">…et {verification.missingConcepts.length - 3} autres</li>
-                                                )}
                                             </ul>
                                         </div>
                                     )}
