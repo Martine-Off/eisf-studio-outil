@@ -159,6 +159,25 @@ router.patch('/:podcastId/title', authMiddleware, async (req, res) => {
     }
 });
 
+// Supprimer un podcast et ses dialogues
+router.delete('/:podcastId', authMiddleware, async (req, res) => {
+    try {
+        const { podcastId } = req.params;
+        await assertPodcastOwner(podcastId, req.userId);
+
+        await pool.query('DELETE FROM dialogues WHERE podcast_id = $1', [podcastId]);
+        const result = await pool.query('DELETE FROM podcasts WHERE id = $1 RETURNING id', [podcastId]);
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Podcast non trouvé' });
+        }
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Erreur suppression podcast:', error);
+        res.status(error.statusCode || 500).json({ error: error.statusCode ? error.message : 'Erreur serveur' });
+    }
+});
+
 // Export PDF d'un podcast (Placeholder pour l'instant)
 router.get('/:id/export/pdf', authMiddleware, async (req, res) => {
     try {
@@ -186,6 +205,7 @@ router.post('/:id/verify', authMiddleware, async (req, res) => {
         }
         const projectId = podcastResult.rows[0].project_id;
         const orderIndex = podcastResult.rows[0].order_index ?? 0;
+        console.log('[VERIFY] segment_content length:', podcastResult.rows[0]?.segment_content?.length ?? 'NULL');
 
         let cleanedText = podcastResult.rows[0].segment_content || null;
         if (!cleanedText) {

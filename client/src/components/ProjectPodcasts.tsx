@@ -66,6 +66,17 @@ export default function ProjectPodcasts() {
         }
     };
 
+    const handleDelete = async (podcastId: number) => {
+        if (!window.confirm('Êtes-vous sûr ? Cette action supprimera le podcast et tous ses dialogues.')) return;
+        try {
+            await api.delete(`/podcasts/${podcastId}`);
+            setPodcasts(prev => prev.filter(p => p.id !== podcastId));
+        } catch (e) {
+            console.error('Erreur suppression podcast:', e);
+            alert('Erreur lors de la suppression.');
+        }
+    };
+
     const scoredPodcasts = podcasts.filter(p => p.fidelity_score != null);
     const meanScore = scoredPodcasts.length > 0
         ? Math.round(scoredPodcasts.reduce((s, p) => s + (p.fidelity_score ?? 0), 0) / scoredPodcasts.length)
@@ -284,12 +295,18 @@ export default function ProjectPodcasts() {
                                 )}
 
                                 {/* CTA */}
-                                <div className="mt-auto pt-3 border-t border-[#F0EEF0]">
+                                <div className="mt-auto pt-3 border-t border-[#F0EEF0] flex flex-col gap-2">
                                     <button
                                         onClick={() => navigate(`/project/${projectId}/podcast/${podcast.id}/edit`)}
                                         className="w-full py-2 rounded-lg text-xs font-semibold bg-[#FDDEDE] text-[#E63337] hover:bg-[#FECECE] transition-colors"
                                     >
                                         Ouvrir l'éditeur
+                                    </button>
+                                    <button
+                                        onClick={() => handleDelete(podcast.id)}
+                                        className="w-full py-2 rounded-lg text-xs font-semibold text-muted-foreground hover:bg-red-50 hover:text-[#E63337] border border-[#E0DCE0] hover:border-[#E63337]/30 transition-colors"
+                                    >
+                                        Supprimer
                                     </button>
                                 </div>
                             </div>
