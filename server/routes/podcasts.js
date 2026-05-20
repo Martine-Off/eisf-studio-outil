@@ -9,6 +9,7 @@ const { generateAudio } = require('../utils/callGeminiTTS');
 const { normalizeText, verifyScriptAgainstSource } = require('./ai');
 const { assertPodcastOwner } = require('../utils/ownershipChecks');
 const { extractSourceSection } = require('../utils/extractSourceSection');
+const { groundingCheck } = require('../utils/groundingCheck');
 
 const router = express.Router();
 
@@ -250,6 +251,12 @@ router.post('/:id/verify', authMiddleware, async (req, res) => {
         );
 
         res.json({ success: true, ia_feedback: iaFeedback, fidelity_score: result.fidelityScore });
+
+        if (result.fidelityScore >= 95) {
+            groundingCheck(id, cleanedText).catch(e =>
+                console.error('[VERIFY] groundingCheck error:', e)
+            );
+        }
     } catch (error) {
         console.error('Erreur vérification GPT:', error);
         res.status(500).json({ error: 'Erreur serveur lors de la vérification IA' });

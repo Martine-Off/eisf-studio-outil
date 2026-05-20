@@ -4,6 +4,7 @@ const authMiddleware = require('../middleware/auth');
 const mammoth = require('mammoth');
 const { callWebhook } = require('../utils/callWebhook');
 const { extractSourceSection } = require('../utils/extractSourceSection');
+const { groundingCheck } = require('../utils/groundingCheck');
 
 const INTRO_TEXT = "<break time=\"2s\" /> Bonjour et bienvenue dans ce podcast de formation EISF — votre capsule audio pour comprendre, apprendre et progresser à votre rythme. Cet épisode, généré par intelligence artificielle à partir de contenus rédigés et validés par nos formateurs, vous accompagne dans vos apprentissages théoriques.";
 const OUTRO_TEXT = "Ce podcast est une création EISF. Il a été généré par intelligence artificielle à partir de contenus pédagogiques rédigés et validés par nos formateurs. Toute reproduction ou diffusion est interdite sans autorisation. <break time=\"2s\" />";
@@ -100,37 +101,6 @@ async function verifyScriptAgainstSource(segmentContent, scriptText, cachedConce
     extractedConcepts: concepts,
     allResults
   };
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// GROUNDING CHECK — détection des répliques non ancrées dans le source
-// ─────────────────────────────────────────────────────────────────────────────
-async function groundingCheck(podcastId, segmentContent) {
-  const result = await pool.query(
-    'SELECT id, text_studio FROM dialogues WHERE podcast_id = $1 ORDER BY order_index ASC',
-    [podcastId]
-  );
-  const dialogues = result.rows;
-  if (!dialogues.length) return;
-
-  const groundingResult = await callWebhook({
-    type: 'grounding-check',
-    sourceText: segmentContent,
-    dialogues: dialogues.map(d => ({ id: d.id, text: d.text_studio }))
-  }, 120_000);
-
-  if (!Array.isArray(groundingResult)) {
-    console.warn('[groundingCheck] Réponse Make invalide:', groundingResult);
-    return;
-  }
-
-  for (const { id, is_grounded } of groundingResult) {
-    if (id == null || typeof is_grounded !== 'boolean') continue;
-    await pool.query(
-      'UPDATE dialogues SET is_grounded = $1 WHERE id = $2 AND podcast_id = $3',
-      [is_grounded, id, podcastId]
-    );
-  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -838,9 +808,10 @@ Réponds UNIQUEMENT en JSON valide :
         const durationSecs = Math.round((actualWordCount / 130) * 60); // Roughly 130 words per min
 
         const finalTitle = buildPodcastTitle(orderIndex, projectTitle, segment.title);
+        console.log('[GENERATE-SINGLE] segment_content length:', segment?.content?.length ?? 'NULL');
         const podcastResult = await pool.query(
-            'INSERT INTO podcasts (project_id, title, order_index, word_count, duration_seconds) VALUES ($1, $2, $3, $4, $5) RETURNING id',
-            [projectId, finalTitle, orderIndex || 0, actualWordCount, durationSecs]
+            'INSERT INTO podcasts (project_id, title, order_index, word_count, duration_seconds, segment_content) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id',
+            [projectId, finalTitle, orderIndex || 0, actualWordCount, durationSecs, segment.content]
         );
         const podcastId = podcastResult.rows[0].id;
 
