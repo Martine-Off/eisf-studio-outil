@@ -244,6 +244,10 @@ export const AIVerificationPanel: React.FC<AIVerificationPanelProps> = ({
                                 </div>
                             )}
 
+                            <div className="flex items-start gap-2 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-xs text-blue-800">
+                                💡 <span><strong>Conseil :</strong> Certains concepts peuvent être des faux positifs. Lancez la correction automatique pour atteindre 95%+ et déclencher la vérification des inventions potentielles, signalées en rouge dans l'éditeur.</span>
+                            </div>
+
                             {autoFixResult && (
                                 <div className="bg-[#F8F7F8] border border-[#E0DCE0] rounded-xl px-4 py-3 text-xs text-muted-foreground space-y-1">
                                     <p className="font-semibold text-foreground mb-1">Détail des passes</p>
