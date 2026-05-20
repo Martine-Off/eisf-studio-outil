@@ -25,6 +25,7 @@ interface Dialogue {
     text_studio: string;
     text_reading?: string;
     section: string;
+    is_grounded?: boolean;
     duration_seconds: number;
     order_index: number;
     podcast_id?: number;
@@ -120,6 +121,7 @@ function SortableDialogue({
     const isInes = dialogue.character.toLowerCase() === 'ines';
     const textParts = parseTextParts(dialogue.text_studio);
     const hasProps = textParts.some(p => p.type === 'proposition');
+    const isUngrounded = dialogue.is_grounded === false;
 
     const mergedRef = useCallback((el: HTMLDivElement | null) => {
         setNodeRef(el);
@@ -135,6 +137,7 @@ function SortableDialogue({
             {...attributes}
             className={`group relative bg-white rounded-xl border transition-all duration-150 ${
                 isDragging ? 'shadow-xl scale-[1.01]' :
+                isUngrounded ? 'border-red-300 bg-red-50' :
                 hasProps ? 'border-[#E6A440]/50 bg-[#FFF8EE]' :
                 'border-[#E0DCE0]'
             }`}
@@ -160,10 +163,18 @@ function SortableDialogue({
 
                 <div className="flex-1 min-w-0">
                     {/* Character name — small caps */}
-                    <p className="text-[10px] font-bold uppercase tracking-widest mb-1.5"
-                        style={{ color: isInes ? '#E63337' : '#3465AE' }}>
-                        {isInes ? 'Inès' : 'Yannick'}
-                    </p>
+                    <div className="flex items-center gap-2 mb-1.5">
+                        <p className="text-[10px] font-bold uppercase tracking-widest"
+                            style={{ color: isInes ? '#E63337' : '#3465AE' }}>
+                            {isInes ? 'Inès' : 'Yannick'}
+                        </p>
+                        {isUngrounded && (
+                            <span className="text-[9px] font-semibold uppercase tracking-wide bg-red-100 text-red-600 border border-red-300 rounded px-1.5 py-0.5">À vérifier</span>
+                        )}
+                        {!isUngrounded && hasProps && (
+                            <span className="text-[9px] font-semibold uppercase tracking-wide bg-[#FFF0D0] text-[#7a5200] border border-[#E6A440]/50 rounded px-1.5 py-0.5">Proposition IA</span>
+                        )}
+                    </div>
 
                     {/* Text */}
                     {editing ? (
