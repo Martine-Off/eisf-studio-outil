@@ -289,6 +289,7 @@ export default function PodcastEditor() {
 
     const [currentPropIdx, setCurrentPropIdx] = useState(0);
     const [verifyError, setVerifyError] = useState<string | null>(null);
+    const [groundingStatus, setGroundingStatus] = useState<'idle' | 'checking' | 'done'>('idle');
     const dialogueElRefs = useRef<Map<number, HTMLDivElement>>(new Map());
 
     const sensors = useSensors(
@@ -454,6 +455,7 @@ export default function PodcastEditor() {
     const handleVerify = async () => {
         if (verification.status === 'running') return;
         setVerifyError(null);
+        setGroundingStatus('idle');
         setVerification(v => ({ ...v, status: 'running' }));
         try {
             const res = await api.post(`/podcasts/${podcastId}/verify`);
@@ -462,6 +464,16 @@ export default function PodcastEditor() {
             const confusing: string[] = res.data.ia_feedback?.informations_erronees ?? [];
             setVerification({ status: score >= 95 ? 'success' : 'insufficient', score, missingConcepts: missing, confusingElements: confusing, passCount: 0 });
             setFidelityScore(score);
+            if (score >= 95) {
+                setGroundingStatus('checking');
+                setTimeout(async () => {
+                    try {
+                        const dlgsRes = await api.get(`/podcasts/${podcastId}/dialogues`);
+                        setDialogues((dlgsRes.data || []).sort((a: Dialogue, b: Dialogue) => a.order_index - b.order_index));
+                    } catch { /* silencieux */ }
+                    setGroundingStatus('done');
+                }, 5000);
+            }
         } catch (e: any) {
             console.error('Erreur vérification:', e);
             const msg = e?.response?.status === 429
@@ -853,6 +865,15 @@ export default function PodcastEditor() {
                                     <div className="flex justify-center">
                                         <ScoreGauge score={verification.score} />
                                     </div>
+                                    {groundingStatus !== 'idle' && (
+                                        <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-xs text-blue-800">
+                                            {groundingStatus === 'checking' ? (
+                                                <><Loader2 className="h-3.5 w-3.5 animate-spin flex-shrink-0" /><span>🔍 Vérification des inventions potentielles en cours...</span></>
+                                            ) : (
+                                                <span>✅ Vérification complète</span>
+                                            )}
+                                        </div>
+                                    )}
                                     {verification.missingConcepts.length > 0 && (
                                         <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
                                             <p className="text-[10px] font-bold uppercase tracking-wide text-amber-700 mb-1.5">
