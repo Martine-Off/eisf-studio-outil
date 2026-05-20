@@ -303,6 +303,15 @@ export default function PodcastEditor() {
             ]);
             setPodcastInfo(infoRes.data);
             setFidelityScore(infoRes.data.fidelity_score ?? null);
+            const feedback = infoRes.data.ia_feedback;
+            if (feedback && infoRes.data.fidelity_score != null) {
+              setVerification({
+                status: infoRes.data.fidelity_score >= 95 ? 'success' : 'insufficient',
+                score: infoRes.data.fidelity_score,
+                missingConcepts: feedback.concepts_manquants ?? [],
+                confusingElements: feedback.informations_erronees ?? [],
+              });
+            }
             if (infoRes.data.audio_url) {
                 const base = import.meta.env.VITE_API_URL || 'http://localhost:3001';
                 setAudioUrl(`${base}${infoRes.data.audio_url}`);
