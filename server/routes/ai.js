@@ -1111,12 +1111,16 @@ router.post("/auto-verify-and-fix", async (req, res) => {
       // ─── APPEL DE CORRECTION (Make) ──────────────────────────────────────
       const fixText = await callWebhook({
         type: 'fix-missing-concepts',
-        prompt: `Tu es un correcteur de script de podcast pédagogique.\nOn te donne un script existant (JSON) et une liste de concepts manquants tirés du contenu source.\nRÈGLES STRICTES :\n- Intégrer les concepts manquants naturellement dans le dialogue entre Inès et Yannick\n- Ne jamais supprimer ni modifier les répliques existantes — seulement en ajouter ou les enrichir\n- Respecter le style oral (tics de langage, balises <break>, hésitations)\n- Réponds UNIQUEMENT avec le tableau JSON complet des dialogues corrigés, sans markdown\n\nCONCEPTS MANQUANTS À INTÉGRER :\n${verif.missingConcepts.map((c, i) => `${i + 1}. ${c}`).join("\n")}\n\nSOURCE :\n${segmentContent}\n\nSCRIPT ACTUEL (JSON) :\n${JSON.stringify(currentDialogues, null, 2)}`
+        prompt: `Tu es un correcteur de script de podcast pédagogique.\nOn te donne un script existant (JSON) et une liste de concepts manquants tirés du contenu source.\nRÈGLES STRICTES :\n- Intégrer les concepts manquants naturellement dans le dialogue entre Inès et Yannick\n- Ne jamais supprimer ni modifier les répliques existantes — seulement en ajouter ou les enrichir\n- Respecter le style oral (tics de langage, balises <break>, hésitations)\n- Réponds UNIQUEMENT avec un tableau JSON des répliques modifiées ou ajoutées (pas tout le tableau), sans markdown\n\nCONCEPTS MANQUANTS À INTÉGRER :\n${verif.missingConcepts.map((c, i) => `${i + 1}. ${c}`).join("\n")}\n\nSOURCE :\n${segmentContent}\n\nSCRIPT ACTUEL (JSON) :\n${JSON.stringify(currentDialogues)}`
       }, 120_000);
       if (!fixText) break;
 
       try {
-        const corrected = Array.isArray(fixText) ? fixText : (fixText.dialogues || []);
+        const parsed = typeof fixText === 'string' ? JSON.parse(fixText) : fixText;
+        const delta = Array.isArray(parsed) ? parsed : (parsed?.dialogues || []);
+        const deltaMap = new Map(delta.filter(d => d.id).map(d => [d.id, d]));
+        const added = delta.filter(d => !d.id);
+        const corrected = [...currentDialogues.map(d => deltaMap.get(d.id) || d), ...added];
 
         if (!Array.isArray(corrected) || corrected.length === 0) {
           console.error(`[auto-verify-and-fix] Pass ${passCount + 1} : réponse Make invalide ou vide — currentDialogues conservé`, fixText);
