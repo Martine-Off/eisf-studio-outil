@@ -1,6 +1,7 @@
 const express = require('express');
 const pool = require('../models/db');
 const authMiddleware = require('../middleware/auth');
+const { queryFallback: authQueryMiddleware } = require('../middleware/auth');
 const fs = require('fs');
 const path = require('path');
 const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, HeadingLevel, WidthType } = require('docx');
@@ -108,6 +109,59 @@ router.get('/:id/source-section', authMiddleware, async (req, res) => {
     } catch (error) {
         console.error('Erreur récupération texte source:', error);
         res.status(500).json({ error: 'Erreur serveur' });
+    }
+});
+
+// Page HTML du texte source d'un podcast (ouverte dans un nouvel onglet)
+router.get('/:id/source', authQueryMiddleware, async (req, res) => {
+    try {
+        const pod = await pool.query(
+            `SELECT p.title, p.segment_content, proj.cleaned_text, p.order_index
+             FROM podcasts p
+             JOIN projects proj ON p.project_id = proj.id
+             WHERE p.id = $1 AND proj.user_id = $2`,
+            [req.params.id, req.userId]
+        );
+        if (pod.rows.length === 0) return res.status(404).send('<p>Podcast non trouvé</p>');
+
+        const { title, segment_content, cleaned_text, order_index } = pod.rows[0];
+        const raw = segment_content || extractSourceSection(cleaned_text || '', order_index ?? 0) || '';
+
+        const blocks = raw.split(/\n{2,}/);
+        const bodyHtml = blocks.map(block => {
+            const line = block.trim();
+            if (!line) return '';
+            const isHeading = line.length < 80 && !/[.!?]$/.test(line) && line.split('\n').length === 1;
+            if (isHeading) return `<h2>${line.replace(/\n/g, '<br>')}</h2>`;
+            return `<p>${line.replace(/\n/g, '<br>')}</p>`;
+        }).join('\n');
+
+        const html = `<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Source — ${title || 'Podcast'}</title>
+<style>
+  body { font-family: Georgia, serif; max-width: 740px; margin: 48px auto; padding: 0 24px 80px; color: #1a1a1a; line-height: 1.75; }
+  h1 { font-size: 1.6rem; font-weight: 800; margin-bottom: 0.25em; color: #111; }
+  .meta { font-size: 0.8rem; color: #888; margin-bottom: 2.5em; font-family: sans-serif; }
+  h2 { font-size: 1.1rem; font-weight: 700; margin-top: 2em; margin-bottom: 0.4em; color: #222; font-family: sans-serif; }
+  p { margin: 0 0 1em; font-size: 0.97rem; }
+</style>
+</head>
+<body>
+<h1>${title || 'Source du podcast'}</h1>
+<p class="meta">Texte source utilisé pour la génération</p>
+${bodyHtml}
+</body>
+</html>`;
+
+        res.setHeader('Content-Type', 'text/html; charset=utf-8');
+        res.send(html);
+    } catch (error) {
+        console.error('Erreur GET /source :', error);
+        res.status(500).send('<p>Erreur serveur</p>');
     }
 });
 

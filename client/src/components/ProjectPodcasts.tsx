@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Loader2, ChevronLeft, Mic, Plus, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Loader2, ChevronLeft, Mic, Plus, CheckCircle, AlertTriangle, LayoutList, Pencil } from 'lucide-react';
 import api from '../utils/api';
 import AppLayout from '../components/AppLayout';
 import { formatDateParis } from '../lib/utils';
@@ -32,6 +32,9 @@ export default function ProjectPodcasts() {
     const [loading, setLoading] = useState(true);
     const [char1Name, setChar1Name] = useState('Inès');
     const [char2Name, setChar2Name] = useState('Yannick');
+    const [editingTitle, setEditingTitle] = useState(false);
+    const [titleDraft, setTitleDraft] = useState('');
+    const titleInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -63,6 +66,18 @@ export default function ProjectPodcasts() {
                 setChar1Name(projectData?.character_1_name || 'Inès');
                 setChar2Name(projectData?.character_2_name || 'Yannick');
             }
+        }
+    };
+
+    const handleSaveTitle = async () => {
+        setEditingTitle(false);
+        const trimmed = titleDraft.trim();
+        if (!trimmed || trimmed === projectData?.title) return;
+        try {
+            await api.patch(`/projects/${projectId}/title`, { title: trimmed });
+            setProjectData(prev => prev ? { ...prev, title: trimmed } : prev);
+        } catch {
+            setTitleDraft(projectData?.title || '');
         }
     };
 
@@ -107,12 +122,40 @@ export default function ProjectPodcasts() {
                             <span>/</span>
                             <span className="text-foreground font-medium">Podcasts</span>
                         </nav>
-                        <h1 className="text-2xl font-bold text-foreground">{projectTitle}</h1>
+                        {editingTitle ? (
+                            <input
+                                ref={titleInputRef}
+                                autoFocus
+                                value={titleDraft}
+                                onChange={e => setTitleDraft(e.target.value)}
+                                onBlur={handleSaveTitle}
+                                onKeyDown={e => {
+                                    if (e.key === 'Enter') handleSaveTitle();
+                                    if (e.key === 'Escape') setEditingTitle(false);
+                                }}
+                                className="text-2xl font-bold text-foreground bg-transparent border-b-2 border-[#E63337] outline-none w-full"
+                            />
+                        ) : (
+                            <h1
+                                className="text-2xl font-bold text-foreground cursor-pointer hover:text-[#E63337] transition-colors group flex items-center gap-2"
+                                onClick={() => { setTitleDraft(projectData?.title || ''); setEditingTitle(true); }}
+                            >
+                                {projectTitle}
+                                <Pencil className="h-4 w-4 opacity-0 group-hover:opacity-40 transition-opacity flex-shrink-0" />
+                            </h1>
+                        )}
                         <p className="text-sm text-muted-foreground mt-1">
                             Récapitulatif des contenus audio générés pour ce projet
                         </p>
                     </div>
                     <div className="flex items-center gap-2 mt-1 flex-shrink-0">
+                        <button
+                            onClick={() => navigate(`/editor/${projectId}`, { state: { step: 2 } })}
+                            className="flex items-center gap-1.5 px-4 py-2 border border-[#E0DCE0] rounded-lg text-sm font-semibold text-muted-foreground hover:text-foreground hover:border-[#E63337]/30 bg-white transition-colors"
+                        >
+                            <LayoutList className="h-4 w-4" />
+                            Voir la structure
+                        </button>
                         <button
                             onClick={() => navigate(`/editor/${projectId}`)}
                             className="flex items-center gap-1.5 px-4 py-2 border border-[#E0DCE0] rounded-lg text-sm font-semibold text-muted-foreground hover:text-foreground hover:border-[#E63337]/30 bg-white transition-colors"
