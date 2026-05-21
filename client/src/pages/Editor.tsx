@@ -297,6 +297,7 @@ export default function Editor() {
     });
 
     const previewInFlightRef = useRef(false);
+    const inFlightChapters = useRef<Set<number>>(new Set());
 
     const handlePreview = useCallback(async () => {
         if (previewInFlightRef.current) return;
@@ -325,10 +326,10 @@ export default function Editor() {
                 const genIdMap: Record<number, number> = {};
                 const genWc: Record<number, number> = {};
                 existingPodcasts.forEach((p: any) => {
-                    if ((p.word_count ?? 0) > 0 && p.order_index != null) {
+                    if (p.order_index != null) {
                         genChapters.add(p.order_index);
                         genIdMap[p.order_index] = p.id;
-                        genWc[p.order_index] = p.word_count;
+                        if ((p.word_count ?? 0) > 0) genWc[p.order_index] = p.word_count;
                     }
                 });
                 setGeneratedChapters(genChapters);
@@ -514,6 +515,8 @@ export default function Editor() {
         const chapter = editableChapters[index];
         if (!chapter) return;
         if (generatingChapters.has(index)) return;
+        if (inFlightChapters.current.has(index)) return;
+        inFlightChapters.current.add(index);
 
         setGeneratingChapters(prev => new Set(prev).add(index));
         try {
@@ -552,6 +555,7 @@ export default function Editor() {
             console.error('Erreur génération unitaire:', error);
             throw error; // Important pour arrêter la boucle globale en cas d'erreur
         } finally {
+            inFlightChapters.current.delete(index);
             setGeneratingChapters(prev => {
                 const next = new Set(prev);
                 next.delete(index);
@@ -1042,7 +1046,7 @@ export default function Editor() {
                                             className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold bg-[#E63337] text-white hover:bg-[#c92d31] disabled:opacity-60 transition-all"
                                         >
                                             {isGenerating && <Loader2 className="h-4 w-4 animate-spin" />}
-                                            {isGenerating ? 'Génération en cours…' : 'Ouvrir dans l\'éditeur →'}
+                                            {isGenerating ? 'Génération en cours…' : isGenerated ? 'Ouvrir dans l\'éditeur →' : 'Générer ce chapitre →'}
                                         </button>
                                     </div>
                                 </div>
