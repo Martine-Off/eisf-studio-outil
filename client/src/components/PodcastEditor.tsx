@@ -31,7 +31,7 @@ interface Dialogue {
     podcast_id?: number;
 }
 
-interface TextPart { type: 'text' | 'proposition'; content: string; fullMatch: string; }
+interface TextPart { type: 'text' | 'proposition' | 'break'; content: string; fullMatch: string; }
 interface PropositionRef { dialogueId: number; partIndex: number; fullMatch: string; content: string; }
 
 interface VerificationState {
@@ -44,11 +44,15 @@ interface VerificationState {
 
 function parseTextParts(text: string): TextPart[] {
     const parts: TextPart[] = [];
-    const regex = /\[PROPOSITION:\s*(.*?)\]/g;
+    const regex = /\[PROPOSITION:\s*(.*?)\]|<break\s+time="([^"]+)"\s*\/>/g;
     let lastIndex = 0, match;
     while ((match = regex.exec(text)) !== null) {
         if (match.index > lastIndex) parts.push({ type: 'text', content: text.slice(lastIndex, match.index), fullMatch: '' });
-        parts.push({ type: 'proposition', content: match[1].trim(), fullMatch: match[0] });
+        if (match[0].startsWith('[PROPOSITION:')) {
+            parts.push({ type: 'proposition', content: match[1].trim(), fullMatch: match[0] });
+        } else {
+            parts.push({ type: 'break', content: match[2], fullMatch: match[0] });
+        }
         lastIndex = match.index + match[0].length;
     }
     if (lastIndex < text.length) parts.push({ type: 'text', content: text.slice(lastIndex), fullMatch: '' });
@@ -206,6 +210,10 @@ function SortableDialogue({
                                         <span>{part.content}</span>
                                         <button onClick={e => { e.stopPropagation(); onAccept(dialogue.id, part.fullMatch); }} className="ml-1 text-[#BDD145] hover:text-green-700 font-bold text-sm">✓</button>
                                         <button onClick={e => { e.stopPropagation(); onReject(dialogue.id, part.fullMatch); }} className="text-[#D6475B] hover:text-red-700 font-bold text-sm">✗</button>
+                                    </span>
+                                ) : part.type === 'break' ? (
+                                    <span key={i} className="inline-flex items-center mx-0.5 px-1.5 py-px rounded text-[10px] font-mono font-semibold bg-slate-100 text-slate-500 border border-slate-200 select-none">
+                                        ⏸ {part.content}
                                     </span>
                                 ) : <span key={i}>{part.content}</span>
                             )}
