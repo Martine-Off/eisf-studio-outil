@@ -245,6 +245,7 @@ export default function Editor() {
     const [chapterScores, setChapterScores] = useState<Record<number, number>>({});
     const [chapterWordCounts, setChapterWordCounts] = useState<Record<number, number>>({});
     const [isGeneratingAll, setIsGeneratingAll] = useState(false);
+    const [isNavigating, setIsNavigating] = useState(false);
     const [selectedChapterIndex, setSelectedChapterIndex] = useState<number>(0);
 
     const sensors = useSensors(
@@ -886,10 +887,11 @@ export default function Editor() {
                                     </span>
                                 </div>
                                 <button
-                                    onClick={() => navigate(`/project/${projectId}/podcasts`)}
-                                    className="flex items-center gap-2 bg-[#D6475B] text-white hover:bg-[#c03d50] px-6 py-3 rounded-xl font-bold shadow-sm transition-all"
+                                    onClick={() => { setIsNavigating(true); navigate(`/project/${projectId}/podcasts`); }}
+                                    disabled={isNavigating}
+                                    className="flex items-center gap-2 bg-[#D6475B] text-white hover:bg-[#c03d50] px-6 py-3 rounded-xl font-bold shadow-sm transition-all disabled:opacity-60 disabled:cursor-not-allowed"
                                 >
-                                    Configurer et générer les podcasts →
+                                    {isNavigating ? 'Chargement…' : 'Configurer et générer les podcasts →'}
                                 </button>
                             </div>
                         )}
