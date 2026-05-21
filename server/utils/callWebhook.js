@@ -1,4 +1,4 @@
-// Appel centralisé vers Make — toute la génération et vérification IA
+﻿// Appel centralisé vers Make — toute la génération et vérification IA
 // MAKE_WEBHOOK_URL absent → retourne null (fonctionnalités IA désactivées)
 async function callWebhook(payload, timeoutMs = 60_000) {
   const url = process.env.MAKE_WEBHOOK_URL;
@@ -34,7 +34,7 @@ async function callWebhook(payload, timeoutMs = 60_000) {
 
     let text = await response.text();
     text = text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
-    text = text.replace(/[“”]/g, ‘”’).replace(/[‘’]/g, “’”);
+    text = text.replace(/[“”]/g, '"').replace(/[‘’]/g, "'");
     try {
       return JSON.parse(text);
     } catch {
@@ -42,7 +42,7 @@ async function callWebhook(payload, timeoutMs = 60_000) {
     }
   } catch (err) {
     if (err.name === 'AbortError') {
-      const timeoutErr = new Error(`Make n'a pas répondu dans le délai imparti (${Math.round(timeoutMs / 1000)}s)`);
+      const timeoutErr = new Error(`Make n'a pas répondu dans le délai imparti (${[Math.round(timeoutMs / 1000)]}s)`);
       timeoutErr.code = 'MAKE_TIMEOUT';
       timeoutErr.status = 504;
       throw timeoutErr;
