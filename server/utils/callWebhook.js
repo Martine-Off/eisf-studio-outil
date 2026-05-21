@@ -34,7 +34,7 @@ async function callWebhook(payload, timeoutMs = 60_000) {
 
     let text = await response.text();
     text = text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
-    text = text.replace(/<break\s+time=[“”‘’]([^“”‘’]+)[“”‘’]\s*\/>/g, '<break time="$1" />');
+    text = text.replace(/[“”]/g, ‘”’).replace(/[‘’]/g, “’”);
     try {
       return JSON.parse(text);
     } catch {
