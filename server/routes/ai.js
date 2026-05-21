@@ -792,9 +792,18 @@ Réponds UNIQUEMENT en JSON valide :
         });
         if (!rawText) throw new Error('Génération impossible : Make n\'a pas renvoyé de contenu valide (réponse vide, non-JSON, ou JSON invalide). Consulte les logs [callWebhook] pour le détail.');
 
-        const dialogue = rawText;
+        if (typeof rawText === 'string') {
+            console.error('[GENERATE-SINGLE] Réponse Make non parsable en JSON. Début réponse brute:', rawText.substring(0, 500));
+            throw new Error('Make a retourné une réponse non-JSON — vérifiez les logs [GENERATE-SINGLE]');
+        }
 
-        const dialoguesNormalized = (dialogue.dialogues || []).map(line => ({
+        const dialogue = rawText;
+        if (!Array.isArray(dialogue.dialogues) || dialogue.dialogues.length === 0) {
+            console.error('[GENERATE-SINGLE] Structure Make invalide — dialogues absent ou vide. Réponse:', JSON.stringify(rawText).substring(0, 500));
+            throw new Error('Structure de réponse Make invalide : clé dialogues absente ou vide');
+        }
+
+        const dialoguesNormalized = dialogue.dialogues.map(line => ({
             ...line,
             text_studio: normalizeText(line.text_studio || line.text || ''),
             text_reading: line.text_reading || line.text_studio || line.text || '',
