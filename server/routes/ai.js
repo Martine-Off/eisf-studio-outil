@@ -84,19 +84,27 @@ async function verifyScriptAgainstSource(segmentContent, scriptText, cachedConce
   // ─── Score calculé mathématiquement par l'app (présents / total × 100) ────
   const lines = verificationText.split('\n').filter(l => l.includes('|'));
   const total = lines.length;
-  const validated = lines.filter(l => l.toLowerCase().includes('present')).length;
-  const missing = lines.filter(l => !l.toLowerCase().includes('present'));
-  const fidelityScore = total > 0 ? Math.round((validated / total) * 100) : 0;
+  const validated  = lines.filter(l => l.toLowerCase().includes('present')).length;
+  const uncertain  = lines.filter(l => l.toLowerCase().includes('uncertain')).length;
+  const missing    = lines.filter(l => !l.toLowerCase().includes('present') && !l.toLowerCase().includes('uncertain'));
+  const countable  = total - uncertain;
+  const fidelityScore = countable > 0 ? Math.round((validated / countable) * 100) : 0;
 
   const allResults = lines.map(l => {
     const parts = l.split('|');
-    return { concept: parts[0].trim(), status: l.toLowerCase().includes('present') ? 'present' : 'absent' };
+    const low = l.toLowerCase();
+    const status = low.includes('present') ? 'present' : low.includes('uncertain') ? 'uncertain' : 'absent';
+    return { concept: parts[0].trim(), status };
   });
 
   return {
     fidelityScore,
     totalConcepts: total,
     validatedConcepts: validated,
+    uncertainConcepts: uncertain,
+    uncertainConceptsList: lines
+      .filter(l => l.toLowerCase().includes('uncertain'))
+      .map(l => l.split('|')[0].trim()),
     missingConcepts: missing.map(l => l.split('|')[0].trim()),
     extractedConcepts: concepts,
     allResults

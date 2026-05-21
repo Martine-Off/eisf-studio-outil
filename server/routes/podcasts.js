@@ -239,6 +239,7 @@ router.post('/:id/verify', authMiddleware, async (req, res) => {
 
         const iaFeedback = {
             concepts_manquants: result.missingConcepts,
+            concepts_incertains: result.uncertainConceptsList ?? [],
             cached_concepts: cachedConcepts || result.extractedConcepts,
             informations_erronees: [],
             suggestions: [`${result.validatedConcepts} / ${result.totalConcepts} concepts du cours sont présents dans le podcast.`]

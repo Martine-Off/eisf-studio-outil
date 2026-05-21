@@ -5,6 +5,7 @@ import api from '../utils/api';
 
 interface VerificationResult {
     concepts_manquants: string[];
+    concepts_incertains?: string[];
     informations_erronees: string[];
     suggestions?: string[];
 }
@@ -237,6 +238,22 @@ export const AIVerificationPanel: React.FC<AIVerificationPanelProps> = ({
                                         {feedback.concepts_manquants.map((c, i) => (
                                             <li key={i} className="flex items-start gap-2 text-xs text-muted-foreground">
                                                 <X className="h-3 w-3 text-[#D6475B] flex-shrink-0 mt-0.5" />
+                                                {c}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
+
+                            {feedback?.concepts_incertains && feedback.concepts_incertains.length > 0 && (
+                                <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+                                    <p className="text-xs font-semibold text-amber-800 mb-2">
+                                        À vérifier ({feedback.concepts_incertains.length})
+                                    </p>
+                                    <ul className="space-y-1 max-h-36 overflow-y-auto">
+                                        {feedback.concepts_incertains.map((c, i) => (
+                                            <li key={i} className="flex items-start gap-2 text-xs text-amber-700">
+                                                <AlertTriangle className="h-3 w-3 text-amber-500 flex-shrink-0 mt-0.5" />
                                                 {c}
                                             </li>
                                         ))}
