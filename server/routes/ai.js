@@ -1234,7 +1234,12 @@ function numberToFr(str) {
 }
 
 function normalizeText(text) {
-    let normalized = text;
+    // Préserver les balises <break> avant toute transformation numérique
+    const breaks = [];
+    let normalized = text.replace(/<break\s[^>]*\/>/g, (match) => {
+        breaks.push(match);
+        return `\x00BREAK${breaks.length - 1}\x00`;
+    });
 
     // Chiffres isolés → lettres (pas ceux déjà dans une parenthèse phonétique)
     normalized = normalized.replace(/(?<!\()\b(\d{1,7}(?:[,\.]\d+)?)\b(?!\s*\))/g, (match) => {
@@ -1268,6 +1273,9 @@ function normalizeText(text) {
     for (const [acronym, phonetic] of Object.entries(acronymMap)) {
         normalized = normalized.replace(new RegExp(`\\b${acronym}\\b(?!\\s*\\()`, 'g'), phonetic);
     }
+
+    // Restaurer les balises <break>
+    normalized = normalized.replace(/\x00BREAK(\d+)\x00/g, (_, i) => breaks[parseInt(i)]);
 
     return normalized;
 }
