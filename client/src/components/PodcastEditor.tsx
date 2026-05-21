@@ -982,7 +982,7 @@ export default function PodcastEditor() {
                 {/* Right — export + audio */}
                 <div className="flex items-center gap-2">
                     <span className="text-xs font-bold text-muted-foreground mr-1 uppercase tracking-wide">Exporter :</span>
-                    {(['word', 'pdf', 'json'] as const).map(fmt => (
+                    {(['word'] as const).map(fmt => (
                         <button key={fmt} onClick={() => handleExport(fmt)}
                             className="flex items-center gap-1.5 px-3 py-2 border border-[#E0DCE0] rounded-lg text-xs font-semibold text-muted-foreground hover:text-foreground hover:border-[#E63337]/30 bg-white transition-colors">
                             <FileDown className="h-3.5 w-3.5" />

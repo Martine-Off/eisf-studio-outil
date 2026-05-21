@@ -791,13 +791,6 @@ export default function Editor() {
                                         <div className="text-[10px] font-bold text-muted-foreground px-2 py-1 uppercase tracking-wider">Word (.docx)</div>
                                         <button onClick={() => handleExport('word', 'studio')} className="text-left px-3 py-2 hover:bg-secondary rounded-lg text-sm transition-colors text-foreground font-medium">Version Studio</button>
                                         <button onClick={() => handleExport('word', 'lecture')} className="text-left px-3 py-2 hover:bg-secondary rounded-lg text-sm transition-colors text-foreground font-medium">Version Lecture</button>
-                                        <div className="h-[1px] bg-border my-1"></div>
-                                        <div className="text-[10px] font-bold text-muted-foreground px-2 py-1 mt-1 uppercase tracking-wider">PDF</div>
-                                        <button onClick={() => handleExport('pdf', 'studio')} className="text-left px-3 py-2 hover:bg-secondary rounded-lg text-sm transition-colors text-foreground font-medium">Version Studio</button>
-                                        <button onClick={() => handleExport('pdf', 'lecture')} className="text-left px-3 py-2 hover:bg-secondary rounded-lg text-sm transition-colors text-foreground font-medium">Version Lecture</button>
-                                        <div className="h-[1px] bg-border my-1"></div>
-                                        <div className="text-[10px] font-bold text-muted-foreground px-2 py-1 mt-1 uppercase tracking-wider">Donnees</div>
-                                        <button onClick={() => handleExport('json', '')} className="text-left px-3 py-2 hover:bg-secondary rounded-lg text-sm transition-colors text-foreground font-medium">JSON (.json)</button>
                                     </div>
                                 </div>
                                 <button
