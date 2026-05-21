@@ -206,7 +206,6 @@ router.post('/:id/verify', authMiddleware, async (req, res) => {
         }
         const projectId = podcastResult.rows[0].project_id;
         const orderIndex = podcastResult.rows[0].order_index ?? 0;
-        console.log('[VERIFY] segment_content length:', podcastResult.rows[0]?.segment_content?.length ?? 'NULL');
 
         let cleanedText = podcastResult.rows[0].segment_content || null;
         if (!cleanedText) {

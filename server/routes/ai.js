@@ -808,7 +808,6 @@ Réponds UNIQUEMENT en JSON valide :
         const durationSecs = Math.round((actualWordCount / 130) * 60); // Roughly 130 words per min
 
         const finalTitle = buildPodcastTitle(orderIndex, projectTitle, segment.title);
-        console.log('[GENERATE-SINGLE] segment_content length:', segment?.content?.length ?? 'NULL');
         const podcastResult = await pool.query(
             'INSERT INTO podcasts (project_id, title, order_index, word_count, duration_seconds, segment_content) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id',
             [projectId, finalTitle, orderIndex || 0, actualWordCount, durationSecs, segment.content]
