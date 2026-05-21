@@ -789,7 +789,7 @@ Réponds UNIQUEMENT en JSON valide :
             nextChapter: nextChapter ? { title: nextChapter.title, wordCount: nextChapter.wordCount } : null,
             character_1_name: char1,
             character_2_name: char2,
-        });
+        }, 120_000);
         if (!rawText) throw new Error('Génération impossible : Make n\'a pas renvoyé de contenu valide (réponse vide, non-JSON, ou JSON invalide). Consulte les logs [callWebhook] pour le détail.');
 
         if (typeof rawText === 'string') {
