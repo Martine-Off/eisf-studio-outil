@@ -25,7 +25,7 @@ interface Dialogue {
     text_studio: string;
     text_reading?: string;
     section: string;
-    is_grounded?: boolean;
+    is_grounded?: boolean | null;
     duration_seconds: number;
     order_index: number;
     podcast_id?: number;
@@ -126,6 +126,7 @@ function SortableDialogue({
     const textParts = parseTextParts(dialogue.text_studio);
     const hasProps = textParts.some(p => p.type === 'proposition');
     const isUngrounded = dialogue.is_grounded === false;
+    const isUncertain  = dialogue.is_grounded === null;
 
     const mergedRef = useCallback((el: HTMLDivElement | null) => {
         setNodeRef(el);
@@ -142,6 +143,7 @@ function SortableDialogue({
             className={`group relative bg-white rounded-xl border transition-all duration-150 ${
                 isDragging ? 'shadow-xl scale-[1.01]' :
                 isUngrounded ? 'border-red-300 bg-red-50' :
+                isUncertain  ? 'border-orange-300 bg-orange-50' :
                 hasProps ? 'border-[#E6A440]/50 bg-[#FFF8EE]' :
                 'border-[#E0DCE0]'
             }`}
@@ -173,9 +175,12 @@ function SortableDialogue({
                             {isInes ? 'Inès' : 'Yannick'}
                         </p>
                         {isUngrounded && (
-                            <span className="text-[9px] font-semibold uppercase tracking-wide bg-red-100 text-red-600 border border-red-300 rounded px-1.5 py-0.5">À vérifier</span>
+                            <span className="text-[9px] font-semibold uppercase tracking-wide bg-red-100 text-red-600 border border-red-300 rounded px-1.5 py-0.5">Inventé</span>
                         )}
-                        {!isUngrounded && hasProps && (
+                        {isUncertain && (
+                            <span className="text-[9px] font-semibold uppercase tracking-wide bg-orange-100 text-orange-700 border border-orange-300 rounded px-1.5 py-0.5">À vérifier</span>
+                        )}
+                        {!isUngrounded && !isUncertain && hasProps && (
                             <span className="text-[9px] font-semibold uppercase tracking-wide bg-[#FFF0D0] text-[#7a5200] border border-[#E6A440]/50 rounded px-1.5 py-0.5">Proposition IA</span>
                         )}
                     </div>

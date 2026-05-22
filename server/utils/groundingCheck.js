@@ -21,10 +21,11 @@ async function groundingCheck(podcastId, segmentContent) {
   }
 
   for (const { id, is_grounded } of groundingResult) {
-    if (id == null || typeof is_grounded !== 'boolean') continue;
+    if (id == null) continue;
+    const value = is_grounded === true ? true : is_grounded === false ? false : null;
     await pool.query(
       'UPDATE dialogues SET is_grounded = $1 WHERE id = $2 AND podcast_id = $3',
-      [is_grounded, id, podcastId]
+      [value, id, podcastId]
     );
   }
 }
