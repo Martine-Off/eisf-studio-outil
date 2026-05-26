@@ -1,3 +1,7 @@
+// Copyright (c) 2026 EISF — École Internationale du Savoir Faire Français
+// Tous droits réservés / All Rights Reserved
+// Auteur : Martine Desmaroux — martine.desmaroux@gmail.com / contact@eisf.fr
+//
 const fs = require('fs');
 
 // L'API Gemini TTS renvoie du PCM brut (24kHz, 16-bit, mono).

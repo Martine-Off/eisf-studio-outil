@@ -1,3 +1,7 @@
+// Copyright (c) 2026 EISF — École Internationale du Savoir Faire Français
+// Tous droits réservés / All Rights Reserved
+// Auteur : Martine Desmaroux — martine.desmaroux@gmail.com / contact@eisf.fr
+//
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Loader2, ChevronLeft, Mic, Plus, CheckCircle, AlertTriangle, LayoutList, Pencil } from 'lucide-react';

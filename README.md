@@ -440,6 +440,21 @@ Les balises de pause `<break time="0.8s" />` / `<break time="1.5s" />` sont touj
 
 ---
 
+## Copyright
+
+```
+Copyright (c) 2026 EISF — École Internationale du Savoir Faire Français
+Tous droits réservés / All Rights Reserved
+
+Auteur      : Martine Desmaroux — martine.desmaroux@gmail.com / contact@eisf.fr
+Organisation: EISF — École Internationale du Savoir Faire Français
+Date        : Mars 2026
+```
+
+Ce logiciel est la propriété exclusive de l'EISF. Toute reproduction ou utilisation sans autorisation écrite préalable est interdite. Voir le fichier [LICENSE](./LICENSE) pour les conditions complètes.
+
+---
+
 ## Roadmap
 
 ### V1.4 (actuel — Avril 2026)

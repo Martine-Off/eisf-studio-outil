@@ -1,3 +1,7 @@
+// Copyright (c) 2026 EISF — École Internationale du Savoir Faire Français
+// Tous droits réservés / All Rights Reserved
+// Auteur : Martine Desmaroux — martine.desmaroux@gmail.com / contact@eisf.fr
+//
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Mic2, X, Loader2, Play, Volume2, Zap } from 'lucide-react';

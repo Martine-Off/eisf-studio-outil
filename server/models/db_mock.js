@@ -1,3 +1,7 @@
+// Copyright (c) 2026 EISF — École Internationale du Savoir Faire Français
+// Tous droits réservés / All Rights Reserved
+// Auteur : Martine Desmaroux — martine.desmaroux@gmail.com / contact@eisf.fr
+//
 /**
  * Mock Database for Studio EISF
  * Simulates PostgreSQL Pool for in-memory testing when Docker is unavailable.

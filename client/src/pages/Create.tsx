@@ -1,3 +1,7 @@
+// Copyright (c) 2026 EISF — École Internationale du Savoir Faire Français
+// Tous droits réservés / All Rights Reserved
+// Auteur : Martine Desmaroux — martine.desmaroux@gmail.com / contact@eisf.fr
+//
 import { useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../utils/api';

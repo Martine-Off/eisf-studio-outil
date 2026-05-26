@@ -1,3 +1,7 @@
+// Copyright (c) 2026 EISF — École Internationale du Savoir Faire Français
+// Tous droits réservés / All Rights Reserved
+// Auteur : Martine Desmaroux — martine.desmaroux@gmail.com / contact@eisf.fr
+//
 /**
  * Utilitaires de vérification de propriété des ressources.
  * Toutes les fonctions lèvent une erreur 403 si l'utilisateur

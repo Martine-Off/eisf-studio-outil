@@ -1,4 +1,8 @@
-﻿// Appel centralisé vers Make — toute la génération et vérification IA
+// Copyright (c) 2026 EISF — École Internationale du Savoir Faire Français
+// Tous droits réservés / All Rights Reserved
+// Auteur : Martine Desmaroux — martine.desmaroux@gmail.com / contact@eisf.fr
+//
+// Appel centralisé vers Make — toute la génération et vérification IA
 // MAKE_WEBHOOK_URL absent → retourne null (fonctionnalités IA désactivées)
 async function callWebhook(payload, timeoutMs = 60_000) {
   const url = process.env.MAKE_WEBHOOK_URL;
