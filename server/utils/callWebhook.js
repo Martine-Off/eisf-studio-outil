@@ -14,7 +14,6 @@ async function callWebhook(payload, timeoutMs = 60_000) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
-  console.log(`[callWebhook] → ${url}`);
   console.log(`[callWebhook] type=${payload.type} | keys=${Object.keys(payload).join(', ')} | sourceText length=${payload.sourceText ? payload.sourceText.length : 'n/a'}`);
 
   try {

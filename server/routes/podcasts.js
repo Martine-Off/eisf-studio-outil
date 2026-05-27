@@ -473,12 +473,14 @@ Réponds UNIQUEMENT avec ce JSON brut (aucun autre texte) :
 });
 
 // Export Word - Studio / Lecture
-router.get('/:id/export-word/:mode', async (req, res) => {
+router.get('/:id/export-word/:mode', authMiddleware, async (req, res) => {
     try {
         const { id, mode } = req.params;
         if (mode !== 'studio' && mode !== 'lecture') {
             return res.status(400).json({ error: 'Mode invalide' });
         }
+
+        await assertPodcastOwner(id, req.userId);
 
         // 1. Fetch dialogues and podcast info
         const podcastRes = await pool.query('SELECT title FROM podcasts WHERE id = $1', [id]);
@@ -568,9 +570,11 @@ router.get('/:id/export-word/:mode', async (req, res) => {
 });
 
 // Export TXT - format Speaker 1/2 pour API Google AI Studio
-router.get('/:id/export-txt', async (req, res) => {
+router.get('/:id/export-txt', authMiddleware, async (req, res) => {
     try {
         const { id } = req.params;
+
+        await assertPodcastOwner(id, req.userId);
 
         const podcastRes = await pool.query('SELECT title FROM podcasts WHERE id = $1', [id]);
         if (podcastRes.rows.length === 0) return res.status(404).json({ error: 'Podcast non trouvé' });

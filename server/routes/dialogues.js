@@ -13,8 +13,21 @@ router.patch('/reorder', authMiddleware, async (req, res) => {
     try {
         const { dialogues } = req.body; // [{ id, order_index }, ...]
 
-        if (!Array.isArray(dialogues)) {
+        if (!Array.isArray(dialogues) || dialogues.length === 0) {
             return res.status(400).json({ error: 'Format invalide' });
+        }
+
+        // Vérifier que tous les dialogues appartiennent à l'utilisateur authentifié
+        const ids = dialogues.map(d => d.id);
+        const owned = await pool.query(
+            `SELECT d.id FROM dialogues d
+             JOIN podcasts p ON d.podcast_id = p.id
+             JOIN projects pr ON p.project_id = pr.id
+             WHERE pr.user_id = $1 AND d.id = ANY($2::int[])`,
+            [req.userId, ids]
+        );
+        if (owned.rows.length !== ids.length) {
+            return res.status(403).json({ error: 'Accès non autorisé' });
         }
 
         const client = await pool.connect();
