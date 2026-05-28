@@ -9,6 +9,14 @@ const pool = require('../models/db');
 
 const router = express.Router();
 
+function validatePassword(password) {
+    if (!password || password.length < 12) return 'Le mot de passe doit contenir au moins 12 caractères.';
+    if (!/[A-Z]/.test(password)) return 'Le mot de passe doit contenir au moins une majuscule.';
+    if (!/[a-z]/.test(password)) return 'Le mot de passe doit contenir au moins une minuscule.';
+    if (!/[0-9]/.test(password)) return 'Le mot de passe doit contenir au moins un chiffre.';
+    return null;
+}
+
 // Inscription
 router.post('/register', async (req, res) => {
     try {
@@ -16,6 +24,11 @@ router.post('/register', async (req, res) => {
 
         if (!email || !password) {
             return res.status(400).json({ error: 'Email et mot de passe requis' });
+        }
+
+        const passwordError = validatePassword(password);
+        if (passwordError) {
+            return res.status(400).json({ error: passwordError });
         }
 
         // Vérifier si l'email existe déjà
