@@ -1,6 +1,6 @@
 # SECURITY_AUDIT.md — EISF Studio
 
-> Audit réalisé le 2026-05-26  
+> Audit réalisé le 2026-05-26 — Mis à jour le 2026-05-28  
 > Portée : backend Node.js/Express, frontend React/TypeScript, base PostgreSQL  
 > Auditeur : Claude Sonnet 4.6 (Anthropic) — commandé par Martine Desmaroux  
 
@@ -8,28 +8,28 @@
 
 ## Résumé exécutif
 
-L'application EISF Studio présente **2 vulnérabilités CRITIQUES**, **6 ÉLEVÉES** et **5 MOYENNES**.  
-Les risques les plus urgents concernent l'authentification export sans protection, l'absence de garde d'autorisation sur le réordonnancement des dialogues, et la journalisation du webhook Make.
+L'application EISF Studio présentait **2 vulnérabilités CRITIQUES**, **6 ÉLEVÉES** et **5 MOYENNES**.  
+**10 vulnérabilités sur 13 ont été corrigées** (2026-05-28). Restent ouvertes : V1, V2, V5 (architecturalement plus lourdes — nécessitent des changements frontend + backend).
 
 ---
 
 ## Tableau de synthèse
 
-| ID  | Vulnérabilité                          | Catégorie       | Criticité | Fichier(s) principal(aux)      |
-|-----|----------------------------------------|-----------------|-----------|-------------------------------|
-| V1  | JWT stocké en localStorage             | Auth / XSS      | CRITIQUE  | `client/src/context/AuthContext.tsx`, `client/src/utils/api.ts` |
-| V2  | Absence de protection CSRF             | CSRF            | ÉLEVÉE    | `server/server.js`            |
-| V3  | Uploads publics sans authentification  | Upload / Accès  | ÉLEVÉE    | `server/routes/projects.js`, `server/server.js` |
-| V4  | Injection indirecte (entrées non validées) | Injection    | ÉLEVÉE    | `server/routes/ai.js`         |
-| V5  | Tokens JWT non révocables              | Auth            | ÉLEVÉE    | `server/routes/auth.js`       |
-| V6  | URL du webhook Make dans les logs      | Secrets         | ÉLEVÉE    | `server/utils/callWebhook.js` |
-| V7  | Absence de garde d'autorisation (reorder dialogues) | AuthZ | ÉLEVÉE | `server/routes/dialogues.js`  |
-| V8  | Routes d'export sans authentification | Auth             | CRITIQUE  | `server/routes/podcasts.js`   |
-| V9  | URL webhook dans les messages d'erreur | Secrets         | MOYENNE   | `server/routes/podcasts.js`, `server/routes/ai.js` |
-| V10 | Politique de mot de passe insuffisante | Auth            | MOYENNE   | `server/routes/auth.js`       |
-| V11 | Rate limiting incomplet                | DoS             | MOYENNE   | `server/server.js`            |
-| V12 | Absence de redirection HTTPS           | Transport       | MOYENNE   | `server/server.js`            |
-| V13 | Contenu dialogue non validé (TTS)      | Validation      | MOYENNE   | `server/utils/callGeminiTTS.js` |
+| ID  | Vulnérabilité                          | Catégorie       | Criticité | Statut | Fichier(s) principal(aux)      |
+|-----|----------------------------------------|-----------------|-----------|--------|-------------------------------|
+| V1  | JWT stocké en localStorage             | Auth / XSS      | CRITIQUE  | 🔴 Ouvert | `client/src/context/AuthContext.tsx`, `client/src/utils/api.ts` |
+| V2  | Absence de protection CSRF             | CSRF            | ÉLEVÉE    | 🔴 Ouvert | `server/server.js`            |
+| V3  | Uploads publics sans authentification  | Upload / Accès  | ÉLEVÉE    | ✅ Corrigé | `server/routes/projects.js`, `server/server.js` |
+| V4  | Injection indirecte (entrées non validées) | Injection    | ÉLEVÉE    | ✅ Corrigé | `server/routes/ai.js`         |
+| V5  | Tokens JWT non révocables              | Auth            | ÉLEVÉE    | 🔴 Ouvert | `server/routes/auth.js`       |
+| V6  | URL du webhook Make dans les logs      | Secrets         | ÉLEVÉE    | ✅ Corrigé | `server/utils/callWebhook.js` |
+| V7  | Absence de garde d'autorisation (reorder dialogues) | AuthZ | ÉLEVÉE | ✅ Corrigé | `server/routes/dialogues.js`  |
+| V8  | Routes d'export sans authentification | Auth             | CRITIQUE  | ✅ Corrigé | `server/routes/podcasts.js`   |
+| V9  | URL webhook dans les messages d'erreur | Secrets         | MOYENNE   | ✅ Corrigé | `server/routes/podcasts.js`, `server/routes/ai.js` |
+| V10 | Politique de mot de passe insuffisante | Auth            | MOYENNE   | ✅ Corrigé | `server/routes/auth.js`       |
+| V11 | Rate limiting incomplet                | DoS             | MOYENNE   | ✅ Corrigé | `server/server.js`            |
+| V12 | Absence de redirection HTTPS           | Transport       | MOYENNE   | ✅ Corrigé | `server/server.js`            |
+| V13 | Contenu dialogue non validé (TTS)      | Validation      | MOYENNE   | ✅ Corrigé | `server/utils/callGeminiTTS.js` |
 
 ---
 
