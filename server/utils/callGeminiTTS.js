@@ -33,6 +33,15 @@ function pcmToWav(pcmBuffer, sampleRate = 24000) {
 
 const ALLOWED_VOICES = new Set(['Kore', 'Charon', 'Fenrir', 'Orus', 'Sadaltager', 'Aoede', 'Puck', 'Zephyr']);
 
+function validateDialogueText(text) {
+  if (!text || typeof text !== 'string') return '';
+  let cleaned = text.replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/g, ' ');
+  cleaned = cleaned.replace(/\[PROPOSITION:[^\]]*\]/g, '');
+  cleaned = cleaned.replace(/\[vocal smile\]|\[newscaster\]|\[empathetic\]|\[laughs\]/gi, '');
+  if (cleaned.length > 2000) cleaned = cleaned.substring(0, 2000);
+  return cleaned.trim();
+}
+
 async function generateAudio(dialogues, outputPath, options = {}) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error('GEMINI_API_KEY manquante');
@@ -50,11 +59,7 @@ async function generateAudio(dialogues, outputPath, options = {}) {
     .sort((a, b) => a.order_index - b.order_index)
     .map(d => {
       const speaker = d.character === 'ines' ? 'Inès' : 'Yannick';
-      // Supprimer les balises [PROPOSITION:...] et les tags expressifs pour le TTS
-      const text = (d.text_studio || d.text_reading || '')
-        .replace(/\[PROPOSITION:[^\]]*\]/g, '')
-        .replace(/\[vocal smile\]|\[newscaster\]|\[empathetic\]|\[laughs\]/gi, '')
-        .trim();
+      const text = validateDialogueText(d.text_studio || d.text_reading || '');
       return `${speaker}: ${text}`;
     })
     .filter(line => line.split(': ')[1]?.length > 0)
