@@ -6,6 +6,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle2, AlertTriangle, Loader2, RefreshCw, Zap, X } from 'lucide-react';
 import api from '../utils/api';
+import ErrorModal from './ErrorModal';
 
 interface VerificationResult {
     concepts_manquants: string[];
@@ -106,10 +107,13 @@ export const AIVerificationPanel: React.FC<AIVerificationPanelProps> = ({
             setStatus(s >= 95 ? 'success' : 'insufficient');
             if (onCorrectionDone) onCorrectionDone(s);
         } catch (err: any) {
-            if (err?.response?.status === 429) {
-                setError("Le quota Make est dépassé. Patientez quelques minutes avant de réessayer.");
+            const code = err?.response?.data?.error;
+            if (err?.response?.status === 429 || code === 'quota_make_exceeded' || code === 'MAKE_QUOTA_EXCEEDED') {
+                setError("Quota Make dépassé. Attendez quelques minutes puis réessayez. Si le problème persiste, connectez-vous sur make.com pour vérifier votre quota mensuel.");
+            } else if (code === 'MAKE_TIMEOUT') {
+                setError("Make n'a pas répondu à temps. Réessayez dans quelques instants. Si le problème persiste, vérifiez que le scénario Make est bien activé sur make.com.");
             } else {
-                setError("Impossible de joindre le serveur de vérification.");
+                setError("Une erreur inattendue s'est produite. Réessayez dans quelques instants.");
             }
             setStatus('idle');
         }
@@ -129,10 +133,13 @@ export const AIVerificationPanel: React.FC<AIVerificationPanelProps> = ({
             setStatus(data.targetReached ? 'success' : 'insufficient');
             if (onCorrectionDone) onCorrectionDone(data.finalScore);
         } catch (err: any) {
-            if (err?.response?.status === 429) {
-                setError("Le quota Make est dépassé. Patientez quelques minutes avant de réessayer.");
+            const code = err?.response?.data?.error;
+            if (err?.response?.status === 429 || code === 'quota_make_exceeded' || code === 'MAKE_QUOTA_EXCEEDED') {
+                setError("Quota Make dépassé. Attendez quelques minutes puis réessayez. Si le problème persiste, connectez-vous sur make.com pour vérifier votre quota mensuel.");
+            } else if (code === 'MAKE_TIMEOUT') {
+                setError("Make n'a pas répondu à temps. Réessayez dans quelques instants. Si le problème persiste, vérifiez que le scénario Make est bien activé sur make.com.");
             } else {
-                setError("Erreur lors de la correction automatique.");
+                setError("Une erreur inattendue s'est produite. Réessayez dans quelques instants.");
             }
             setStatus('insufficient');
         }
@@ -301,13 +308,7 @@ export const AIVerificationPanel: React.FC<AIVerificationPanelProps> = ({
                     )}
                 </AnimatePresence>
 
-                {/* Error */}
-                {error && (
-                    <div className="flex items-center gap-2 text-sm text-[#D6475B] bg-[#D6475B]/[0.06] border border-[#D6475B]/20 rounded-lg px-4 py-3">
-                        <X className="h-4 w-4 flex-shrink-0" />
-                        {error}
-                    </div>
-                )}
+                {error && <ErrorModal message={error} onClose={() => setError(null)} />}
             </div>
         </div>
     );

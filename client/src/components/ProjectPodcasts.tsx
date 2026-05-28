@@ -7,6 +7,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Loader2, ChevronLeft, Mic, Plus, CheckCircle, AlertTriangle, LayoutList, Pencil, Volume2 } from 'lucide-react';
 import api from '../utils/api';
 import AppLayout from '../components/AppLayout';
+import ErrorModal from '../components/ErrorModal';
 import { formatDateParis } from '../lib/utils';
 import type { Project, Podcast } from '../types';
 
@@ -41,6 +42,7 @@ export default function ProjectPodcasts() {
     const titleInputRef = useRef<HTMLInputElement>(null);
     const [audioModalPodcastId, setAudioModalPodcastId] = useState<number | null>(null);
     const [generatingAudioId, setGeneratingAudioId] = useState<number | null>(null);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -107,10 +109,18 @@ export default function ProjectPodcasts() {
                 p.id === podcastId ? { ...p, audio_url: res.data.audioPath } : p
             ));
         } catch (e: any) {
-            if (e?.response?.data?.error === 'propositions_unresolved') {
-                alert('Des propositions non validées sont présentes. Ouvrez l\'éditeur pour les résoudre avant de générer l\'audio.');
+            const code = e?.response?.data?.error;
+            const status = e?.response?.status;
+            if (code === 'propositions_unresolved') {
+                setErrorMessage("Des passages non validés sont présents. Ouvrez l'éditeur, vérifiez les passages en jaune et corrigez-les avant de générer l'audio.");
+            } else if (code === 'quota_elevenlabs_exceeded') {
+                setErrorMessage("Quota ElevenLabs dépassé. Attendez 1 à 2 minutes puis réessayez. Si le problème persiste, connectez-vous sur elevenlabs.io pour vérifier les crédits disponibles.");
+            } else if (status === 401) {
+                setErrorMessage("Clé API ElevenLabs invalide. Vérifiez la variable ELEVENLABS_API_KEY dans le fichier .env du serveur.");
+            } else if (e?.code === 'ECONNABORTED' || e?.message?.includes('timeout') || e?.message?.includes('Network Error')) {
+                setErrorMessage("La génération a pris trop de temps. Vérifiez votre connexion internet et réessayez.");
             } else {
-                alert('Erreur lors de la génération audio.');
+                setErrorMessage("Une erreur inattendue s'est produite. Réessayez dans quelques instants.");
             }
         } finally {
             setGeneratingAudioId(null);
@@ -405,6 +415,8 @@ export default function ProjectPodcasts() {
                 </div>
             </div>
         </AppLayout>
+
+        {errorMessage && <ErrorModal message={errorMessage} onClose={() => setErrorMessage(null)} />}
 
         {audioModalPodcastId !== null && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
