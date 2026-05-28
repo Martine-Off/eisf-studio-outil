@@ -10,13 +10,31 @@ const fs = require('fs');
 const path = require('path');
 const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, HeadingLevel, WidthType } = require('docx');
 const { callWebhook } = require('../utils/callWebhook');
-const { generateAudio } = require('../utils/callGeminiTTS');
+const { generateDialogueMp3 } = require('../utils/callElevenLabs');
+const ffmpeg = require('fluent-ffmpeg');
+const ffmpegStatic = require('ffmpeg-static');
+ffmpeg.setFfmpegPath(ffmpegStatic);
 const { normalizeText, verifyScriptAgainstSource } = require('./ai');
 const { assertPodcastOwner } = require('../utils/ownershipChecks');
 const { extractSourceSection } = require('../utils/extractSourceSection');
 const { groundingCheck } = require('../utils/groundingCheck');
 
 const devMsg = (msg) => process.env.NODE_ENV !== 'production' ? msg : undefined;
+
+function concatenateMp3s(inputPaths, outputPath) {
+    const listPath = outputPath + '.txt';
+    fs.writeFileSync(listPath, inputPaths.map(p => `file '${p.replace(/\\/g, '/').replace(/'/g, "'\\''")}'`).join('\n'));
+    return new Promise((resolve, reject) => {
+        ffmpeg()
+            .input(listPath)
+            .inputOptions(['-f', 'concat', '-safe', '0'])
+            .outputOptions(['-c', 'copy'])
+            .output(outputPath)
+            .on('error', (err) => { try { fs.unlinkSync(listPath); } catch {} reject(err); })
+            .on('end',   ()    => { try { fs.unlinkSync(listPath); } catch {} resolve(); })
+            .run();
+    });
+}
 
 const router = express.Router();
 
@@ -323,11 +341,10 @@ router.post('/:id/verify', authMiddleware, async (req, res) => {
     }
 });
 
-// Génération audio TTS
+// Génération audio TTS via ElevenLabs
 router.post('/:id/generate-audio', authMiddleware, async (req, res) => {
     try {
         const podcastId = req.params.id;
-
         await assertPodcastOwner(podcastId, req.userId);
 
         const dialoguesRes = await pool.query(
@@ -338,32 +355,36 @@ router.post('/:id/generate-audio', authMiddleware, async (req, res) => {
         const hasUnresolved = dialoguesRes.rows.some(d =>
             d.text_studio && d.text_studio.includes('[PROPOSITION:')
         );
-        if (hasUnresolved) {
-            return res.status(400).json({ error: 'propositions_unresolved' });
+        if (hasUnresolved) return res.status(400).json({ error: 'propositions_unresolved' });
+
+        const mp3Paths = [];
+        for (const d of dialoguesRes.rows) {
+            const text = (d.text_reading || '').trim();
+            if (!text) continue;
+            const filePath = await generateDialogueMp3(text, d.character, podcastId, d.id);
+            mp3Paths.push(filePath);
+            await new Promise(r => setTimeout(r, 500));
         }
 
-        const audioDir = path.join(__dirname, '../audio');
-        if (!fs.existsSync(audioDir)) fs.mkdirSync(audioDir, { recursive: true });
-        const outputPath = path.join(audioDir, `podcast_${podcastId}.wav`);
+        if (mp3Paths.length === 0)
+            return res.status(400).json({ error: 'Aucun dialogue avec text_reading trouvé' });
 
-        const { voiceInes, voiceYannick, speed } = req.body;
-        await generateAudio(dialoguesRes.rows, outputPath, { voiceInes, voiceYannick, speed: Number(speed) || 1.0 });
+        const outputPath = path.join(__dirname, '../audio', `podcast_${podcastId}.mp3`);
+        await concatenateMp3s(mp3Paths, outputPath);
 
         const totalWords = dialoguesRes.rows.reduce((sum, d) =>
-            sum + (d.text_reading || d.text_studio || '').split(' ').length, 0);
+            sum + (d.text_reading || '').split(/\s+/).length, 0);
         const durationSeconds = Math.round((totalWords / 150) * 60);
 
         await pool.query(
             'UPDATE podcasts SET duration_seconds = $1, audio_url = $2 WHERE id = $3',
-            [durationSeconds, `/audio/podcast_${podcastId}.wav`, podcastId]
+            [durationSeconds, `/audio/podcast_${podcastId}.mp3`, podcastId]
         );
 
-        res.json({
-            success: true,
-            audioPath: `/audio/podcast_${podcastId}.wav`,
-            durationSeconds
-        });
+        res.json({ success: true, audioPath: `/audio/podcast_${podcastId}.mp3`, durationSeconds });
     } catch (error) {
+        if (error.code === 'ELEVENLABS_QUOTA_EXCEEDED')
+            return res.status(429).json({ error: 'quota_elevenlabs_exceeded' });
         console.error('[GENERATE-AUDIO] Erreur:', error);
         res.status(500).json({ error: 'Erreur génération audio', details: devMsg(error.message) });
     }
