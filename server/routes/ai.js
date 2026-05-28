@@ -10,6 +10,8 @@ const { callWebhook } = require('../utils/callWebhook');
 const { extractSourceSection } = require('../utils/extractSourceSection');
 const { groundingCheck } = require('../utils/groundingCheck');
 
+const devMsg = (msg) => process.env.NODE_ENV !== 'production' ? msg : undefined;
+
 const INTRO_TEXT = "<break time=\"2s\" /> Bonjour et bienvenue dans ce podcast de formation EISF — votre capsule audio pour comprendre, apprendre et progresser à votre rythme. Cet épisode, généré par intelligence artificielle à partir de contenus rédigés et validés par nos formateurs, vous accompagne dans vos apprentissages théoriques.";
 const OUTRO_TEXT = "Ce podcast est une création EISF. Il a été généré par intelligence artificielle à partir de contenus pédagogiques rédigés et validés par nos formateurs. Toute reproduction ou diffusion est interdite sans autorisation. <break time=\"2s\" />";
 
@@ -515,7 +517,7 @@ VÉRIFIE AVANT D'ENVOYER :
         if (error.code === 'MAKE_QUOTA_EXCEEDED') {
             return res.status(429).json({ error: 'quota_make_exceeded', message: 'Le quota Make est temporairement dépassé. Réessayez dans quelques minutes.' });
         }
-        res.status(500).json({ error: 'Erreur lors de la génération', details: error.message });
+        res.status(500).json({ error: 'Erreur lors de la génération', details: devMsg(error.message) });
     }
 });
 
@@ -671,7 +673,7 @@ Réponds UNIQUEMENT en JSON valide :
         res.json({ success: true, podcasts: allPodcasts });
     } catch (error) {
         console.error('[GENERATE-PROJECT] Erreur:', error);
-        res.status(500).json({ error: 'Erreur génération IA', details: error.message });
+        res.status(500).json({ error: 'Erreur génération IA', details: devMsg(error.message) });
     }
 });
 
@@ -859,7 +861,7 @@ Réponds UNIQUEMENT en JSON valide :
         if (error.code === 'MAKE_QUOTA_EXCEEDED') {
             return res.status(429).json({ error: 'quota_make_exceeded', message: 'Le quota Make est temporairement dépassé. Réessayez dans quelques minutes.' });
         }
-        res.status(500).json({ error: 'Erreur génération podcast', details: error.message });
+        res.status(500).json({ error: 'Erreur génération podcast', details: devMsg(error.message) });
     }
 });
 
@@ -958,7 +960,7 @@ Génère UNIQUEMENT ce JSON :
 
     } catch (error) {
         console.error('[REGENERATE] Erreur:', error);
-        res.status(500).json({ error: 'Erreur lors de la régénération', details: error.message });
+        res.status(500).json({ error: 'Erreur lors de la régénération', details: devMsg(error.message) });
     }
 });
 
@@ -991,7 +993,7 @@ router.post("/verify", async (req, res) => {
     if (error.code === 'MAKE_QUOTA_EXCEEDED') {
         return res.status(429).json({ error: 'quota_make_exceeded', message: 'Le quota Make est temporairement dépassé. Réessayez dans quelques minutes.' });
     }
-    return res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: devMsg(error.message) || 'Erreur interne du serveur' });
   }
 });
 
@@ -1051,7 +1053,7 @@ router.post('/fix-missing-concepts', authMiddleware, async (req, res) => {
         if (error.code === 'MAKE_QUOTA_EXCEEDED') {
             return res.status(429).json({ error: 'quota_make_exceeded', message: 'Le quota Make est temporairement dépassé. Réessayez dans quelques minutes.' });
         }
-        res.status(500).json({ error: 'Erreur lors de la correction', details: error.message });
+        res.status(500).json({ error: 'Erreur lors de la correction', details: devMsg(error.message) });
     }
 });
 
@@ -1184,7 +1186,7 @@ router.post("/auto-verify-and-fix", async (req, res) => {
     if (error.code === 'MAKE_QUOTA_EXCEEDED') {
         return res.status(429).json({ error: 'quota_make_exceeded', message: 'Le quota Make est temporairement dépassé. Réessayez dans quelques minutes.' });
     }
-    return res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: devMsg(error.message) || 'Erreur interne du serveur' });
   }
 });
 

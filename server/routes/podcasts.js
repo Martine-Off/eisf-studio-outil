@@ -16,6 +16,8 @@ const { assertPodcastOwner } = require('../utils/ownershipChecks');
 const { extractSourceSection } = require('../utils/extractSourceSection');
 const { groundingCheck } = require('../utils/groundingCheck');
 
+const devMsg = (msg) => process.env.NODE_ENV !== 'production' ? msg : undefined;
+
 const router = express.Router();
 
 // Récupérer tous les podcasts d'un projet
@@ -363,7 +365,7 @@ router.post('/:id/generate-audio', authMiddleware, async (req, res) => {
         });
     } catch (error) {
         console.error('[GENERATE-AUDIO] Erreur:', error);
-        res.status(500).json({ error: 'Erreur génération audio', details: error.message });
+        res.status(500).json({ error: 'Erreur génération audio', details: devMsg(error.message) });
     }
 });
 
