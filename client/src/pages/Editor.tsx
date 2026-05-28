@@ -528,6 +528,7 @@ export default function Editor() {
                 projectId: Number(projectId),
                 segment: chapter,
                 orderIndex: index,
+                totalChapters: editableChapters.length,
                 previousChapter: editableChapters[index - 1] || null,
                 nextChapter: editableChapters[index + 1] || null,
             });

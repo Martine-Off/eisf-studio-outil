@@ -709,7 +709,7 @@ router.post('/generate-single-chapter', authMiddleware, validate([
 ]), async (req, res) => {
     try {
         console.log('[GENERATE-SINGLE] Début');
-        const { projectId, segment, orderIndex, previousChapter, nextChapter } = req.body;
+        const { projectId, segment, orderIndex, totalChapters, previousChapter, nextChapter } = req.body;
         const targetDuration = 6;
 
         // Récupérer le titre et les prénoms du projet
@@ -804,6 +804,8 @@ Réponds UNIQUEMENT en JSON valide :
             previousChapter: previousChapter ? { title: previousChapter.title, wordCount: previousChapter.wordCount } : null,
             nextChapter: nextChapter ? { title: nextChapter.title, wordCount: nextChapter.wordCount } : null,
             orderIndex,
+            totalChapters,
+            projectTitle,
             character_1_name: char1,
             character_2_name: char2,
         }, 120_000);
