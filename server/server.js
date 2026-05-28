@@ -51,6 +51,9 @@ app.use((req, res, next) => {
     next();
 });
 
+// Activer trust proxy pour lire X-Forwarded-For derrière Nginx
+app.set('trust proxy', 1);
+
 // Rate limiting (avant les routes, /health exclu)
 app.use('/api/auth', authLimiter);
 app.use('/api/ai', aiLimiter);
