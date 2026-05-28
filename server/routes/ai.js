@@ -803,6 +803,7 @@ Réponds UNIQUEMENT en JSON valide :
             targetWords: Math.round(targetDuration * 130),
             previousChapter: previousChapter ? { title: previousChapter.title, wordCount: previousChapter.wordCount } : null,
             nextChapter: nextChapter ? { title: nextChapter.title, wordCount: nextChapter.wordCount } : null,
+            orderIndex,
             character_1_name: char1,
             character_2_name: char2,
         }, 120_000);
