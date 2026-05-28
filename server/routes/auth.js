@@ -5,6 +5,7 @@
 const express = require('express');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const pool = require('../models/db');
 const { body } = require('express-validator');
 const { validate } = require('../middleware/validate');
@@ -65,12 +66,13 @@ router.post('/register', validate([
             { expiresIn: '7d' }
         );
 
-        res.cookie('token', token, {
-            httpOnly: true,
+        const cookieOpts = {
             secure: process.env.NODE_ENV === 'production',
             sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
             maxAge: 7 * 24 * 60 * 60 * 1000,
-        });
+        };
+        res.cookie('token', token, { ...cookieOpts, httpOnly: true });
+        res.cookie('csrf_token', crypto.randomBytes(32).toString('hex'), { ...cookieOpts, httpOnly: false });
         res.status(201).json({ user });
     } catch (error) {
         console.error('Erreur inscription:', error);
@@ -116,12 +118,13 @@ router.post('/login', async (req, res) => {
             { expiresIn: '7d' }
         );
 
-        res.cookie('token', token, {
-            httpOnly: true,
+        const cookieOpts = {
             secure: process.env.NODE_ENV === 'production',
             sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
             maxAge: 7 * 24 * 60 * 60 * 1000,
-        });
+        };
+        res.cookie('token', token, { ...cookieOpts, httpOnly: true });
+        res.cookie('csrf_token', crypto.randomBytes(32).toString('hex'), { ...cookieOpts, httpOnly: false });
         res.json({
             user: {
                 id: user.id,
@@ -136,13 +139,14 @@ router.post('/login', async (req, res) => {
     }
 });
 
-// Déconnexion — efface le cookie HttpOnly
+// Déconnexion — efface les cookies JWT et CSRF
 router.post('/logout', (req, res) => {
-    res.clearCookie('token', {
-        httpOnly: true,
+    const clearOpts = {
         secure: process.env.NODE_ENV === 'production',
         sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
-    });
+    };
+    res.clearCookie('token', { ...clearOpts, httpOnly: true });
+    res.clearCookie('csrf_token', { ...clearOpts, httpOnly: false });
     res.json({ success: true });
 });
 

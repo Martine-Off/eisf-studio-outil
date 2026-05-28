@@ -9,6 +9,17 @@ const api = axios.create({
     withCredentials: true, // envoie le cookie HttpOnly automatiquement
 });
 
+// Intercepteur pour envoyer le token CSRF sur les requêtes mutantes
+api.interceptors.request.use((config) => {
+    const method = (config.method || '').toLowerCase();
+    if (['post', 'put', 'patch', 'delete'].includes(method)) {
+        const match = document.cookie.split(';').find(c => c.trim().startsWith('csrf_token='));
+        const csrfToken = match?.split('=')[1];
+        if (csrfToken) config.headers['X-CSRF-Token'] = csrfToken;
+    }
+    return config;
+});
+
 // Intercepteur pour gérer les erreurs 401 (cookie expiré ou absent)
 api.interceptors.response.use(
     (response) => response,
