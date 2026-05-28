@@ -20,6 +20,29 @@ const OUTRO_TEXT = "Ce podcast est une création EISF. Il a été généré par 
 const INTRO_READING = "Bonjour et bienvenue dans ce podcast de formation E.I.S.F. — votre capsule audio pour comprendre, apprendre et progresser à votre rythme. Cet épisode, généré par intelligence artificielle à partir de contenus rédigés et validés par nos formateurs, vous accompagne dans vos apprentissages théoriques.";
 const OUTRO_READING = "Ce podcast est une création E.I.S.F.. Il a été généré par intelligence artificielle à partir de contenus pédagogiques rédigés et validés par nos formateurs. Toute reproduction ou diffusion est interdite sans autorisation.";
 
+function buildStaticDialogues({ orderIndex, totalChapters, projectTitle, chapterTitle, char1, char2 }) {
+    const toCharId = (name) => name.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '');
+    const episodeNum = orderIndex != null ? orderIndex + 1 : null;
+    let introPrefix = '';
+    if (episodeNum != null && totalChapters != null) {
+        introPrefix = `Épisode ${episodeNum} sur ${totalChapters}`;
+        if (projectTitle) introPrefix += ` — ${projectTitle}`;
+        if (chapterTitle) introPrefix += ` — ${chapterTitle}`;
+        introPrefix += '. ';
+    }
+    const introStudio = `<break time="2s" /> ${introPrefix}Bonjour et bienvenue dans ce podcast de formation EISF — votre capsule audio pour comprendre, apprendre et progresser à votre rythme. Cet épisode, généré par intelligence artificielle à partir de contenus rédigés et validés par nos formateurs, vous accompagne dans vos apprentissages théoriques. Je suis ${char2} et je suis accompagné de ${char1}.`;
+    const introReading = `${introPrefix}Bonjour et bienvenue dans ce podcast de formation E.I.S.F. — votre capsule audio pour comprendre, apprendre et progresser à votre rythme. Cet épisode, généré par intelligence artificielle à partir de contenus rédigés et validés par nos formateurs, vous accompagne dans vos apprentissages théoriques. Je suis ${char2} et je suis accompagné de ${char1}.`;
+    return {
+        intro: [
+            { character: toCharId(char2), text_studio: introStudio, text_reading: introReading, section: 'jingle' },
+            { character: toCharId(char1), text_studio: 'Bonjour !', text_reading: 'Bonjour !', section: 'jingle' },
+        ],
+        outro: [
+            { character: toCharId(char2), text_studio: 'Ce podcast est une création EISF — tous droits réservés.', text_reading: 'Ce podcast est une création E.I.S.F. — tous droits réservés.', section: 'conclusion' },
+        ],
+    };
+}
+
 const router = express.Router();
 
 // ─── Helper : parser JSON robuste ────────────────────────────────────────────
@@ -481,18 +504,9 @@ VÉRIFIE AVANT D'ENVOYER :
         }));
 
         // AJOUT EN DUR DES PHRASES OBLIGATOIRES
-        normalized.unshift({
-            character: 'ines',
-            text_studio: INTRO_TEXT,
-            text_reading: INTRO_READING,
-            section: 'jingle'
-        });
-        normalized.push({
-            character: 'ines',
-            text_studio: OUTRO_TEXT,
-            text_reading: OUTRO_READING,
-            section: 'conclusion'
-        });
+        const { intro: introLines0, outro: outroLines0 } = buildStaticDialogues({ orderIndex: null, totalChapters: null, projectTitle: null, chapterTitle: null, char1, char2 });
+        normalized.unshift(...introLines0);
+        normalized.push(...outroLines0);
 
         const actualWordCount = normalized.reduce((sum, d) => sum + d.text_reading.split(/\s+/).length, 0);
 
@@ -531,8 +545,9 @@ router.post('/generate-from-project', authMiddleware, async (req, res) => {
         console.log('[GENERATE-PROJECT] Début');
         const { projectId, segments } = req.body;
 
-        const projectRow = await pool.query('SELECT cleaned_text, character_1_name, character_2_name FROM projects WHERE id = $1', [projectId]);
+        const projectRow = await pool.query('SELECT title, cleaned_text, character_1_name, character_2_name FROM projects WHERE id = $1', [projectId]);
         if (projectRow.rows.length === 0) return res.status(404).json({ error: 'Projet non trouvé' });
+        const projectTitle = projectRow.rows[0].title || '';
         const char1 = projectRow.rows[0].character_1_name || 'Inès';
         const char2 = projectRow.rows[0].character_2_name || 'Yannick';
 
@@ -642,8 +657,9 @@ Réponds UNIQUEMENT en JSON valide :
             }));
 
             // AJOUT EN DUR DES PHRASES OBLIGATOIRES
-            dialoguesNorm.unshift({ character: 'ines', text_studio: INTRO_TEXT, text_reading: INTRO_READING, section: 'jingle' });
-            dialoguesNorm.push({ character: 'ines', text_studio: OUTRO_TEXT, text_reading: OUTRO_READING, section: 'conclusion' });
+            const { intro: introLinesP, outro: outroLinesP } = buildStaticDialogues({ orderIndex: idx, totalChapters: segmentsToGenerate.length, projectTitle, chapterTitle: segment.title, char1, char2 });
+            dialoguesNorm.unshift(...introLinesP);
+            dialoguesNorm.push(...outroLinesP);
 
             const actualWordCount = dialoguesNorm.reduce((sum, d) => sum + (d.text_reading ? d.text_reading.split(/\s+/).length : 0), 0);
             const durationSecs = Math.round((actualWordCount / 130) * 60);
@@ -829,8 +845,9 @@ Réponds UNIQUEMENT en JSON valide :
         }));
 
         // AJOUT EN DUR DES PHRASES OBLIGATOIRES
-        dialoguesNormalized.unshift({ character: 'ines', text_studio: INTRO_TEXT, text_reading: INTRO_READING, section: 'jingle' });
-        dialoguesNormalized.push({ character: 'ines', text_studio: OUTRO_TEXT, text_reading: OUTRO_READING, section: 'conclusion' });
+        const { intro: introLinesS, outro: outroLinesS } = buildStaticDialogues({ orderIndex, totalChapters, projectTitle, chapterTitle: segment.title, char1, char2 });
+        dialoguesNormalized.unshift(...introLinesS);
+        dialoguesNormalized.push(...outroLinesS);
 
         const actualWordCount = dialoguesNormalized.reduce((sum, d) => sum + (d.text_reading ? d.text_reading.split(/\s+/).length : 0), 0);
         const durationSecs = Math.round((actualWordCount / 130) * 60); // Roughly 130 words per min
