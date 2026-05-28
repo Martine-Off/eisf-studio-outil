@@ -946,7 +946,7 @@ export default function Editor() {
                                         >
                                             <GripVertical className="h-3.5 w-3.5 text-muted-foreground/40 flex-shrink-0" />
                                             <div className="flex-1 min-w-0">
-                                                <p className="text-xs font-semibold text-foreground truncate">{chapter.title}</p>
+                                                <p className="text-xs font-semibold text-foreground truncate">{i + 1}. {chapter.title}</p>
                                                 <div className="flex items-center gap-3 mt-0.5">
                                                     <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
                                                         <FileText className="h-3 w-3" />{chapter.wordCount} mots
