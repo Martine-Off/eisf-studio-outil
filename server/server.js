@@ -7,6 +7,7 @@ process.env.TZ = 'Europe/Paris';
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const cookieParser = require('cookie-parser');
 require('dotenv').config();
 
 const { generalLimiter, authLimiter, aiLimiter } = require('./middleware/rateLimiter');
@@ -42,6 +43,7 @@ app.use(cors({
 }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(cookieParser());
 
 // Security headers
 app.use((req, res, next) => {

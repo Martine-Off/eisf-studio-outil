@@ -12,7 +12,8 @@ if (!JWT_SECRET) {
 
 const authMiddleware = (req, res, next) => {
     try {
-        const token = req.headers.authorization?.split(' ')[1]; // "Bearer TOKEN"
+        // Cookie HttpOnly en priorité, fallback sur header Authorization (Postman / dev)
+        const token = req.cookies?.token || req.headers.authorization?.split(' ')[1];
 
         if (!token) {
             return res.status(401).json({ error: 'Token manquant' });
@@ -30,7 +31,7 @@ const authMiddleware = (req, res, next) => {
 // Variante acceptant le token en query param ?token= (pour window.open / nouveaux onglets)
 const authQueryMiddleware = (req, res, next) => {
     try {
-        const token = req.headers.authorization?.split(' ')[1] || req.query.token;
+        const token = req.cookies?.token || req.headers.authorization?.split(' ')[1] || req.query.token;
         if (!token) return res.status(401).json({ error: 'Token manquant' });
         const decoded = jwt.verify(token, JWT_SECRET);
         req.userId = decoded.userId;

@@ -65,7 +65,13 @@ router.post('/register', validate([
             { expiresIn: '7d' }
         );
 
-        res.status(201).json({ user, token });
+        res.cookie('token', token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
+            maxAge: 7 * 24 * 60 * 60 * 1000,
+        });
+        res.status(201).json({ user });
     } catch (error) {
         console.error('Erreur inscription:', error);
         res.status(500).json({ error: 'Erreur serveur' });
@@ -110,6 +116,12 @@ router.post('/login', async (req, res) => {
             { expiresIn: '7d' }
         );
 
+        res.cookie('token', token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
+            maxAge: 7 * 24 * 60 * 60 * 1000,
+        });
         res.json({
             user: {
                 id: user.id,
@@ -117,12 +129,21 @@ router.post('/login', async (req, res) => {
                 first_name: user.first_name,
                 last_name: user.last_name,
             },
-            token,
         });
     } catch (error) {
         console.error('Erreur connexion:', error);
         res.status(500).json({ error: 'Erreur serveur' });
     }
+});
+
+// Déconnexion — efface le cookie HttpOnly
+router.post('/logout', (req, res) => {
+    res.clearCookie('token', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
+    });
+    res.json({ success: true });
 });
 
 module.exports = router;

@@ -999,8 +999,7 @@ export default function PodcastEditor() {
                 <div className="flex items-center gap-2">
                     <button
                         onClick={() => {
-                            const token = localStorage.getItem('token');
-                            window.open(`/api/podcasts/${podcastId}/source?token=${token}`, '_blank');
+                            window.open(`/api/podcasts/${podcastId}/source`, '_blank');
                         }}
                         className="flex items-center gap-1.5 px-3 py-2 border border-[#E0DCE0] rounded-lg text-xs font-semibold text-muted-foreground hover:text-foreground hover:border-[#3465AE]/30 bg-white transition-colors"
                     >

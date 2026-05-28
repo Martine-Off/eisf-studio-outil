@@ -35,8 +35,7 @@ export default function Register() {
                 first_name: '',
                 last_name: '',
             });
-            const { token, user } = response.data;
-            login(token, user);
+            login(response.data.user);
             navigate('/dashboard');
         } catch (err: any) {
             setError(err.response?.data?.error || "Erreur lors de l'inscription.");
