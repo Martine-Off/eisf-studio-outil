@@ -9,6 +9,8 @@ const mammoth = require('mammoth');
 const { callWebhook } = require('../utils/callWebhook');
 const { extractSourceSection } = require('../utils/extractSourceSection');
 const { groundingCheck } = require('../utils/groundingCheck');
+const { body } = require('express-validator');
+const { validate } = require('../middleware/validate');
 
 const devMsg = (msg) => process.env.NODE_ENV !== 'production' ? msg : undefined;
 
@@ -700,15 +702,15 @@ function buildPodcastTitle(orderIndex, projectTitle, chapterTitle) {
 // ─────────────────────────────────────────────────────────────────────────────
 // ROUTE : /generate-single-chapter
 // ─────────────────────────────────────────────────────────────────────────────
-router.post('/generate-single-chapter', authMiddleware, async (req, res) => {
+router.post('/generate-single-chapter', authMiddleware, validate([
+    body('projectId').isInt({ min: 1 }).withMessage('projectId invalide'),
+    body('orderIndex').isInt({ min: 0 }).withMessage('orderIndex invalide'),
+    body('segment.content').isString().notEmpty().withMessage('Contenu du segment requis').isLength({ max: 50000 }).withMessage('Segment trop long (max 50 000 caractères)'),
+]), async (req, res) => {
     try {
         console.log('[GENERATE-SINGLE] Début');
         const { projectId, segment, orderIndex, previousChapter, nextChapter } = req.body;
         const targetDuration = 6;
-
-        if (!segment || !segment.content) {
-            return res.status(400).json({ error: 'Segment content is required' });
-        }
 
         // Récupérer le titre et les prénoms du projet
         const projTitleRes = await pool.query('SELECT title, character_1_name, character_2_name FROM projects WHERE id = $1', [projectId]);

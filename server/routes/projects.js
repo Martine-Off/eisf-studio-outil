@@ -10,6 +10,8 @@ const path = require('path');
 const fs = require('fs');
 const { callWebhook } = require('../utils/callWebhook');
 const { parseStorylineFile } = require('../utils/storylineParser');
+const { body } = require('express-validator');
+const { validate } = require('../middleware/validate');
 
 const router = express.Router();
 
@@ -71,7 +73,9 @@ router.get('/', authMiddleware, async (req, res) => {
 });
 
 // Créer projet + upload fichier
-router.post('/create', authMiddleware, upload.single('file'), async (req, res) => {
+router.post('/create', authMiddleware, upload.single('file'), validate([
+    body('title').optional().trim().isLength({ max: 255 }).withMessage('Titre trop long (max 255 caractères)'),
+]), async (req, res) => {
     try {
         const { title, content } = req.body;
         const userId = req.userId;
@@ -210,13 +214,12 @@ router.delete('/:projectId', authMiddleware, async (req, res) => {
 });
 
 // PATCH /api/projects/:projectId/title
-router.patch('/:projectId/title', authMiddleware, async (req, res) => {
+router.patch('/:projectId/title', authMiddleware, validate([
+    body('title').trim().notEmpty().withMessage('Titre requis').isLength({ max: 255 }).withMessage('Titre trop long (max 255 caractères)'),
+]), async (req, res) => {
     try {
         const { projectId } = req.params;
         const { title } = req.body;
-        if (!title || !title.trim()) {
-            return res.status(400).json({ error: 'Titre requis' });
-        }
         const result = await pool.query(
             'UPDATE projects SET title = $1, updated_at = NOW() WHERE id = $2 AND user_id = $3 RETURNING id, title, updated_at',
             [title.trim(), projectId, req.userId]

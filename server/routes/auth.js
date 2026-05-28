@@ -6,6 +6,8 @@ const express = require('express');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const pool = require('../models/db');
+const { body } = require('express-validator');
+const { validate } = require('../middleware/validate');
 
 const router = express.Router();
 
@@ -18,7 +20,11 @@ function validatePassword(password) {
 }
 
 // Inscription
-router.post('/register', async (req, res) => {
+router.post('/register', validate([
+    body('email').isEmail().withMessage('Email invalide').normalizeEmail(),
+    body('first_name').optional().trim().isLength({ max: 100 }).withMessage('Prénom trop long (max 100 caractères)'),
+    body('last_name').optional().trim().isLength({ max: 100 }).withMessage('Nom trop long (max 100 caractères)'),
+]), async (req, res) => {
     try {
         const { email, password, first_name, last_name } = req.body;
 
