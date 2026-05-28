@@ -10,6 +10,7 @@ const path = require('path');
 require('dotenv').config();
 
 const { generalLimiter, authLimiter, aiLimiter } = require('./middleware/rateLimiter');
+const { queryFallback: authQueryMiddleware } = require('./middleware/auth');
 const apiRoutes = require('./routes');
 
 const app = express();
@@ -61,8 +62,8 @@ app.use((req, res, next) => {
     next();
 });
 
-// Servir les fichiers statiques du dossier uploads
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+// Servir les fichiers statiques du dossier uploads (token requis)
+app.use('/uploads', authQueryMiddleware, express.static(path.join(__dirname, 'uploads')));
 
 // Servir les fichiers audio générés par Gemini TTS
 app.use('/audio', express.static(path.join(__dirname, 'audio')));
