@@ -23,16 +23,24 @@ const OUTRO_READING = "Ce podcast est une création E.I.S.F.. Il a été génér
 function buildStaticDialogues({ orderIndex, totalChapters, projectTitle, chapterTitle, char1, char2 }) {
     const toCharId = (name) => name.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '');
     const elide = (name) => /^[aeiouyéèêàâùûîïœæ]/i.test(name) ? "d'" : "de ";
+    const ordinals = ['', 'première', 'deuxième', 'troisième', 'quatrième', 'cinquième', 'sixième', 'septième', 'huitième', 'neuvième', 'dixième'];
+    const formatTitleForSpeech = (title) => {
+        if (!title) return '';
+        return title
+            .replace(/\((\d+)\/\d+\)/g, (_, n) => { const i = parseInt(n); return ordinals[i] ? `${ordinals[i]} partie` : `partie ${n}`; })
+            .replace(/[()]/g, '')
+            .toLowerCase()
+            .replace(/\s+/g, ' ')
+            .trim();
+    };
     const episodeNum = orderIndex != null ? orderIndex + 1 : null;
-    let introPrefix = '';
-    if (episodeNum != null && totalChapters != null) {
-        introPrefix = `Épisode ${episodeNum} sur ${totalChapters}`;
-        if (projectTitle) introPrefix += ` — ${projectTitle}`;
-        if (chapterTitle) introPrefix += ` — ${chapterTitle}`;
-        introPrefix += '. ';
-    }
-    const introStudio = `<break time="2s" /> ${introPrefix}Bonjour et bienvenue dans ce podcast de formation EISF — votre capsule audio pour comprendre, apprendre et progresser à votre rythme. Cet épisode, généré par intelligence artificielle à partir de contenus rédigés et validés par nos formateurs, vous accompagne dans vos apprentissages théoriques. Je suis ${char2} et je suis accompagné ${elide(char1)}${char1}.`;
-    const introReading = `${introPrefix}Bonjour et bienvenue dans ce podcast de formation E.I.S.F. — votre capsule audio pour comprendre, apprendre et progresser à votre rythme. Cet épisode, généré par intelligence artificielle à partir de contenus rédigés et validés par nos formateurs, vous accompagne dans vos apprentissages théoriques. Je suis ${char2} et je suis accompagné ${elide(char1)}${char1}.`;
+    const idParts = [];
+    if (projectTitle) idParts.push(projectTitle);
+    if (episodeNum != null && totalChapters != null) idParts.push(`chapitre ${episodeNum} sur ${totalChapters}`);
+    if (chapterTitle) idParts.push(formatTitleForSpeech(chapterTitle));
+    const idSuffix = idParts.length > 0 ? ' ' + idParts.join(' — ') + '.' : '';
+    const introStudio = `<break time="2s" /> Bonjour et bienvenue dans ce podcast de formation EISF — votre capsule audio pour comprendre, apprendre et progresser à votre rythme. Cet épisode, généré par intelligence artificielle à partir de contenus rédigés et validés par nos formateurs, vous accompagne dans vos apprentissages théoriques. Je suis ${char2} et je suis accompagné ${elide(char1)}${char1}.${idSuffix}`;
+    const introReading = `Bonjour et bienvenue dans ce podcast de formation E.I.S.F. — votre capsule audio pour comprendre, apprendre et progresser à votre rythme. Cet épisode, généré par intelligence artificielle à partir de contenus rédigés et validés par nos formateurs, vous accompagne dans vos apprentissages théoriques. Je suis ${char2} et je suis accompagné ${elide(char1)}${char1}.${idSuffix}`;
     return {
         intro: [
             { character: toCharId(char2), text_studio: introStudio, text_reading: introReading, section: 'jingle' },
