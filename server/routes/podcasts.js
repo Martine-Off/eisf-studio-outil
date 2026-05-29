@@ -36,6 +36,17 @@ function concatenateMp3s(inputPaths, outputPath) {
     });
 }
 
+function trimMp3(inputPath, outputPath, durationSeconds) {
+    return new Promise((resolve, reject) => {
+        ffmpeg(inputPath)
+            .outputOptions(['-t', String(durationSeconds), '-c', 'copy'])
+            .output(outputPath)
+            .on('error', reject)
+            .on('end', resolve)
+            .run();
+    });
+}
+
 const router = express.Router();
 
 // Récupérer tous les podcasts d'un projet
@@ -366,10 +377,22 @@ router.post('/:id/generate-audio', authMiddleware, async (req, res) => {
         );
         if (hasUnresolved) return res.status(400).json({ error: 'propositions_unresolved' });
 
+        const transitionSrc = process.env.TRANSITION_SOUND_PATH
+            || path.join(__dirname, '../audio/assets/transition.mp3');
+        const trimPaths = [];
+
         const mp3Paths = [];
         for (const d of dialoguesRes.rows) {
             const text = (d.text_studio || '').replace(/\[PROPOSITION:[^\]]*\]/g, '').trim();
             if (!text) continue;
+
+            if (d.sound_before && fs.existsSync(transitionSrc)) {
+                const trimPath = path.join(__dirname, '../audio', `transition_${podcastId}_${d.id}.mp3`);
+                await trimMp3(transitionSrc, trimPath, 3);
+                mp3Paths.push(trimPath);
+                trimPaths.push(trimPath);
+            }
+
             const filePath = await generateDialogueMp3(text, d.character, podcastId, d.id);
             mp3Paths.push(filePath);
             await new Promise(r => setTimeout(r, 500));
@@ -380,6 +403,7 @@ router.post('/:id/generate-audio', authMiddleware, async (req, res) => {
 
         const outputPath = path.join(__dirname, '../audio', fileName);
         await concatenateMp3s(mp3Paths, outputPath);
+        for (const p of trimPaths) { try { fs.unlinkSync(p); } catch {} }
 
         const totalWords = dialoguesRes.rows.reduce((sum, d) =>
             sum + (d.text_studio || '').split(/\s+/).length, 0);
