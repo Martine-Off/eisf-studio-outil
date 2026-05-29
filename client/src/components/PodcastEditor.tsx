@@ -13,12 +13,12 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import {
     Loader2, CheckCircle, ChevronLeft, ChevronRight, GripVertical, Pencil,
-    X, FileDown, Plus, AlertTriangle, RotateCcw, Clock, FileText, Trash2
+    X, FileDown, Plus, AlertTriangle, RotateCcw, Clock, FileText, Trash2, Volume2
 } from 'lucide-react';
 import api from '../utils/api';
 import { useKeyboardNav } from '../hooks/useKeyboardNav';
 import AppLayout from '../components/AppLayout';
-import GenerateAudioModal, { type AudioSettings } from '../components/GenerateAudioModal';
+import ErrorModal from '../components/ErrorModal';
 import { motion, AnimatePresence } from 'framer-motion';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -286,9 +286,10 @@ export default function PodcastEditor() {
     const [loading, setLoading] = useState(true);
     const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved');
     const [podcastInfo, setPodcastInfo] = useState<{ title: string; project_title?: string; word_count?: number; order_index?: number }>({ title: 'Chargement...' });
-    const [isAudioModalOpen, setIsAudioModalOpen] = useState(false);
+    const [audioConfirmOpen, setAudioConfirmOpen] = useState(false);
     const [audioUrl, setAudioUrl] = useState<string | null>(null);
     const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const [isAddingDialogue, setIsAddingDialogue] = useState(false);
     const [insertAfterId, setInsertAfterId] = useState<number | null>(null);
     const [newDialogueChar, setNewDialogueChar] = useState<'ines' | 'yannick'>('ines');
@@ -539,19 +540,26 @@ export default function PodcastEditor() {
         } catch (e) { console.error('Erreur renommage:', e); }
     };
 
-    const handleGenerateAudio = async (settings: AudioSettings) => {
-        setIsAudioModalOpen(false);
+    const handleGenerateAudio = async () => {
+        setAudioConfirmOpen(false);
         setIsGeneratingAudio(true);
         try {
-            const res = await api.post(`/podcasts/${podcastId}/generate-audio`, {
-                voiceInes: settings.voiceInes, voiceYannick: settings.voiceYannick, speed: settings.speed,
-            }, { timeout: 300000 });
+            const res = await api.post(`/podcasts/${podcastId}/generate-audio`, {}, { timeout: 300000 });
             const base = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-            setAudioUrl(`${base}${res.data.audio_url}`);
+            setAudioUrl(`${base}${res.data.audioPath}`);
         } catch (e: any) {
-            if (e?.response?.data?.error === 'tts_not_configured') alert('La génération audio sera disponible prochainement.');
-            else if (e?.response?.status === 429) alert('Quota Make dépassé. Réessayez dans quelques minutes.');
-            else { console.error('Erreur TTS:', e); alert('Erreur lors de la génération audio.'); }
+            const code = e?.response?.data?.error;
+            const status = e?.response?.status;
+            if (code === 'propositions_unresolved')
+                setErrorMessage("Des passages non validés sont présents. Ouvrez l'éditeur, vérifiez les passages en jaune et corrigez-les avant de générer l'audio.");
+            else if (code === 'quota_elevenlabs_exceeded')
+                setErrorMessage("Quota ElevenLabs dépassé. Attendez 1 à 2 minutes puis réessayez. Si le problème persiste, connectez-vous sur elevenlabs.io pour vérifier les crédits disponibles.");
+            else if (status === 401)
+                setErrorMessage("Clé API ElevenLabs invalide. Vérifiez la variable ELEVENLABS_API_KEY dans le fichier .env du serveur.");
+            else if (e?.code === 'ECONNABORTED' || e?.message?.includes('timeout') || e?.message?.includes('Network Error'))
+                setErrorMessage("La génération a pris trop de temps. Vérifiez votre connexion internet et réessayez.");
+            else
+                setErrorMessage("Une erreur inattendue s'est produite. Réessayez dans quelques instants.");
         } finally { setIsGeneratingAudio(false); }
     };
 
@@ -621,7 +629,7 @@ export default function PodcastEditor() {
             <div className="w-full bg-amber-50 border-b border-amber-200 px-6 py-2.5 flex items-center gap-2">
                 <AlertTriangle className="h-4 w-4 text-amber-600 flex-shrink-0" />
                 <p className="text-sm font-semibold text-amber-800">
-                    ⚠️ Ce script est généré par IA. Il doit être relu par l'ingénieur pédagogique avant export.
+                    Ce script est généré par IA. Il doit être relu par l'ingénieur pédagogique avant export.
                 </p>
             </div>
             {/* ── Verification banners ── */}
@@ -1014,14 +1022,16 @@ export default function PodcastEditor() {
                             {fmt.charAt(0).toUpperCase() + fmt.slice(1)}
                         </button>
                     ))}
-                    <button
-                        onClick={() => setIsAudioModalOpen(true)}
-                        disabled={isGeneratingAudio}
-                        className="flex items-center gap-2 px-4 py-2 bg-[#E63337] text-white rounded-lg text-xs font-bold hover:bg-[#c92d31] disabled:opacity-60 transition-colors ml-1"
-                    >
-                        {isGeneratingAudio ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : '🎵'}
-                        Générer Audio
-                    </button>
+                    {fidelityScore !== null && fidelityScore >= 95 && !dialogues.some(d => d.is_grounded === false) && (
+                        <button
+                            onClick={() => setAudioConfirmOpen(true)}
+                            disabled={isGeneratingAudio}
+                            className="flex items-center gap-2 px-4 py-2 bg-[#E6F4EA] text-green-700 rounded-lg text-xs font-bold hover:bg-[#D4EDD9] disabled:opacity-60 transition-colors ml-1"
+                        >
+                            {isGeneratingAudio ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Volume2 className="h-3.5 w-3.5" />}
+                            Générer l'audio
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -1033,14 +1043,33 @@ export default function PodcastEditor() {
                 </div>
             )}
 
-            {/* Audio modal */}
-            <GenerateAudioModal
-                isOpen={isAudioModalOpen}
-                onCancel={() => setIsAudioModalOpen(false)}
-                onConfirm={handleGenerateAudio}
-                isGenerating={isGeneratingAudio}
-                estimatedDurationMin={Math.round(totalWords / 150) || undefined}
-            />
+            {errorMessage && <ErrorModal message={errorMessage} onClose={() => setErrorMessage(null)} />}
+
+            {audioConfirmOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+                    <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full mx-4">
+                        <div className="flex items-start gap-3 mb-4">
+                            <AlertTriangle className="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5" />
+                            <div>
+                                <h3 className="font-bold text-base text-foreground mb-2">Générer l'audio de ce podcast ?</h3>
+                                <p className="text-sm text-muted-foreground leading-relaxed">
+                                    Cette action va générer les fichiers audio via ElevenLabs et a un coût. Assurez-vous que le script a été relu et validé par l'ingénieur pédagogique avant de lancer — cette action ne peut pas être annulée.
+                                </p>
+                            </div>
+                        </div>
+                        <div className="flex gap-3 justify-end mt-6">
+                            <button onClick={() => setAudioConfirmOpen(false)}
+                                className="px-4 py-2 rounded-lg text-sm font-semibold border border-[#E0DCE0] text-muted-foreground hover:bg-[#F0EEF0] transition-colors">
+                                Annuler
+                            </button>
+                            <button onClick={handleGenerateAudio}
+                                className="px-4 py-2 rounded-lg text-sm font-semibold bg-[#E63337] text-white hover:bg-[#C62828] transition-colors">
+                                Générer l'audio
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Source modal */}
             <AnimatePresence>

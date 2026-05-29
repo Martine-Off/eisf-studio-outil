@@ -747,12 +747,26 @@ router.post('/generate-single-chapter', authMiddleware, validate([
             const actualWordCount = 60;
             const durationSecs = 120;
             const mockTitle = buildPodcastTitle(orderIndex, projectTitle, segment.title);
-            const podcastResult = await pool.query(
-                'INSERT INTO podcasts (project_id, title, order_index, word_count, duration_seconds) VALUES ($1, $2, $3, $4, $5) RETURNING id',
-                [projectId, mockTitle, orderIndex || 0, actualWordCount, durationSecs]
+            const existingMock = await pool.query(
+                'SELECT id FROM podcasts WHERE project_id = $1 AND order_index = $2',
+                [projectId, orderIndex || 0]
             );
-            const podcastId = podcastResult.rows[0].id;
-            
+            let podcastId;
+            if (existingMock.rows.length > 0) {
+                podcastId = existingMock.rows[0].id;
+                await pool.query(
+                    'UPDATE podcasts SET title=$1, word_count=$2, duration_seconds=$3, fidelity_score=NULL, ia_feedback=NULL, audio_url=NULL, updated_at=NOW() WHERE id=$4',
+                    [mockTitle, actualWordCount, durationSecs, podcastId]
+                );
+                await pool.query('DELETE FROM dialogues WHERE podcast_id = $1', [podcastId]);
+            } else {
+                const r = await pool.query(
+                    'INSERT INTO podcasts (project_id, title, order_index, word_count, duration_seconds) VALUES ($1, $2, $3, $4, $5) RETURNING id',
+                    [projectId, mockTitle, orderIndex || 0, actualWordCount, durationSecs]
+                );
+                podcastId = r.rows[0].id;
+            }
+
             for (let i = 0; i < mockDialogues.length; i++) {
                 const d = mockDialogues[i];
                 await pool.query(
@@ -853,11 +867,25 @@ Réponds UNIQUEMENT en JSON valide :
         const durationSecs = Math.round((actualWordCount / 130) * 60); // Roughly 130 words per min
 
         const finalTitle = buildPodcastTitle(orderIndex, projectTitle, segment.title);
-        const podcastResult = await pool.query(
-            'INSERT INTO podcasts (project_id, title, order_index, word_count, duration_seconds, segment_content) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id',
-            [projectId, finalTitle, orderIndex || 0, actualWordCount, durationSecs, segment.content]
+        const existingPod = await pool.query(
+            'SELECT id FROM podcasts WHERE project_id = $1 AND order_index = $2',
+            [projectId, orderIndex || 0]
         );
-        const podcastId = podcastResult.rows[0].id;
+        let podcastId;
+        if (existingPod.rows.length > 0) {
+            podcastId = existingPod.rows[0].id;
+            await pool.query(
+                'UPDATE podcasts SET title=$1, word_count=$2, duration_seconds=$3, segment_content=$4, fidelity_score=NULL, ia_feedback=NULL, audio_url=NULL, updated_at=NOW() WHERE id=$5',
+                [finalTitle, actualWordCount, durationSecs, segment.content, podcastId]
+            );
+            await pool.query('DELETE FROM dialogues WHERE podcast_id = $1', [podcastId]);
+        } else {
+            const r = await pool.query(
+                'INSERT INTO podcasts (project_id, title, order_index, word_count, duration_seconds, segment_content) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id',
+                [projectId, finalTitle, orderIndex || 0, actualWordCount, durationSecs, segment.content]
+            );
+            podcastId = r.rows[0].id;
+        }
 
         for (let i = 0; i < dialoguesNormalized.length; i++) {
             const d = dialoguesNormalized[i];

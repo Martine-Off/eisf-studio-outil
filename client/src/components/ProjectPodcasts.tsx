@@ -4,10 +4,9 @@
 //
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Loader2, ChevronLeft, Mic, Plus, CheckCircle, AlertTriangle, LayoutList, Pencil, Volume2 } from 'lucide-react';
+import { Loader2, ChevronLeft, Mic, Plus, CheckCircle, AlertTriangle, LayoutList, Pencil } from 'lucide-react';
 import api from '../utils/api';
 import AppLayout from '../components/AppLayout';
-import ErrorModal from '../components/ErrorModal';
 import { formatDateParis } from '../lib/utils';
 import type { Project, Podcast } from '../types';
 
@@ -40,9 +39,6 @@ export default function ProjectPodcasts() {
     const [editingTitle, setEditingTitle] = useState(false);
     const [titleDraft, setTitleDraft] = useState('');
     const titleInputRef = useRef<HTMLInputElement>(null);
-    const [audioModalPodcastId, setAudioModalPodcastId] = useState<number | null>(null);
-    const [generatingAudioId, setGeneratingAudioId] = useState<number | null>(null);
-    const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -97,33 +93,6 @@ export default function ProjectPodcasts() {
         } catch (e) {
             console.error('Erreur suppression podcast:', e);
             alert('Erreur lors de la suppression.');
-        }
-    };
-
-    const handleGenerateAudio = async (podcastId: number) => {
-        setAudioModalPodcastId(null);
-        setGeneratingAudioId(podcastId);
-        try {
-            const res = await api.post(`/podcasts/${podcastId}/generate-audio`);
-            setPodcasts(prev => prev.map(p =>
-                p.id === podcastId ? { ...p, audio_url: res.data.audioPath } : p
-            ));
-        } catch (e: any) {
-            const code = e?.response?.data?.error;
-            const status = e?.response?.status;
-            if (code === 'propositions_unresolved') {
-                setErrorMessage("Des passages non validés sont présents. Ouvrez l'éditeur, vérifiez les passages en jaune et corrigez-les avant de générer l'audio.");
-            } else if (code === 'quota_elevenlabs_exceeded') {
-                setErrorMessage("Quota ElevenLabs dépassé. Attendez 1 à 2 minutes puis réessayez. Si le problème persiste, connectez-vous sur elevenlabs.io pour vérifier les crédits disponibles.");
-            } else if (status === 401) {
-                setErrorMessage("Clé API ElevenLabs invalide. Vérifiez la variable ELEVENLABS_API_KEY dans le fichier .env du serveur.");
-            } else if (e?.code === 'ECONNABORTED' || e?.message?.includes('timeout') || e?.message?.includes('Network Error')) {
-                setErrorMessage("La génération a pris trop de temps. Vérifiez votre connexion internet et réessayez.");
-            } else {
-                setErrorMessage("Une erreur inattendue s'est produite. Réessayez dans quelques instants.");
-            }
-        } finally {
-            setGeneratingAudioId(null);
         }
     };
 
@@ -381,16 +350,6 @@ export default function ProjectPodcasts() {
                                         Ouvrir l'éditeur
                                     </button>
                                     <button
-                                        onClick={() => setAudioModalPodcastId(podcast.id)}
-                                        disabled={generatingAudioId === podcast.id}
-                                        className="w-full py-2 rounded-lg text-xs font-semibold bg-[#E6F4EA] text-green-700 hover:bg-[#D4EDD9] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
-                                    >
-                                        {generatingAudioId === podcast.id
-                                            ? <><Loader2 className="h-3.5 w-3.5 animate-spin" />Génération en cours...</>
-                                            : <><Volume2 className="h-3.5 w-3.5" />Générer l'audio</>
-                                        }
-                                    </button>
-                                    <button
                                         onClick={() => handleDelete(podcast.id)}
                                         className="w-full py-2 rounded-lg text-xs font-semibold text-muted-foreground hover:bg-red-50 hover:text-[#E63337] border border-[#E0DCE0] hover:border-[#E63337]/30 transition-colors"
                                     >
@@ -416,36 +375,5 @@ export default function ProjectPodcasts() {
             </div>
         </AppLayout>
 
-        {errorMessage && <ErrorModal message={errorMessage} onClose={() => setErrorMessage(null)} />}
-
-        {audioModalPodcastId !== null && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-                <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full mx-4">
-                    <div className="flex items-start gap-3 mb-4">
-                        <AlertTriangle className="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5" />
-                        <div>
-                            <h3 className="font-bold text-base text-foreground mb-2">Générer l'audio de ce podcast ?</h3>
-                            <p className="text-sm text-muted-foreground leading-relaxed">
-                                Cette action va générer les fichiers audio via ElevenLabs et a un coût. Assurez-vous que le script a été relu et validé par l'ingénieur pédagogique avant de lancer — cette action ne peut pas être annulée.
-                            </p>
-                        </div>
-                    </div>
-                    <div className="flex gap-3 justify-end mt-6">
-                        <button
-                            onClick={() => setAudioModalPodcastId(null)}
-                            className="px-4 py-2 rounded-lg text-sm font-semibold border border-[#E0DCE0] text-muted-foreground hover:bg-[#F0EEF0] transition-colors"
-                        >
-                            Annuler
-                        </button>
-                        <button
-                            onClick={() => handleGenerateAudio(audioModalPodcastId)}
-                            className="px-4 py-2 rounded-lg text-sm font-semibold bg-[#E63337] text-white hover:bg-[#C62828] transition-colors"
-                        >
-                            Générer l'audio
-                        </button>
-                    </div>
-                </div>
-            </div>
-        )}
     );
 }
