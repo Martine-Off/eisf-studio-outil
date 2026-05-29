@@ -78,7 +78,9 @@ CREATE TABLE IF NOT EXISTS dialogues (
   text_studio TEXT NOT NULL,
   text_reading TEXT NOT NULL,
   duration_seconds INTEGER,
-  section VARCHAR(50)
+  section          VARCHAR(50),
+  is_grounded      BOOLEAN,
+  sound_before     BOOLEAN DEFAULT false
 );
 
 -- Table project_shares

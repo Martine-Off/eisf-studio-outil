@@ -55,6 +55,9 @@ async function run() {
               EXECUTE FUNCTION update_updated_at_column();
         `);
 
+        console.log("Adding sound_before to dialogues...");
+        await pool.query('ALTER TABLE dialogues ADD COLUMN IF NOT EXISTS sound_before BOOLEAN DEFAULT false;');
+
         console.log("All migrations OK!");
     } catch (e) {
         console.error("Error:", e);
