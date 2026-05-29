@@ -50,7 +50,7 @@ export default function Create() {
             const headingMatches = (htmlResult.value.match(/<h[1-2]/gi) ?? []).length;
             setStats({
                 wordCount: words,
-                estimatedChapters: Math.max(headingMatches, Math.ceil(words / 800)),
+                estimatedChapters: Math.ceil(words / 700),
                 contentBlocks: paragraphs.length,
                 fileName: f.name,
                 fileSize: f.size,

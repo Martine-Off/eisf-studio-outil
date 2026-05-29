@@ -236,7 +236,7 @@ function findSentenceBoundary(text, nearChar) {
     return best !== null ? best : nearChar;
 }
 
-function rebalanceSegments(segments, minWords = 875, maxWords = 780) {
+function rebalanceSegments(segments, minWords = 600, maxWords = 1200) {
     // Fusion des segments trop courts (vers le suivant)
     const merged = [];
     let i = 0;
