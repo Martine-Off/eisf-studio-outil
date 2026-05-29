@@ -387,7 +387,10 @@ export default function PodcastEditor() {
     }, [allPropositions]);
 
     const handleUpdate = (id: number, _field: 'studio', text: string) => {
-        setDialogues(items => items.map(item => item.id === id ? { ...item, text_studio: text } : item));
+        const textReading = text.replace(/<break\s[^>]*\/?>/gi, ' ').replace(/\s+/g, ' ').trim();
+        setDialogues(items => items.map(item =>
+            item.id === id ? { ...item, text_studio: text, text_reading: textReading } : item
+        ));
         setSaveStatus('unsaved');
     };
 
@@ -787,8 +790,9 @@ export default function PodcastEditor() {
                             disabled={saveStatus === 'saving'}
                             className="flex items-center gap-1.5 bg-white border border-[#E0DCE0] rounded-lg px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground transition-all"
                         >
+                            {saveStatus === 'saving' && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
                             {saveStatus === 'saved' && <CheckCircle className="h-3.5 w-3.5 text-green-500" />}
-                            Sauvegarder
+                            {saveStatus === 'saving' ? 'Sauvegarde en cours…' : saveStatus === 'saved' ? 'Sauvegardé ✅' : 'Sauvegarder'}
                         </button>
                     </div>
                 </div>
