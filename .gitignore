@@ -41,5 +41,9 @@ recap_transmission_projet.md
 # Scripts locaux de démarrage
 *.bat
 
-# Fichiers audio de test
-server/test_*.wav
+# Fichiers audio générés (MP3/WAV produits par TTS)
+server/audio/*.mp3
+server/audio/*.wav
+server/audio/*/
+# Garder les assets statiques (transition.mp3, etc.)
+!server/audio/assets/
