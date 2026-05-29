@@ -22,6 +22,7 @@ const OUTRO_READING = "Ce podcast est une création E.I.S.F.. Il a été génér
 
 function buildStaticDialogues({ orderIndex, totalChapters, projectTitle, chapterTitle, char1, char2 }) {
     const toCharId = (name) => name.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '');
+    const elide = (name) => /^[aeiouyéèêàâùûîïœæ]/i.test(name) ? "d'" : "de ";
     const episodeNum = orderIndex != null ? orderIndex + 1 : null;
     let introPrefix = '';
     if (episodeNum != null && totalChapters != null) {
@@ -30,15 +31,16 @@ function buildStaticDialogues({ orderIndex, totalChapters, projectTitle, chapter
         if (chapterTitle) introPrefix += ` — ${chapterTitle}`;
         introPrefix += '. ';
     }
-    const introStudio = `<break time="2s" /> ${introPrefix}Bonjour et bienvenue dans ce podcast de formation EISF — votre capsule audio pour comprendre, apprendre et progresser à votre rythme. Cet épisode, généré par intelligence artificielle à partir de contenus rédigés et validés par nos formateurs, vous accompagne dans vos apprentissages théoriques. Je suis ${char2} et je suis accompagné de ${char1}.`;
-    const introReading = `${introPrefix}Bonjour et bienvenue dans ce podcast de formation E.I.S.F. — votre capsule audio pour comprendre, apprendre et progresser à votre rythme. Cet épisode, généré par intelligence artificielle à partir de contenus rédigés et validés par nos formateurs, vous accompagne dans vos apprentissages théoriques. Je suis ${char2} et je suis accompagné de ${char1}.`;
+    const introStudio = `<break time="2s" /> ${introPrefix}Bonjour et bienvenue dans ce podcast de formation EISF — votre capsule audio pour comprendre, apprendre et progresser à votre rythme. Cet épisode, généré par intelligence artificielle à partir de contenus rédigés et validés par nos formateurs, vous accompagne dans vos apprentissages théoriques. Je suis ${char2} et je suis accompagné ${elide(char1)}${char1}.`;
+    const introReading = `${introPrefix}Bonjour et bienvenue dans ce podcast de formation E.I.S.F. — votre capsule audio pour comprendre, apprendre et progresser à votre rythme. Cet épisode, généré par intelligence artificielle à partir de contenus rédigés et validés par nos formateurs, vous accompagne dans vos apprentissages théoriques. Je suis ${char2} et je suis accompagné ${elide(char1)}${char1}.`;
     return {
         intro: [
             { character: toCharId(char2), text_studio: introStudio, text_reading: introReading, section: 'jingle' },
             { character: toCharId(char1), text_studio: 'Bonjour !', text_reading: 'Bonjour !', section: 'jingle' },
         ],
         outro: [
-            { character: toCharId(char2), text_studio: 'Ce podcast est une création EISF — tous droits réservés.', text_reading: 'Ce podcast est une création E.I.S.F. — tous droits réservés.', section: 'conclusion' },
+            { character: toCharId(char1), text_studio: 'À très bientôt !', text_reading: 'À très bientôt !', section: 'conclusion' },
+            { character: toCharId(char2), text_studio: 'Ce podcast est une création EISF. Toute reproduction ou diffusion est interdite sans autorisation.', text_reading: 'Ce podcast est une création E.I.S.F. Toute reproduction ou diffusion est interdite sans autorisation.', section: 'conclusion' },
         ],
     };
 }

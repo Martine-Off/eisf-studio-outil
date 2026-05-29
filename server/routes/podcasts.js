@@ -347,6 +347,15 @@ router.post('/:id/generate-audio', authMiddleware, async (req, res) => {
         const podcastId = req.params.id;
         await assertPodcastOwner(podcastId, req.userId);
 
+        const podcastMeta = await pool.query('SELECT title FROM podcasts WHERE id = $1', [podcastId]);
+        const titleSlug = (podcastMeta.rows[0]?.title || '')
+            .toLowerCase()
+            .normalize('NFD').replace(/\p{Diacritic}/gu, '')
+            .replace(/[^a-z0-9]+/g, '_')
+            .replace(/^_+|_+$/g, '')
+            .substring(0, 60);
+        const fileName = `podcast_${podcastId}_${titleSlug}.mp3`;
+
         const dialoguesRes = await pool.query(
             'SELECT * FROM dialogues WHERE podcast_id = $1 ORDER BY order_index ASC',
             [podcastId]
@@ -369,7 +378,7 @@ router.post('/:id/generate-audio', authMiddleware, async (req, res) => {
         if (mp3Paths.length === 0)
             return res.status(400).json({ error: 'Aucun dialogue avec text_reading trouvé' });
 
-        const outputPath = path.join(__dirname, '../audio', `podcast_${podcastId}.mp3`);
+        const outputPath = path.join(__dirname, '../audio', fileName);
         await concatenateMp3s(mp3Paths, outputPath);
 
         const totalWords = dialoguesRes.rows.reduce((sum, d) =>
@@ -378,10 +387,10 @@ router.post('/:id/generate-audio', authMiddleware, async (req, res) => {
 
         await pool.query(
             'UPDATE podcasts SET duration_seconds = $1, audio_url = $2 WHERE id = $3',
-            [durationSeconds, `/audio/podcast_${podcastId}.mp3`, podcastId]
+            [durationSeconds, `/audio/${fileName}`, podcastId]
         );
 
-        res.json({ success: true, audioPath: `/audio/podcast_${podcastId}.mp3`, durationSeconds });
+        res.json({ success: true, audioPath: `/audio/${fileName}`, durationSeconds });
     } catch (error) {
         if (error.code === 'ELEVENLABS_QUOTA_EXCEEDED')
             return res.status(429).json({ error: 'quota_elevenlabs_exceeded' });

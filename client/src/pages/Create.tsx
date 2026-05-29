@@ -208,6 +208,13 @@ export default function Create() {
                             )}
                         </AnimatePresence>
 
+                        {stats && (
+                            <p className="text-xs text-muted-foreground bg-[#F8F7F8] border border-[#E0DCE0] rounded-lg px-4 py-2.5 leading-relaxed">
+                                💡 <strong>Conseil :</strong> numérotez vos projets pour les retrouver facilement
+                                (ex&nbsp;: <em>01 - La panification</em>, <em>02 - Les farines…</em>)
+                            </p>
+                        )}
+
                         {/* Processing notice */}
                         {isParsing && (
                             <p className="text-xs text-muted-foreground text-center italic">
