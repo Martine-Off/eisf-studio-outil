@@ -950,7 +950,7 @@ export default function Editor() {
                             {/* Chapter list */}
                             <div className="p-3 space-y-1 max-h-[520px] overflow-y-auto">
                                 {editableChapters.map((chapter, i) => {
-                                    const isGenerating = generatingChapters.has(i);
+                                    const isThisChapterGenerating = generatingChapters.has(i);
                                     const isGenerated = generatedChapters.has(i);
                                     const isSelected = selectedChapterIndex === i;
                                     return (
@@ -982,8 +982,8 @@ export default function Editor() {
                                                     </span>
                                                 </div>
                                             </div>
-                                            {isGenerating && <Loader2 className="h-3.5 w-3.5 text-[#E63337] animate-spin flex-shrink-0" />}
-                                            {isGenerated && !isGenerating && <CheckCircle className="h-3.5 w-3.5 text-green-500 flex-shrink-0" />}
+                                            {isThisChapterGenerating && <Loader2 className="h-3.5 w-3.5 text-[#E63337] animate-spin flex-shrink-0" />}
+                                            {isGenerated && !isThisChapterGenerating && <CheckCircle className="h-3.5 w-3.5 text-green-500 flex-shrink-0" />}
                                         </div>
                                     );
                                 })}
@@ -1001,7 +1001,7 @@ export default function Editor() {
                         {editableChapters[selectedChapterIndex] && (() => {
                             const ch = editableChapters[selectedChapterIndex];
                             const i = selectedChapterIndex;
-                            const isGenerating = generatingChapters.has(i);
+                            const isThisChapterGenerating = generatingChapters.has(i);
                             const isGenerated = generatedChapters.has(i);
                             return (
                                 <div className="bg-white rounded-2xl border border-[#E0DCE0] shadow-sm overflow-hidden flex flex-col">
@@ -1062,11 +1062,11 @@ export default function Editor() {
                                                     handleGenerateSingle(i);
                                                 }
                                             }}
-                                            disabled={isGenerating}
+                                            disabled={isThisChapterGenerating}
                                             className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold bg-[#E63337] text-white hover:bg-[#c92d31] disabled:opacity-60 transition-all"
                                         >
-                                            {isGenerating && <Loader2 className="h-4 w-4 animate-spin" />}
-                                            {isGenerating ? 'Génération en cours…' : isGenerated ? 'Ouvrir dans l\'éditeur →' : 'Générer ce chapitre →'}
+                                            {isThisChapterGenerating && <Loader2 className="h-4 w-4 animate-spin" />}
+                                            {isThisChapterGenerating ? 'Génération en cours…' : isGenerated ? 'Ouvrir dans l\'éditeur →' : 'Générer ce chapitre →'}
                                         </button>
                                     </div>
                                 </div>
