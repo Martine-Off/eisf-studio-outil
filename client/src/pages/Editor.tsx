@@ -995,7 +995,7 @@ export default function Editor() {
                                             />
                                             {chapterWordCounts[i] ? (
                                                 <span className="flex-shrink-0 text-xs font-semibold text-green-700 bg-green-50 border border-green-200 px-3 py-1 rounded-full">
-                                                    {Math.ceil(chapterWordCounts[i] / 140)} min réelles
+                                                    ~{Math.ceil(chapterWordCounts[i] / 140)} min estimées
                                                 </span>
                                             ) : (
                                                 <span className="flex-shrink-0 text-xs font-semibold text-muted-foreground bg-[#F4F6FA] border border-[#E0DCE0] px-3 py-1 rounded-full">
