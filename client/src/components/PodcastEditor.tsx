@@ -768,7 +768,7 @@ export default function PodcastEditor() {
                             ) : (
                                 <p style={{ fontSize: '0.875rem', color: '#6b7280', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: '100%', marginTop: '2px', cursor: 'text' }}
                                     onClick={() => { setTitleDraft(podcastInfo.title); setIsEditingTitle(true); }}>
-                                    {podcastInfo.order_index !== undefined ? `Chapitre ${podcastInfo.order_index + 1} — ${podcastInfo.title}` : podcastInfo.title}
+                                    {podcastInfo.title}
                                 </p>
                             )}
                         </div>
@@ -1018,7 +1018,7 @@ export default function PodcastEditor() {
                             CHAPITRE ACTUEL
                         </p>
                         <p className="text-sm font-semibold text-foreground truncate max-w-[220px]">
-                            {podcastInfo.order_index !== undefined ? `Chapitre ${podcastInfo.order_index + 1} — ${podcastInfo.title}` : podcastInfo.title}
+                            {podcastInfo.title}
                         </p>
                     </div>
                 </div>
@@ -1114,7 +1114,7 @@ export default function PodcastEditor() {
                             className="fixed inset-x-4 top-[8%] bottom-[8%] max-w-3xl mx-auto bg-white border border-[#E0DCE0] shadow-2xl rounded-2xl z-50 flex flex-col">
                             <div className="p-5 border-b border-[#E0DCE0] flex items-center justify-between flex-shrink-0">
                                 <div>
-                                    <h2 className="font-bold text-base">Texte source — {podcastInfo.order_index !== undefined ? `Chapitre ${podcastInfo.order_index + 1} — ${podcastInfo.title}` : podcastInfo.title}</h2>
+                                    <h2 className="font-bold text-base">Texte source — {podcastInfo.title}</h2>
                                     <p className="text-xs text-muted-foreground mt-0.5">Contenu du cours correspondant à ce chapitre</p>
                                 </div>
                                 <button onClick={() => setShowSourceModal(false)} className="p-2 hover:bg-[#F0EEF0] rounded-lg text-muted-foreground">
