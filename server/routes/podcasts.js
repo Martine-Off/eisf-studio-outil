@@ -368,7 +368,7 @@ router.post('/:id/generate-audio', authMiddleware, async (req, res) => {
 
         const mp3Paths = [];
         for (const d of dialoguesRes.rows) {
-            const text = (d.text_reading || '').trim();
+            const text = (d.text_studio || '').replace(/\[PROPOSITION:[^\]]*\]/g, '').trim();
             if (!text) continue;
             const filePath = await generateDialogueMp3(text, d.character, podcastId, d.id);
             mp3Paths.push(filePath);
@@ -376,13 +376,13 @@ router.post('/:id/generate-audio', authMiddleware, async (req, res) => {
         }
 
         if (mp3Paths.length === 0)
-            return res.status(400).json({ error: 'Aucun dialogue avec text_reading trouvé' });
+            return res.status(400).json({ error: 'Aucun dialogue avec text_studio trouvé' });
 
         const outputPath = path.join(__dirname, '../audio', fileName);
         await concatenateMp3s(mp3Paths, outputPath);
 
         const totalWords = dialoguesRes.rows.reduce((sum, d) =>
-            sum + (d.text_reading || '').split(/\s+/).length, 0);
+            sum + (d.text_studio || '').split(/\s+/).length, 0);
         const durationSeconds = Math.round((totalWords / 150) * 60);
 
         await pool.query(
