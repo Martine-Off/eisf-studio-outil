@@ -332,6 +332,13 @@ export default function PodcastEditor() {
         return () => window.removeEventListener('beforeunload', handler);
     }, [isGeneratingAudio]);
 
+    useEffect(() => {
+        if (verification.status !== 'running') return;
+        const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ''; };
+        window.addEventListener('beforeunload', handler);
+        return () => window.removeEventListener('beforeunload', handler);
+    }, [verification.status]);
+
     const loadData = async () => {
         try {
             const [infoRes, dlgsRes] = await Promise.all([
@@ -730,7 +737,8 @@ export default function PodcastEditor() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, overflow: 'hidden' }}>
                         <button
                             onClick={() => { handleSaveAction(dialogues); navigate(`/project/${projectId}/podcasts`); }}
-                            className="p-2 bg-white border border-[#E0DCE0] rounded-lg text-muted-foreground hover:text-foreground hover:border-[#E63337]/30 transition-all flex-shrink-0"
+                            disabled={verification.status === 'running'}
+                            className="p-2 bg-white border border-[#E0DCE0] rounded-lg text-muted-foreground hover:text-foreground hover:border-[#E63337]/30 transition-all flex-shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
                         >
                             <ChevronLeft className="h-4 w-4" />
                         </button>
@@ -994,7 +1002,8 @@ export default function PodcastEditor() {
                 {/* Left — chapter navigation */}
                 <div className="flex items-center gap-3">
                     <button onClick={handleNavigateBack}
-                        className="p-2 rounded-lg border border-[#E0DCE0] text-muted-foreground hover:text-foreground hover:border-[#E63337]/30 transition-colors">
+                        disabled={verification.status === 'running'}
+                        className="p-2 rounded-lg border border-[#E0DCE0] text-muted-foreground hover:text-foreground hover:border-[#E63337]/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
                         <ChevronLeft className="h-4 w-4" />
                     </button>
                     <button disabled className="p-2 rounded-lg border border-[#E0DCE0] text-muted-foreground opacity-40 cursor-not-allowed">

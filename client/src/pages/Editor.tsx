@@ -300,6 +300,15 @@ export default function Editor() {
         onSave: () => handleSaveAction(dialogues),
     });
 
+    const isGenerating = isGeneratingAll || generatingChapters.size > 0;
+
+    useEffect(() => {
+        if (!isGenerating) return;
+        const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ''; };
+        window.addEventListener('beforeunload', handler);
+        return () => window.removeEventListener('beforeunload', handler);
+    }, [isGenerating]);
+
     const previewInFlightRef = useRef(false);
     const inFlightChapters = useRef<Set<number>>(new Set());
 
@@ -678,6 +687,14 @@ export default function Editor() {
     return (
         <AppLayout>
             <div className="max-w-5xl mx-auto pb-20">
+                {/* Bandeau génération en cours */}
+                {isGenerating && (
+                    <div className="fixed top-0 inset-x-0 z-40 bg-[#E6A440] text-white text-sm font-semibold text-center py-2.5 px-4 flex items-center justify-center gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin flex-shrink-0" />
+                        ⏳ Génération en cours — ne fermez pas cette fenêtre et n'utilisez pas les boutons de navigation.
+                    </div>
+                )}
+
                 {/* Stepper EISF */}
                 <div className="flex items-center justify-center gap-2 mb-8 mt-2">
                     {[
@@ -718,21 +735,26 @@ export default function Editor() {
                     <div className="flex items-center gap-3">
                         <button
                             onClick={() => navigate('/dashboard')}
-                            className="p-2 bg-card border border-border rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-all shadow-sm"
+                            disabled={isGenerating}
+                            className="p-2 bg-card border border-border rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-all shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
                         >
                             <ChevronLeft size={16} />
                         </button>
                         {step === 'editor' && (
                             <button
                                 onClick={() => navigate(`/project/${projectId}/podcasts`)}
-                                className="flex items-center gap-1.5 px-3 py-2 bg-card border border-border rounded-lg text-sm font-semibold text-muted-foreground hover:text-foreground hover:border-[#E63337]/30 transition-all shadow-sm"
+                                disabled={isGenerating}
+                                className="flex items-center gap-1.5 px-3 py-2 bg-card border border-border rounded-lg text-sm font-semibold text-muted-foreground hover:text-foreground hover:border-[#E63337]/30 transition-all shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
                             >
                                 Voir les podcasts →
                             </button>
                         )}
                         <div>
                             <nav className="flex items-center gap-1 text-xs text-muted-foreground mb-0.5">
-                                <Link to="/dashboard" className="hover:text-foreground transition-colors">Projets</Link>
+                                {isGenerating
+                                    ? <span className="opacity-40 cursor-not-allowed">Projets</span>
+                                    : <Link to="/dashboard" className="hover:text-foreground transition-colors">Projets</Link>
+                                }
                                 <span>/</span>
                                 <span className="text-foreground font-medium">{project?.title || 'Éditeur'}</span>
                             </nav>
@@ -1080,7 +1102,8 @@ export default function Editor() {
                         <div className="pt-8 flex justify-between">
                             <button
                                 onClick={() => saveAndGoTo('chapters')}
-                                className="text-muted-foreground hover:text-foreground text-sm font-medium transition-colors"
+                                disabled={isGenerating}
+                                className="text-muted-foreground hover:text-foreground text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                             >
                                 ← Retour aux chapitres
                             </button>
@@ -1192,7 +1215,8 @@ export default function Editor() {
                         <div className="pt-2">
                             <button
                                 onClick={() => saveAndGoTo('editor')}
-                                className="text-muted-foreground hover:text-foreground text-sm font-medium transition-colors"
+                                disabled={isGenerating}
+                                className="text-muted-foreground hover:text-foreground text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                             >
                                 ← Retour a l'editeur
                             </button>
