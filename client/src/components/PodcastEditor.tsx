@@ -30,6 +30,7 @@ interface Dialogue {
     text_reading?: string;
     section: string;
     is_grounded?: boolean | null;
+    sound_before?: boolean;
     duration_seconds: number;
     order_index: number;
     podcast_id?: number;
@@ -183,6 +184,9 @@ function SortableDialogue({
                         )}
                         {isUncertain && (
                             <span className="text-[9px] font-semibold uppercase tracking-wide bg-orange-100 text-orange-700 border border-orange-300 rounded px-1.5 py-0.5">À vérifier</span>
+                        )}
+                        {dialogue.sound_before && (
+                            <span className="text-[9px] font-semibold uppercase tracking-wide bg-purple-50 text-purple-600 border border-purple-200 rounded px-1.5 py-0.5">♪ Transition</span>
                         )}
                         {!isUngrounded && !isUncertain && hasProps && (
                             <span className="text-[9px] font-semibold uppercase tracking-wide bg-[#FFF0D0] text-[#7a5200] border border-[#E6A440]/50 rounded px-1.5 py-0.5">Proposition IA</span>
