@@ -32,6 +32,7 @@ interface AutoFixResult {
 interface AIVerificationPanelProps {
     podcastId: string | number;
     onCorrectionDone?: (score: number) => void;
+    dialogues?: { is_grounded: boolean | null }[];
 }
 
 function ScoreGauge({ score }: { score: number }) {
@@ -73,6 +74,7 @@ function ScoreGauge({ score }: { score: number }) {
 export const AIVerificationPanel: React.FC<AIVerificationPanelProps> = ({
     podcastId,
     onCorrectionDone,
+    dialogues = [],
 }) => {
     const [feedback, setFeedback] = useState<VerificationResult | null>(null);
     const [score, setScore] = useState<number | null>(null);
@@ -307,6 +309,26 @@ export const AIVerificationPanel: React.FC<AIVerificationPanelProps> = ({
                         </motion.div>
                     )}
                 </AnimatePresence>
+
+                {/* Grounding status */}
+                {(() => {
+                    const ungroundedCount = dialogues.filter(d => d.is_grounded === false).length;
+                    const uncertainCount = dialogues.filter(d => d.is_grounded === null).length;
+                    return (
+                        <>
+                            {ungroundedCount > 0 && (
+                                <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-xs text-red-800">
+                                    🔴 <span><strong>{ungroundedCount} réplique{ungroundedCount > 1 ? 's' : ''}</strong> contiennent des informations potentiellement inventées — vérifiez les passages en rouge dans l'éditeur.</span>
+                                </div>
+                            )}
+                            {uncertainCount > 0 && (
+                                <div className="flex items-start gap-2 bg-orange-50 border border-orange-200 rounded-xl px-4 py-3 text-xs text-orange-800">
+                                    🟠 <span><strong>{uncertainCount} réplique{uncertainCount > 1 ? 's' : ''}</strong> à vérifier — vérifiez les passages en orange dans l'éditeur.</span>
+                                </div>
+                            )}
+                        </>
+                    );
+                })()}
 
                 {error && <ErrorModal message={error} onClose={() => setError(null)} />}
             </div>
