@@ -1012,18 +1012,18 @@ export default function Editor() {
                                     </div>
 
                                     {/* Source extract */}
-                                    <div className="px-6 py-5 flex-1">
-                                        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">
-                                            Extrait du document source (.docx)
-                                        </p>
-                                        <div className="bg-[#F6F7F9] rounded-xl max-h-[350px] overflow-y-auto p-4">
-                                            <pre className="font-mono text-xs text-foreground/75 whitespace-pre-wrap leading-relaxed">
-                                                {(ch.lines?.length ?? 0) > 0
-                                                    ? ch.lines!.join('\n')
-                                                    : <span className="italic text-muted-foreground font-sans">Contenu source non disponible pour ce projet.</span>}
-                                            </pre>
+                                    {(ch.lines?.length ?? 0) > 0 && (
+                                        <div className="px-6 py-5 flex-1">
+                                            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">
+                                                Extrait du document source (.docx)
+                                            </p>
+                                            <div className="bg-[#F6F7F9] rounded-xl max-h-[350px] overflow-y-auto p-4">
+                                                <pre className="font-mono text-xs text-foreground/75 whitespace-pre-wrap leading-relaxed">
+                                                    {ch.lines!.join('\n')}
+                                                </pre>
+                                            </div>
                                         </div>
-                                    </div>
+                                    )}
 
                                     {/* Bottom action bar */}
                                     <div className="px-6 pb-5 pt-3 border-t border-[#F0EEF0] flex items-center gap-4">
