@@ -689,7 +689,7 @@ export default function Editor() {
             <div className="max-w-5xl mx-auto pb-20">
                 {/* Bandeau génération en cours */}
                 {isGenerating && (
-                    <div className="fixed top-0 inset-x-0 z-40 bg-[#E6A440] text-white text-sm font-semibold text-center py-2.5 px-4 flex items-center justify-center gap-2">
+                    <div className="fixed top-14 inset-x-0 z-[60] bg-[#E6A440] text-white text-sm font-semibold text-center py-2.5 px-4 flex items-center justify-center gap-2">
                         <Loader2 className="h-4 w-4 animate-spin flex-shrink-0" />
                         ⏳ Génération en cours — ne fermez pas cette fenêtre et n'utilisez pas les boutons de navigation.
                     </div>
