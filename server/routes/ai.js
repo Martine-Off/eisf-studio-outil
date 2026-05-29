@@ -780,8 +780,8 @@ router.post('/generate-single-chapter', authMiddleware, validate([
             for (let i = 0; i < mockDialogues.length; i++) {
                 const d = mockDialogues[i];
                 await pool.query(
-                    'INSERT INTO dialogues (podcast_id, order_index, character, text_studio, text_reading, duration_seconds, section) VALUES ($1, $2, $3, $4, $5, $6, $7)',
-                    [podcastId, i, d.character, d.text_studio, d.text_reading, 24, d.section]
+                    'INSERT INTO dialogues (podcast_id, order_index, character, text_studio, text_reading, duration_seconds, section, sound_before) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
+                    [podcastId, i, d.character, d.text_studio, d.text_reading, 24, d.section, false]
                 );
             }
 
@@ -902,8 +902,8 @@ Réponds UNIQUEMENT en JSON valide :
             const wCount = d.text_reading ? d.text_reading.split(/\s+/).length : 0;
             const eDuration = Math.round((wCount / 130) * 60);
             await pool.query(
-                'INSERT INTO dialogues (podcast_id, order_index, character, text_studio, text_reading, duration_seconds, section) VALUES ($1, $2, $3, $4, $5, $6, $7)',
-                [podcastId, i, d.character || 'ines', sanitizeBreakTimes(d.text_studio), d.text_reading, eDuration, d.section || 'content']
+                'INSERT INTO dialogues (podcast_id, order_index, character, text_studio, text_reading, duration_seconds, section, sound_before) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
+                [podcastId, i, d.character || 'ines', sanitizeBreakTimes(d.text_studio), d.text_reading, eDuration, d.section || 'content', d.sound_before === true]
             );
         }
 
