@@ -292,6 +292,7 @@ export default function PodcastEditor() {
     const [podcastInfo, setPodcastInfo] = useState<{ title: string; project_title?: string; word_count?: number; order_index?: number }>({ title: 'Chargement...' });
     const [audioConfirmOpen, setAudioConfirmOpen] = useState(false);
     const [audioUrl, setAudioUrl] = useState<string | null>(null);
+    const [audioSuccess, setAudioSuccess] = useState(false);
     const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const [isAddingDialogue, setIsAddingDialogue] = useState(false);
@@ -568,6 +569,8 @@ export default function PodcastEditor() {
             const res = await api.post(`/podcasts/${podcastId}/generate-audio`, {}, { timeout: 300000 });
             const base = import.meta.env.VITE_API_URL || 'http://localhost:3001';
             setAudioUrl(`${base}${res.data.audioPath}`);
+            setAudioSuccess(true);
+            setTimeout(() => setAudioSuccess(false), 4000);
         } catch (e: any) {
             const code = e?.response?.data?.error;
             const status = e?.response?.status;
@@ -1047,14 +1050,31 @@ export default function PodcastEditor() {
                         </button>
                     ))}
                     {fidelityScore !== null && fidelityScore >= 95 && !dialogues.some(d => d.is_grounded === false) && (
-                        <button
-                            onClick={() => setAudioConfirmOpen(true)}
-                            disabled={isGeneratingAudio}
-                            className="flex items-center gap-2 px-4 py-2 bg-[#E6F4EA] text-green-700 rounded-lg text-xs font-bold hover:bg-[#D4EDD9] disabled:opacity-60 transition-colors ml-1"
-                        >
-                            {isGeneratingAudio ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Volume2 className="h-3.5 w-3.5" />}
-                            Générer l'audio
-                        </button>
+                        audioUrl ? (
+                            <div className="flex items-center gap-1.5 ml-1">
+                                <span className="text-[11px] font-bold text-green-700 bg-[#E6F4EA] border border-green-200 rounded-lg px-3 py-2 flex items-center gap-1.5">
+                                    <CheckCircle className="h-3.5 w-3.5" />
+                                    Audio prêt
+                                </span>
+                                <button
+                                    onClick={() => setAudioConfirmOpen(true)}
+                                    disabled={isGeneratingAudio}
+                                    className="flex items-center gap-1.5 px-3 py-2 border border-[#E0DCE0] rounded-lg text-xs font-semibold text-muted-foreground hover:text-foreground hover:border-[#E63337]/30 bg-white transition-colors disabled:opacity-60"
+                                >
+                                    {isGeneratingAudio ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Volume2 className="h-3.5 w-3.5" />}
+                                    Regénérer
+                                </button>
+                            </div>
+                        ) : (
+                            <button
+                                onClick={() => setAudioConfirmOpen(true)}
+                                disabled={isGeneratingAudio}
+                                className="flex items-center gap-2 px-4 py-2 bg-[#E6F4EA] text-green-700 rounded-lg text-xs font-bold hover:bg-[#D4EDD9] disabled:opacity-60 transition-colors ml-1"
+                            >
+                                {isGeneratingAudio ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Volume2 className="h-3.5 w-3.5" />}
+                                Générer l'audio
+                            </button>
+                        )
                     )}
                 </div>
             </div>
@@ -1077,6 +1097,13 @@ export default function PodcastEditor() {
                             <div className="w-full h-full bg-[#6BB8CD] rounded-full animate-pulse" />
                         </div>
                     </div>
+                </div>
+            )}
+
+            {audioSuccess && (
+                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-green-600 text-white px-5 py-2.5 rounded-full shadow-xl text-sm font-semibold flex items-center gap-2 pointer-events-none">
+                    <CheckCircle className="h-4 w-4" />
+                    Audio généré avec succès !
                 </div>
             )}
 
