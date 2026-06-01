@@ -309,6 +309,7 @@ export default function PodcastEditor() {
     const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved');
     const [podcastInfo, setPodcastInfo] = useState<{ title: string; project_title?: string; word_count?: number; order_index?: number }>({ title: 'Chargement...' });
     const [audioConfirmOpen, setAudioConfirmOpen] = useState(false);
+    const [audioSaveConfirmOpen, setAudioSaveConfirmOpen] = useState(false);
     const [audioUrl, setAudioUrl] = useState<string | null>(null);
     const [audioSuccess, setAudioSuccess] = useState(false);
     const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
@@ -645,6 +646,14 @@ export default function PodcastEditor() {
             link.click();
             link.remove();
         } catch (e) { console.error('Erreur export:', e); }
+    };
+
+    const handleRequestAudio = () => {
+        if (saveStatus === 'unsaved') {
+            setAudioSaveConfirmOpen(true);
+        } else {
+            setAudioConfirmOpen(true);
+        }
     };
 
     const handleNavigateBack = () => {
@@ -1112,7 +1121,7 @@ export default function PodcastEditor() {
                                     Audio prêt
                                 </span>
                                 <button
-                                    onClick={() => setAudioConfirmOpen(true)}
+                                    onClick={handleRequestAudio}
                                     disabled={isGeneratingAudio}
                                     className="flex items-center gap-1.5 px-3 py-2 border border-[#E0DCE0] rounded-lg text-xs font-semibold text-muted-foreground hover:text-foreground hover:border-[#E63337]/30 bg-white transition-colors disabled:opacity-60"
                                 >
@@ -1122,7 +1131,7 @@ export default function PodcastEditor() {
                             </div>
                         ) : (
                             <button
-                                onClick={() => setAudioConfirmOpen(true)}
+                                onClick={handleRequestAudio}
                                 disabled={isGeneratingAudio}
                                 className="flex items-center gap-2 px-4 py-2 bg-[#E6F4EA] text-green-700 rounded-lg text-xs font-bold hover:bg-[#D4EDD9] disabled:opacity-60 transition-colors ml-1"
                             >
@@ -1163,6 +1172,46 @@ export default function PodcastEditor() {
             )}
 
             {errorMessage && <ErrorModal message={errorMessage} onClose={() => setErrorMessage(null)} />}
+
+            {audioSaveConfirmOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+                    <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full mx-4">
+                        <div className="flex items-start gap-3 mb-4">
+                            <AlertTriangle className="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5" />
+                            <div>
+                                <h3 className="font-bold text-base text-foreground mb-1">Modifications non sauvegardées</h3>
+                                <p className="text-sm text-muted-foreground leading-relaxed">
+                                    Des modifications n'ont pas encore été sauvegardées. Voulez-vous sauvegarder avant de générer l'audio ?
+                                </p>
+                            </div>
+                        </div>
+                        <div className="flex gap-2 justify-end mt-5 flex-wrap">
+                            <button
+                                onClick={() => setAudioSaveConfirmOpen(false)}
+                                className="px-4 py-2 rounded-lg text-sm font-semibold border border-[#E0DCE0] text-muted-foreground hover:bg-[#F0EEF0] transition-colors"
+                            >
+                                Annuler
+                            </button>
+                            <button
+                                onClick={() => { setAudioSaveConfirmOpen(false); setAudioConfirmOpen(true); }}
+                                className="px-4 py-2 rounded-lg text-sm font-semibold border border-[#E0DCE0] text-foreground hover:bg-[#F0EEF0] transition-colors"
+                            >
+                                Générer sans sauvegarder
+                            </button>
+                            <button
+                                onClick={async () => {
+                                    setAudioSaveConfirmOpen(false);
+                                    await handleSaveAction(dialogues);
+                                    setAudioConfirmOpen(true);
+                                }}
+                                className="px-4 py-2 rounded-lg text-sm font-semibold bg-[#E63337] text-white hover:bg-[#c92d31] transition-colors"
+                            >
+                                Sauvegarder et générer
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {audioConfirmOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
