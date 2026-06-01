@@ -485,6 +485,13 @@ export default function PodcastEditor() {
         setDialogues(items => items.map(d => d.id === id ? { ...d, sound_before: !current } : d));
     };
 
+    const scrollToFirstUngrounded = () => {
+        const first = dialogues.find(d => d.is_grounded === false);
+        if (!first) return;
+        const el = dialogueElRefs.current.get(first.id);
+        el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    };
+
     const handleValidateGrounding = async (id: number) => {
         await api.patch(`/dialogues/${id}`, { is_grounded: true });
         setDialogues(items => items.map(d => d.id === id ? { ...d, is_grounded: true } : d));
@@ -562,13 +569,22 @@ export default function PodcastEditor() {
             setFidelityScore(score);
             if (score >= 95) {
                 setGroundingStatus('checking');
-                setTimeout(async () => {
+                let attempts = 0;
+                const poll = setInterval(async () => {
+                    attempts++;
                     try {
                         const dlgsRes = await api.get(`/podcasts/${podcastId}/dialogues`);
-                        setDialogues((dlgsRes.data || []).sort((a: Dialogue, b: Dialogue) => a.order_index - b.order_index));
-                    } catch { /* silencieux */ }
-                    setGroundingStatus('done');
-                }, 5000);
+                        const dlgs: Dialogue[] = dlgsRes.data || [];
+                        const contentDlgs = dlgs.filter(d => d.section !== 'jingle' && d.section !== 'conclusion');
+                        const hasGroundingData = contentDlgs.length === 0
+                            || contentDlgs.some(d => d.is_grounded !== null);
+                        if (hasGroundingData || attempts >= 20) {
+                            setDialogues(dlgs.sort((a, b) => a.order_index - b.order_index));
+                            setGroundingStatus('done');
+                            clearInterval(poll);
+                        }
+                    } catch { clearInterval(poll); setGroundingStatus('done'); }
+                }, 3000);
             }
         } catch (e: any) {
             console.error('Erreur vérification:', e);
@@ -996,9 +1012,12 @@ export default function PodcastEditor() {
                                         const inc = dialogues.filter(d => d.is_grounded === null).length;
                                         return (<>
                                             {inv > 0 && (
-                                                <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-800">
-                                                    🔴 <span><strong>{inv} réplique{inv > 1 ? 's' : ''}</strong> contiennent des informations potentiellement inventées — vérifiez les passages en rouge dans l'éditeur.</span>
-                                                </div>
+                                                <button
+                                                    onClick={scrollToFirstUngrounded}
+                                                    className="w-full flex items-start gap-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-800 hover:bg-red-100 transition-colors text-left cursor-pointer"
+                                                >
+                                                    🔴 <span><strong>{inv} réplique{inv > 1 ? 's' : ''}</strong> contiennent des informations potentiellement inventées — cliquez pour y accéder.</span>
+                                                </button>
                                             )}
                                             {inc > 0 && (
                                                 <div className="flex items-start gap-2 bg-orange-50 border border-orange-200 rounded-lg px-3 py-2 text-xs text-orange-800">
