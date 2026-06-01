@@ -106,7 +106,7 @@ function ScoreGauge({ score }: { score: number | null }) {
 // ─── Dialogue card ────────────────────────────────────────────────────────────
 
 function SortableDialogue({
-    dialogue, onUpdate, onAccept, onReject, onDelete, onAddAfter, onValidate, onRevert, originalText, activePropositionMatch, elementRef
+    dialogue, onUpdate, onAccept, onReject, onDelete, onAddAfter, onValidate, onRevert, onToggleSoundBefore, originalText, activePropositionMatch, elementRef
 }: {
     dialogue: Dialogue;
     onUpdate: (id: number, field: 'studio', text: string) => void;
@@ -115,6 +115,7 @@ function SortableDialogue({
     onDelete: (id: number) => void;
     onValidate: (id: number) => void;
     onRevert: (id: number) => void;
+    onToggleSoundBefore: (id: number, current: boolean) => void;
     originalText?: string;
     onAddAfter: (afterId: number) => void;
     activePropositionMatch: string | null;
@@ -195,9 +196,16 @@ function SortableDialogue({
                         {isUncertain && (
                             <span className="text-[9px] font-semibold uppercase tracking-wide bg-orange-100 text-orange-700 border border-orange-300 rounded px-1.5 py-0.5">À vérifier</span>
                         )}
-                        {dialogue.sound_before && (
-                            <span className="text-[9px] font-semibold uppercase tracking-wide bg-purple-50 text-purple-600 border border-purple-200 rounded px-1.5 py-0.5">♪ Transition</span>
-                        )}
+                        {dialogue.sound_before
+                            ? <button onClick={() => onToggleSoundBefore(dialogue.id, true)}
+                                className="text-[9px] font-semibold uppercase tracking-wide bg-purple-50 text-purple-600 border border-purple-200 rounded px-1.5 py-0.5 hover:bg-purple-100 hover:border-purple-300 transition-colors">
+                                ♪ Transition ×
+                              </button>
+                            : <button onClick={() => onToggleSoundBefore(dialogue.id, false)}
+                                className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground/40 hover:text-purple-500 hover:bg-purple-50 border border-transparent hover:border-purple-200 rounded px-1.5 py-0.5 transition-colors">
+                                ♪+
+                              </button>
+                        }
                         {!isUngrounded && !isUncertain && hasProps && (
                             <span className="text-[9px] font-semibold uppercase tracking-wide bg-[#FFF0D0] text-[#7a5200] border border-[#E6A440]/50 rounded px-1.5 py-0.5">Proposition IA</span>
                         )}
@@ -464,6 +472,11 @@ export default function PodcastEditor() {
             d.id === id ? { ...d, text_studio: original, text_reading: textReading } : d
         ));
         setSaveStatus('unsaved');
+    };
+
+    const handleToggleSoundBefore = async (id: number, current: boolean) => {
+        await api.patch(`/dialogues/${id}`, { sound_before: !current });
+        setDialogues(items => items.map(d => d.id === id ? { ...d, sound_before: !current } : d));
     };
 
     const handleValidateGrounding = async (id: number) => {
@@ -866,6 +879,7 @@ export default function PodcastEditor() {
                                         onDelete={handleDeleteDialogue}
                                         onValidate={handleValidateGrounding}
                                         onRevert={handleRevert}
+                                        onToggleSoundBefore={handleToggleSoundBefore}
                                         originalText={originalTextsRef.current.get(d.id)}
                                         onAddAfter={handleAddAfter}
                                         activePropositionMatch={activeProp?.dialogueId === d.id ? activeProp.fullMatch : null}
