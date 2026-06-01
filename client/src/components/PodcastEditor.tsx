@@ -937,6 +937,22 @@ export default function PodcastEditor() {
                                     <div className="flex justify-center">
                                         <ScoreGauge score={verification.score} />
                                     </div>
+                                    {(() => {
+                                        const inv = dialogues.filter(d => d.is_grounded === false).length;
+                                        const inc = dialogues.filter(d => d.is_grounded === null).length;
+                                        return (<>
+                                            {inv > 0 && (
+                                                <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-800">
+                                                    🔴 <span><strong>{inv} réplique{inv > 1 ? 's' : ''}</strong> contiennent des informations potentiellement inventées — vérifiez les passages en rouge dans l'éditeur.</span>
+                                                </div>
+                                            )}
+                                            {inc > 0 && (
+                                                <div className="flex items-start gap-2 bg-orange-50 border border-orange-200 rounded-lg px-3 py-2 text-xs text-orange-800">
+                                                    🟠 <span><strong>{inc} réplique{inc > 1 ? 's' : ''}</strong> à vérifier — vérifiez les passages en orange dans l'éditeur.</span>
+                                                </div>
+                                            )}
+                                        </>);
+                                    })()}
                                     {groundingStatus !== 'idle' && (
                                         <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-xs text-blue-800">
                                             {groundingStatus === 'checking' ? (
