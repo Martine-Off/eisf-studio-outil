@@ -39,7 +39,13 @@ function concatenateMp3s(inputPaths, outputPath) {
 function trimMp3(inputPath, outputPath, durationSeconds) {
     return new Promise((resolve, reject) => {
         ffmpeg(inputPath)
-            .outputOptions(['-t', String(durationSeconds), '-c', 'copy'])
+            .audioCodec('libmp3lame')
+            .outputOptions([
+                '-t', String(durationSeconds),
+                '-ar', '44100',
+                '-ac', '1',
+                '-b:a', '128k',
+            ])
             .output(outputPath)
             .on('error', reject)
             .on('end', resolve)
