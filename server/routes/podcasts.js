@@ -327,9 +327,7 @@ router.post('/:id/verify', authMiddleware, async (req, res) => {
 
         // 2. Vérification déterministe via Anthropic (extraction + vérification binaire)
         console.log('[VERIFY] Lancement verifyScriptAgainstSource...');
-        const existingFeedback = await pool.query('SELECT ia_feedback FROM podcasts WHERE id = $1', [id]);
-        const cachedConcepts = existingFeedback.rows[0]?.ia_feedback?.cached_concepts || null;
-        const result = await verifyScriptAgainstSource(cleanedText, scriptText, cachedConcepts);
+        const result = await verifyScriptAgainstSource(cleanedText, scriptText, null);
 
         // Pénalité -5% par réplique is_grounded = false (données du grounding check précédent)
         const ungroundedRes = await pool.query(
@@ -343,7 +341,7 @@ router.post('/:id/verify', authMiddleware, async (req, res) => {
         const iaFeedback = {
             concepts_manquants: result.missingConcepts,
             concepts_incertains: result.uncertainConceptsList ?? [],
-            cached_concepts: cachedConcepts || result.extractedConcepts,
+            cached_concepts: result.extractedConcepts,
             informations_erronees: [],
             suggestions: [`${result.validatedConcepts} / ${result.totalConcepts} concepts du cours sont présents dans le podcast.`]
         };
