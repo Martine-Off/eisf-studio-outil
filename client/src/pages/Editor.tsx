@@ -1062,7 +1062,7 @@ export default function Editor() {
                                                     handleGenerateSingle(i);
                                                 }
                                             }}
-                                            disabled={isThisChapterGenerating}
+                                            disabled={isGenerating}
                                             className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold bg-[#E63337] text-white hover:bg-[#c92d31] disabled:opacity-60 transition-all"
                                         >
                                             {isThisChapterGenerating && <Loader2 className="h-4 w-4 animate-spin" />}
