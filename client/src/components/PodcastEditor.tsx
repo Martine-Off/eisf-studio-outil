@@ -106,7 +106,7 @@ function ScoreGauge({ score }: { score: number | null }) {
 // ─── Dialogue card ────────────────────────────────────────────────────────────
 
 function SortableDialogue({
-    dialogue, onUpdate, onAccept, onReject, onDelete, onAddAfter, onValidate, activePropositionMatch, elementRef
+    dialogue, onUpdate, onAccept, onReject, onDelete, onAddAfter, onValidate, onRevert, originalText, activePropositionMatch, elementRef
 }: {
     dialogue: Dialogue;
     onUpdate: (id: number, field: 'studio', text: string) => void;
@@ -114,6 +114,8 @@ function SortableDialogue({
     onReject: (id: number, fullMatch: string) => void;
     onDelete: (id: number) => void;
     onValidate: (id: number) => void;
+    onRevert: (id: number) => void;
+    originalText?: string;
     onAddAfter: (afterId: number) => void;
     activePropositionMatch: string | null;
     elementRef: (el: HTMLDivElement | null) => void;
@@ -202,6 +204,14 @@ function SortableDialogue({
                     </div>
 
                     {/* Text */}
+                    {editing && originalText !== undefined && cleanStudio(dialogue.text_studio) !== cleanStudio(originalText) && (
+                        <button
+                            onClick={() => onRevert(dialogue.id)}
+                            className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-[#E63337] mb-1 transition-colors"
+                        >
+                            <RotateCcw className="h-3 w-3" /> Annuler les modifications
+                        </button>
+                    )}
                     {editing ? (
                         <textarea
                             data-no-dnd="true"
@@ -322,6 +332,7 @@ export default function PodcastEditor() {
     const [verifyError, setVerifyError] = useState<string | null>(null);
     const [groundingStatus, setGroundingStatus] = useState<'idle' | 'checking' | 'done'>('idle');
     const dialogueElRefs = useRef<Map<number, HTMLDivElement>>(new Map());
+    const originalTextsRef = useRef<Map<number, string>>(new Map());
 
     const sensors = useSensors(
         useSensor(PointerSensor),
@@ -374,6 +385,7 @@ export default function PodcastEditor() {
                 setAudioUrl(`${base}${infoRes.data.audio_url}`);
             }
             const dlgs: Dialogue[] = dlgsRes.data || [];
+            dlgs.forEach(d => originalTextsRef.current.set(d.id, d.text_studio));
             setDialogues(dlgs.sort((a, b) => a.order_index - b.order_index));
         } catch (e) { console.error('Erreur chargement podcast:', e); }
         finally { setLoading(false); }
@@ -439,7 +451,18 @@ export default function PodcastEditor() {
                 });
             }
             setSaveStatus('saved');
+            current.forEach(d => originalTextsRef.current.set(d.id, d.text_studio));
         } catch (e) { console.error('Erreur sauvegarde:', e); setSaveStatus('unsaved'); }
+    };
+
+    const handleRevert = (id: number) => {
+        const original = originalTextsRef.current.get(id);
+        if (original === undefined) return;
+        const textReading = original.replace(/<break\s[^>]*\/?>/gi, ' ').replace(/\s+/g, ' ').trim();
+        setDialogues(items => items.map(d =>
+            d.id === id ? { ...d, text_studio: original, text_reading: textReading } : d
+        ));
+        setSaveStatus('unsaved');
     };
 
     const handleValidateGrounding = async (id: number) => {
@@ -833,6 +856,8 @@ export default function PodcastEditor() {
                                         onReject={handleReject}
                                         onDelete={handleDeleteDialogue}
                                         onValidate={handleValidateGrounding}
+                                        onRevert={handleRevert}
+                                        originalText={originalTextsRef.current.get(d.id)}
                                         onAddAfter={handleAddAfter}
                                         activePropositionMatch={activeProp?.dialogueId === d.id ? activeProp.fullMatch : null}
                                         elementRef={el => { if (el) dialogueElRefs.current.set(d.id, el); else dialogueElRefs.current.delete(d.id); }}
