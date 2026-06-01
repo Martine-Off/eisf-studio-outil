@@ -220,6 +220,7 @@ function SortableDialogue({
                     {/* Text */}
                     {editing && originalText !== undefined && cleanStudio(dialogue.text_studio) !== cleanStudio(originalText) && (
                         <button
+                            onMouseDown={e => e.preventDefault()}
                             onClick={() => onRevert(dialogue.id)}
                             className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-[#E63337] mb-1 transition-colors"
                         >
