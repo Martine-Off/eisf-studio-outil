@@ -211,6 +211,12 @@ function SortableDialogue({
                         )}
                     </div>
 
+                    {isUngrounded && (
+                        <p className="text-[10px] text-red-400 mb-1">
+                            ⚠️ Information absente du source — à vérifier manuellement
+                        </p>
+                    )}
+
                     {/* Text */}
                     {editing && originalText !== undefined && cleanStudio(dialogue.text_studio) !== cleanStudio(originalText) && (
                         <button

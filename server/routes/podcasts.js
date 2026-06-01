@@ -330,7 +330,15 @@ router.post('/:id/verify', authMiddleware, async (req, res) => {
         const existingFeedback = await pool.query('SELECT ia_feedback FROM podcasts WHERE id = $1', [id]);
         const cachedConcepts = existingFeedback.rows[0]?.ia_feedback?.cached_concepts || null;
         const result = await verifyScriptAgainstSource(cleanedText, scriptText, cachedConcepts);
-        console.log(`[VERIFY] Score : ${result.fidelityScore}% (${result.validatedConcepts}/${result.totalConcepts})`);
+
+        // Pénalité -5% par réplique is_grounded = false (données du grounding check précédent)
+        const ungroundedRes = await pool.query(
+            'SELECT COUNT(*) FROM dialogues WHERE podcast_id = $1 AND is_grounded = false', [id]
+        );
+        const ungroundedCount = parseInt(ungroundedRes.rows[0].count) || 0;
+        const penalty = ungroundedCount * 5;
+        const finalScore = Math.min(99, Math.max(0, result.fidelityScore - penalty));
+        console.log(`[VERIFY] Score brut : ${result.fidelityScore}% — pénalité : -${penalty}% (${ungroundedCount} inventées) — score final : ${finalScore}%`);
 
         const iaFeedback = {
             concepts_manquants: result.missingConcepts,
@@ -342,12 +350,12 @@ router.post('/:id/verify', authMiddleware, async (req, res) => {
 
         await pool.query(
             'UPDATE podcasts SET ia_feedback = $1, fidelity_score = $2 WHERE id = $3',
-            [JSON.stringify(iaFeedback), result.fidelityScore, id]
+            [JSON.stringify(iaFeedback), finalScore, id]
         );
 
-        res.json({ success: true, ia_feedback: iaFeedback, fidelity_score: result.fidelityScore });
+        res.json({ success: true, ia_feedback: iaFeedback, fidelity_score: finalScore });
 
-        if (result.fidelityScore >= 95) {
+        if (finalScore >= 95) {
             groundingCheck(id, cleanedText).catch(e =>
                 console.error('[VERIFY] groundingCheck error:', e)
             );
