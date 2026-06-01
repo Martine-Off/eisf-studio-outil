@@ -106,13 +106,14 @@ function ScoreGauge({ score }: { score: number | null }) {
 // ─── Dialogue card ────────────────────────────────────────────────────────────
 
 function SortableDialogue({
-    dialogue, onUpdate, onAccept, onReject, onDelete, onAddAfter, activePropositionMatch, elementRef
+    dialogue, onUpdate, onAccept, onReject, onDelete, onAddAfter, onValidate, activePropositionMatch, elementRef
 }: {
     dialogue: Dialogue;
     onUpdate: (id: number, field: 'studio', text: string) => void;
     onAccept: (id: number, fullMatch: string) => void;
     onReject: (id: number, fullMatch: string) => void;
     onDelete: (id: number) => void;
+    onValidate: (id: number) => void;
     onAddAfter: (afterId: number) => void;
     activePropositionMatch: string | null;
     elementRef: (el: HTMLDivElement | null) => void;
@@ -128,7 +129,8 @@ function SortableDialogue({
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: dialogue.id });
     const style = { transform: CSS.Transform.toString(transform), transition, zIndex: isDragging ? 50 : 'auto', opacity: isDragging ? 0.8 : 1 };
     const isInes = dialogue.character.toLowerCase() === 'ines';
-    const textParts = parseTextParts(dialogue.text_studio);
+    const cleanStudio = (t: string) => t.replace(/sound_before:\s*true/gi, '').trim();
+    const textParts = parseTextParts(cleanStudio(dialogue.text_studio));
     const hasProps = textParts.some(p => p.type === 'proposition');
     const isUngrounded = dialogue.is_grounded === false;
     const isUncertain  = dialogue.is_grounded === null;
@@ -180,7 +182,13 @@ function SortableDialogue({
                             {isInes ? 'Inès' : 'Yannick'}
                         </p>
                         {isUngrounded && (
-                            <span className="text-[9px] font-semibold uppercase tracking-wide bg-red-100 text-red-600 border border-red-300 rounded px-1.5 py-0.5">Inventé</span>
+                            <>
+                                <span className="text-[9px] font-semibold uppercase tracking-wide bg-red-100 text-red-600 border border-red-300 rounded px-1.5 py-0.5">Inventé</span>
+                                <button
+                                    onClick={() => onValidate(dialogue.id)}
+                                    className="text-[9px] font-semibold uppercase tracking-wide bg-white text-red-600 border border-red-300 rounded px-1.5 py-0.5 hover:bg-red-50 transition-colors"
+                                >✓ Valider malgré tout</button>
+                            </>
                         )}
                         {isUncertain && (
                             <span className="text-[9px] font-semibold uppercase tracking-wide bg-orange-100 text-orange-700 border border-orange-300 rounded px-1.5 py-0.5">À vérifier</span>
@@ -200,11 +208,11 @@ function SortableDialogue({
                             onPointerDown={e => e.stopPropagation()}
                             className="w-full bg-[#F8F7F8] border border-[#E0DCE0] rounded-lg px-3 py-2 text-[13px] leading-relaxed resize-none focus:outline-none focus:ring-2 focus:border-transparent"
                             style={{ '--tw-ring-color': borderColor } as React.CSSProperties}
-                            value={dialogue.text_studio}
+                            value={cleanStudio(dialogue.text_studio)}
                             onChange={e => onUpdate(dialogue.id, 'studio', e.target.value)}
                             onBlur={() => setEditing(false)}
                             onKeyDown={e => { if (e.key === 'Escape') { e.preventDefault(); setEditing(false); } }}
-                            rows={Math.max(2, Math.ceil(dialogue.text_studio.length / 90))}
+                            rows={Math.max(2, Math.ceil(cleanStudio(dialogue.text_studio).length / 90))}
                             autoFocus
                         />
                     ) : (
@@ -423,7 +431,7 @@ export default function PodcastEditor() {
         setSaveStatus('saving');
         try {
             await Promise.all(current.map(d =>
-                api.patch(`/dialogues/${d.id}`, { text_studio: d.text_studio, text_reading: d.text_reading || d.text_studio })
+                api.patch(`/dialogues/${d.id}`, { text_studio: d.text_studio.replace(/sound_before:\s*true/gi, '').trim(), text_reading: d.text_reading || d.text_studio })
             ));
             if (current.length > 0) {
                 await api.patch('/dialogues/reorder', {
@@ -432,6 +440,11 @@ export default function PodcastEditor() {
             }
             setSaveStatus('saved');
         } catch (e) { console.error('Erreur sauvegarde:', e); setSaveStatus('unsaved'); }
+    };
+
+    const handleValidateGrounding = async (id: number) => {
+        await api.patch(`/dialogues/${id}`, { is_grounded: true });
+        setDialogues(items => items.map(d => d.id === id ? { ...d, is_grounded: true } : d));
     };
 
     const handleDeleteDialogue = async (id: number) => {
@@ -819,6 +832,7 @@ export default function PodcastEditor() {
                                         onAccept={handleAccept}
                                         onReject={handleReject}
                                         onDelete={handleDeleteDialogue}
+                                        onValidate={handleValidateGrounding}
                                         onAddAfter={handleAddAfter}
                                         activePropositionMatch={activeProp?.dialogueId === d.id ? activeProp.fullMatch : null}
                                         elementRef={el => { if (el) dialogueElRefs.current.set(d.id, el); else dialogueElRefs.current.delete(d.id); }}

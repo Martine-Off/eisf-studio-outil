@@ -300,7 +300,7 @@ export default function Editor() {
         onSave: () => handleSaveAction(dialogues),
     });
 
-    const isGenerating = isGeneratingAll || generatingChapters.size > 0;
+    const isGenerating = isGeneratingAll || generatingChapters.size > 0 || regeneratingId !== null;
 
     useEffect(() => {
         if (!isGenerating) return;

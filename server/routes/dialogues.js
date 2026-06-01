@@ -58,7 +58,7 @@ const updateDialogueHandler = async (req, res) => {
 
     try {
         const { dialogueId } = req.params;
-        const { text_studio, text_reading, character, section } = req.body;
+        const { text_studio, text_reading, character, section, is_grounded } = req.body;
 
         const updates = [];
         const values = [];
@@ -79,6 +79,10 @@ const updateDialogueHandler = async (req, res) => {
         if (section !== undefined) {
             updates.push(`section = $${paramIndex++}`);
             values.push(section);
+        }
+        if (is_grounded !== undefined) {
+            updates.push(`is_grounded = $${paramIndex++}`);
+            values.push(is_grounded);
         }
 
         if (updates.length === 0) {
