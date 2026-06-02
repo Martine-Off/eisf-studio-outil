@@ -38,9 +38,11 @@ async function callWebhook(payload, timeoutMs = 60_000) {
     let text = await response.text();
     text = text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
     text = text.replace(/[“”]/g, '"').replace(/[‘’]/g, "'");
+    console.log(`[callWebhook] Resp brute type=${payload.type} (${text.length} car.): ${text.substring(0,400)}`);
     try {
       return JSON.parse(text);
     } catch {
+      console.warn(`[callWebhook] Reponse non-JSON pour type=${payload.type}, retour brut`);
       return text;
     }
   } catch (err) {

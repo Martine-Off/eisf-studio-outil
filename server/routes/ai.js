@@ -9,6 +9,7 @@ const mammoth = require('mammoth');
 const { callWebhook } = require('../utils/callWebhook');
 const { extractSourceSection } = require('../utils/extractSourceSection');
 const { groundingCheck } = require('../utils/groundingCheck');
+const { verifyScriptAgainstSource } = require('../utils/verification');
 const { body } = require('express-validator');
 const { validate } = require('../middleware/validate');
 
@@ -85,71 +86,6 @@ function sanitizeBreakTimes(text) {
 // ─── Helper : est-ce qu'on utilise le mock ? ─────────────────────────────────
 function useMock() {
     return process.env.USE_MOCK_AI === 'true';
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-
-
-function toTextString(result) {
-  if (typeof result === 'string') return result;
-  return result?.text || result?.output || JSON.stringify(result);
-}
-
-async function verifyScriptAgainstSource(segmentContent, scriptText, cachedConcepts = null) {
-  let concepts = cachedConcepts && cachedConcepts.length > 0 ? cachedConcepts : null;
-
-  // ─── Appel 1 : extraction des concepts (sauté si cache présent) ──────────
-  if (!concepts) {
-    const conceptsRaw = await callWebhook({
-      type: 'verify-extract-concepts',
-      prompt: `Tu es un extracteur de concepts pédagogiques.\nListe UNIQUEMENT les concepts, faits, chiffres présents dans ce texte.\nFormat : une ligne par concept, commençant par "- ". Sois atomique et exhaustif.\n\nExtrais TOUS les concepts de ce contenu source :\n\n${segmentContent}`
-    });
-    if (!conceptsRaw) throw new Error('Extraction des concepts impossible (Make n\'a pas répondu)');
-    const conceptsText = toTextString(conceptsRaw);
-    concepts = conceptsText
-      .split('\n')
-      .filter(l => l.startsWith('- '))
-      .map(l => l.slice(2).trim())
-      .filter(Boolean);
-    if (concepts.length === 0) throw new Error('Aucun concept extrait du source');
-  }
-
-  // ─── Appel 2 : vérification binaire présent/absent dans le script ─────────
-  const verificationRaw = await callWebhook({
-    type: 'verify-check-concepts',
-    prompt: `Pour chaque concept, réponds UNIQUEMENT "present" ou "absent" selon qu'il est couvert (même reformulé) dans le script.\nFormat strict par ligne : concept | present   ou   concept | absent\n\nCONCEPTS:\n${concepts.map(c => `- ${c}`).join('\n')}\n\nSCRIPT:\n${scriptText}`
-  });
-  if (!verificationRaw) throw new Error('Vérification des concepts impossible (Make n\'a pas répondu)');
-  const verificationText = toTextString(verificationRaw);
-
-  // ─── Score calculé mathématiquement par l'app (présents / total × 100) ────
-  const lines = verificationText.split('\n').filter(l => l.includes('|'));
-  const total = lines.length;
-  const validated  = lines.filter(l => l.toLowerCase().includes('present')).length;
-  const uncertain  = lines.filter(l => l.toLowerCase().includes('uncertain')).length;
-  const missing    = lines.filter(l => !l.toLowerCase().includes('present') && !l.toLowerCase().includes('uncertain'));
-  const countable  = total - uncertain;
-  const fidelityScore = countable > 0 ? Math.round((validated / countable) * 100) : 0;
-
-  const allResults = lines.map(l => {
-    const parts = l.split('|');
-    const low = l.toLowerCase();
-    const status = low.includes('present') ? 'present' : low.includes('uncertain') ? 'uncertain' : 'absent';
-    return { concept: parts[0].trim(), status };
-  });
-
-  return {
-    fidelityScore,
-    totalConcepts: total,
-    validatedConcepts: validated,
-    uncertainConcepts: uncertain,
-    uncertainConceptsList: lines
-      .filter(l => l.toLowerCase().includes('uncertain'))
-      .map(l => l.split('|')[0].trim()),
-    missingConcepts: missing.map(l => l.split('|')[0].trim()),
-    extractedConcepts: concepts,
-    allResults
-  };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1167,6 +1103,7 @@ router.post("/auto-verify-and-fix", async (req, res) => {
         .join("\n");
 
       const verif = await verifyScriptAgainstSource(segmentContent, currentScriptText, cachedConcepts);
+      console.log(`[auto-verify-and-fix] Pass ${passCount + 1} — score=${verif.fidelityScore}%, validés=${verif.validatedConcepts}/${verif.totalConcepts}, manquants=${verif.missingConcepts.length}`);
 
       if (!cachedConcepts && verif.extractedConcepts?.length > 0) {
         cachedConcepts = verif.extractedConcepts;
@@ -1194,6 +1131,7 @@ router.post("/auto-verify-and-fix", async (req, res) => {
       }, 120_000);
       if (!fixText) break;
 
+      console.log(`[auto-verify-and-fix] Pass ${passCount + 1} — réponse Make fix (type=${typeof fixText}) :`, typeof fixText === 'string' ? fixText.substring(0, 400) : JSON.stringify(fixText).substring(0, 400));
       try {
         const parsed = typeof fixText === 'string' ? JSON.parse(fixText) : fixText;
         const delta = Array.isArray(parsed) ? parsed : (parsed?.dialogues || []);
@@ -1409,4 +1347,4 @@ NORMALISATION OBLIGATOIRE DU TEXTE (applique à chaque réplique) :
 - text_studio = version avec phonétique pour la voix TTS (ex: "l'EISF (E.I.S.F.) forme cent cinquante apprentis")
 - text_reading = version lisible sans parenthèses (ex: "l'EISF forme 150 apprentis")`;
 
-module.exports = { router, normalizeText, NORMALIZATION_INSTRUCTIONS, ORAL_NATURALNESS_INSTRUCTIONS, verifyScriptAgainstSource };
+module.exports = { router, normalizeText, NORMALIZATION_INSTRUCTIONS, ORAL_NATURALNESS_INSTRUCTIONS };
