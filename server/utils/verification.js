@@ -41,7 +41,8 @@ async function verifyScriptAgainstSource(segmentContent, scriptText, cachedConce
   const uncertain  = lines.filter(l => l.toLowerCase().includes('uncertain')).length;
   const missing    = lines.filter(l => !l.toLowerCase().includes('present') && !l.toLowerCase().includes('uncertain'));
   const countable  = total - uncertain;
-  const fidelityScore = countable > 0 ? Math.round((validated / countable) * 100) : 0;
+  const rawScore = countable > 0 ? Math.round((validated / countable) * 100) : 0;
+  const fidelityScore = missing.length > 0 ? Math.min(rawScore, 94) : Math.min(rawScore, 99);
 
   const allResults = lines.map(l => {
     const parts = l.split('|');
