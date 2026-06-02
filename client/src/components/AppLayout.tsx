@@ -4,7 +4,7 @@
 //
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { GraduationCap, LayoutGrid, Plus, LogOut, Bell, Menu, X } from 'lucide-react';
+import { LayoutGrid, Plus, LogOut, Bell, Menu, X } from 'lucide-react';
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -31,9 +31,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 <div className="max-w-[1400px] mx-auto px-6 h-14 flex items-center gap-4">
                     {/* Logo */}
                     <Link to="/dashboard" className="flex items-center gap-2.5 flex-shrink-0">
-                        <div className="flex h-7 w-7 items-center justify-center rounded bg-danger">
-                            <GraduationCap className="h-4 w-4 text-white" />
-                        </div>
+                        <img src="/logo-eisf.png" className="h-7 w-auto" alt="EISF" />
                         <span className="w-px h-4 bg-border shrink-0" aria-hidden="true" />
                         <span className="font-heading font-bold text-[13px] text-ink tracking-tight">EISF&nbsp;/&nbsp;Studio</span>
                     </Link>
