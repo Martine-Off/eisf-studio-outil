@@ -1162,6 +1162,15 @@ router.post("/auto-verify-and-fix", async (req, res) => {
       passCount++;
     }
 
+    // ─── Passe de vérification finale (sans correction) ──────────────────────
+    const finalScriptText = currentDialogues
+      .map(d => `${d.character}: ${d.text_reading || d.text_studio}`)
+      .join('\n');
+    const finalVerif = await verifyScriptAgainstSource(segmentContent, finalScriptText, cachedConcepts);
+    console.log(`[auto-verify-and-fix] Vérif finale — score=${finalVerif.fidelityScore}%, manquants=${finalVerif.missingConcepts.length}`);
+    lastScore = finalVerif.fidelityScore;
+    passHistory.push({ pass: 'final', score: lastScore, missingCount: finalVerif.missingConcepts.length, missing: finalVerif.missingConcepts });
+
     // Mettre à jour le score du podcast en BDD
     await pool.query('UPDATE podcasts SET fidelity_score = $1 WHERE id = $2', [lastScore, podcastId]);
 
