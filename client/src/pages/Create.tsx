@@ -122,16 +122,16 @@ export default function Create() {
                     initial={{ opacity: 0, y: 14 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.3 }}
-                    className="bg-white rounded-2xl shadow-[0_2px_24px_0_rgb(0,0,0,0.09)] border border-[#E0DCE0] overflow-hidden"
+                    className="bg-surface rounded-lg shadow-pop border border-border overflow-hidden"
                 >
                     {/* Card header */}
                     <div className="flex items-center justify-between px-8 pt-8 pb-0">
-                        <h1 className="text-lg font-bold text-foreground">Importer un fichier .docx</h1>
-                        <span className="text-[10px] font-bold tracking-widest uppercase bg-[#E6E2E6] text-muted-foreground px-2.5 py-1 rounded-full">
+                        <h1 className="text-lg font-heading font-bold text-ink">Importer un fichier .docx</h1>
+                        <span className="text-[10px] font-medium bg-border-soft text-ink-soft px-2.5 py-1 rounded-pill">
                             Nouveau projet
                         </span>
                     </div>
-                    <p className="px-8 mt-1 text-sm text-muted-foreground">
+                    <p className="px-8 mt-1 text-sm text-ink-soft">
                         Commencez par importer votre document source pour structurer votre module de formation.
                     </p>
 
@@ -142,12 +142,12 @@ export default function Create() {
                             onDragLeave={() => setIsDragging(false)}
                             onDrop={handleDrop}
                             onClick={() => !file && inputRef.current?.click()}
-                            className={`relative flex flex-col items-center justify-center rounded-xl border-2 border-dashed transition-all cursor-pointer py-10 px-6 ${
+                            className={`relative flex flex-col items-center justify-center rounded border-2 border-dashed transition-all cursor-pointer py-10 px-6 ${
                                 isDragging
-                                    ? 'border-[#D6475B] bg-[#D6475B]/[0.04]'
+                                    ? 'border-primary bg-primary/[.04]'
                                     : file
-                                    ? 'border-[#BDD145] bg-[#BDD145]/[0.04] cursor-default'
-                                    : 'border-[#D4D0D4] bg-[#F8F7F8] hover:border-[#D6475B]/50 hover:bg-[#D6475B]/[0.02]'
+                                    ? 'border-emerald bg-emerald/[.05] cursor-default'
+                                    : 'border-border bg-black/[.02] hover:border-primary/40 hover:bg-black/[.03]'
                             }`}
                         >
                             <input
@@ -160,33 +160,33 @@ export default function Create() {
 
                             {isParsing ? (
                                 <>
-                                    <Loader2 className="h-10 w-10 text-[#6BB8CD] animate-spin mb-3" />
-                                    <p className="text-sm text-muted-foreground">Analyse du document…</p>
+                                    <Loader2 className="h-10 w-10 text-primary animate-spin mb-3" />
+                                    <p className="text-sm text-ink-soft">Analyse du document…</p>
                                 </>
                             ) : file ? (
                                 <>
-                                    <FileText className="h-10 w-10 text-[#BDD145] mb-3" />
-                                    <p className="text-sm font-semibold text-foreground">{stats?.fileName}</p>
-                                    <p className="text-xs text-muted-foreground mt-0.5">
+                                    <FileText className="h-10 w-10 text-emerald mb-3" />
+                                    <p className="text-sm font-semibold text-ink">{stats?.fileName}</p>
+                                    <p className="text-xs text-ink-soft mt-0.5">
                                         {stats ? `${(stats.fileSize / 1024).toFixed(0)} Ko` : ''}
                                     </p>
                                     <button
                                         onClick={(e) => { e.stopPropagation(); resetFile(); }}
-                                        className="mt-3 text-xs text-[#D6475B] hover:underline flex items-center gap-1"
+                                        className="mt-3 text-xs text-primary hover:underline flex items-center gap-1"
                                     >
                                         <X className="h-3 w-3" /> Changer de fichier
                                     </button>
                                 </>
                             ) : (
                                 <>
-                                    <UploadCloud className="h-10 w-10 text-muted-foreground mb-3" />
-                                    <p className="text-sm font-semibold text-foreground">Glissez-déposez votre document ici</p>
-                                    <p className="text-xs text-muted-foreground mt-0.5">
+                                    <UploadCloud className="h-10 w-10 text-ink-faint mb-3" />
+                                    <p className="text-sm font-semibold text-ink">Glissez-déposez votre document ici</p>
+                                    <p className="text-xs text-ink-soft mt-0.5">
                                         Ou cliquez pour parcourir vos fichiers locaux
                                     </p>
-                                    <div className="flex items-center gap-1 mt-3 text-[11px] text-muted-foreground/70">
+                                    <div className="flex items-center gap-1 mt-3 text-[11px] text-ink-faint">
                                         <Info className="h-3 w-3" />
-                                        FORMAT SUPPORTÉ : .DOCX (MAX 25 MB)
+                                        Format supporté : .docx (max 25 Mo)
                                     </div>
                                 </>
                             )}
@@ -209,22 +209,22 @@ export default function Create() {
                         </AnimatePresence>
 
                         {stats && (
-                            <p className="text-xs text-muted-foreground bg-[#F8F7F8] border border-[#E0DCE0] rounded-lg px-4 py-2.5 leading-relaxed">
-                                💡 <strong>Conseil :</strong> numérotez vos projets pour les retrouver facilement
+                            <p className="text-xs text-ink-soft leading-relaxed">
+                                Conseil : numérotez vos projets pour les retrouver facilement
                                 (ex&nbsp;: <em>01 - La panification</em>, <em>02 - Les farines…</em>)
                             </p>
                         )}
 
                         {/* Processing notice */}
                         {isParsing && (
-                            <p className="text-xs text-muted-foreground text-center italic">
+                            <p className="text-xs text-ink-faint text-center italic">
                                 L'analyse automatique peut prendre quelques secondes…
                             </p>
                         )}
 
                         {/* Error */}
                         {error && (
-                            <div className="flex items-center gap-2 text-sm text-[#D6475B] bg-[#D6475B]/[0.06] border border-[#D6475B]/20 rounded-lg px-4 py-3">
+                            <div className="flex items-center gap-2 text-sm text-danger bg-danger/[.06] border border-danger/20 rounded-lg px-4 py-3">
                                 <X className="h-4 w-4 flex-shrink-0" />
                                 {error}
                             </div>
@@ -234,7 +234,7 @@ export default function Create() {
                         <button
                             onClick={handleContinue}
                             disabled={!file || isParsing || isUploading}
-                            className="flex w-full items-center justify-center gap-2 bg-[#D6475B] text-white font-semibold py-3 rounded-lg text-sm transition-all hover:bg-[#c03d50] disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.99]"
+                            className="flex w-full items-center justify-center gap-2 bg-primary text-white font-medium py-3 rounded text-sm transition-all hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.99]"
                         >
                             {isUploading ? (
                                 <>
@@ -253,11 +253,11 @@ export default function Create() {
 
                 {/* Step indicator */}
                 <div className="flex items-center justify-center gap-3 mt-6">
-                    <div className="h-0.5 w-16 bg-[#D6475B] rounded-full" />
-                    <span className="text-xs font-semibold text-muted-foreground tracking-widest uppercase">
+                    <div className="h-0.5 w-16 bg-primary rounded-full" />
+                    <span className="text-xs font-medium text-ink-faint">
                         Étape 1 / 3
                     </span>
-                    <div className="h-0.5 w-16 bg-[#E0DCE0] rounded-full" />
+                    <div className="h-0.5 w-16 bg-border rounded-full" />
                 </div>
             </div>
         </AppLayout>
@@ -266,10 +266,10 @@ export default function Create() {
 
 function StatCard({ icon: Icon, value, label }: { icon: React.ElementType; value: string; label: string }) {
     return (
-        <div className="flex flex-col items-center justify-center bg-[#F8F7F8] border border-[#E0DCE0] rounded-xl py-4 px-3 text-center">
-            <Icon className="h-5 w-5 text-[#6BB8CD] mb-2" />
-            <p className="text-xl font-extrabold text-foreground">{value}</p>
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wider mt-0.5">{label}</p>
+        <div className="flex flex-col items-center justify-center bg-surface border border-border rounded py-4 px-3 text-center">
+            <Icon className="h-5 w-5 text-primary mb-2" />
+            <p className="text-xl font-heading font-bold text-ink">{value}</p>
+            <p className="text-[10px] text-ink-faint mt-0.5">{label}</p>
         </div>
     );
 }
