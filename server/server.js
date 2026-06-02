@@ -33,6 +33,9 @@ app.use(cors({
             }
             return callback(null, true);
         }
+        if (process.env.NODE_ENV !== 'production' && /^https?:\/\/localhost(:\d+)?$/.test(origin)) {
+            return callback(null, true);
+        }
         if (allowedOrigins.includes(origin)) {
             return callback(null, true);
         }
