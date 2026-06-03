@@ -177,7 +177,8 @@ export default function ProjectPodcasts() {
                     </div>
                 </div>
 
-                {/* ── Analyse globale banner ── */}
+                {/* ── Analyse globale banner — masqué si pas encore d'analyse ── */}
+                {(macroScore !== null || macroFeedback.length > 0) && (
                 <div className="bg-surface rounded-lg border border-border shadow-card p-5 mb-6 flex gap-6 items-start">
                     {/* Left — score gauge */}
                     <div className="flex-shrink-0 flex flex-col items-center gap-1.5">
@@ -253,6 +254,7 @@ export default function ProjectPodcasts() {
                         )}
                     </div>
                 </div>
+                )}
 
                 {/* ── Prénoms des personnages ── */}
                 <div className={`bg-surface rounded-lg border border-border shadow-card p-5 mb-6 ${locked ? 'opacity-60' : ''}`}>
