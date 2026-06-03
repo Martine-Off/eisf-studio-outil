@@ -4,7 +4,7 @@
 //
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { GraduationCap, LayoutGrid, Plus, LogOut, Bell, Menu, X } from 'lucide-react';
+import { LayoutGrid, Plus, LogOut, Bell, Menu, X } from 'lucide-react';
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -25,26 +25,25 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         .join('') || 'U';
 
     return (
-        <div className="min-h-screen bg-[#E6E2E6] font-sans text-foreground">
+        <div className="min-h-screen bg-canvas font-body text-ink">
             {/* Header */}
-            <header className="sticky top-0 z-50 bg-white border-b border-[#E0DCE0] shadow-[0_1px_4px_0_rgb(0,0,0,0.06)]">
+            <header className="sticky top-0 z-50 bg-surface border-b border-border shadow-card">
                 <div className="max-w-[1400px] mx-auto px-6 h-14 flex items-center gap-4">
                     {/* Logo */}
-                    <Link to="/dashboard" className="flex items-center gap-2 flex-shrink-0">
-                        <div className="flex h-7 w-7 items-center justify-center rounded-md bg-[#D6475B]">
-                            <GraduationCap className="h-4 w-4 text-white" />
-                        </div>
-                        <span className="font-bold text-sm text-foreground tracking-tight">Studio EISF</span>
+                    <Link to="/dashboard" className="flex items-center gap-2.5 flex-shrink-0">
+                        <img src="/logo-eisf.png" className="h-7 w-auto" alt="EISF" />
+                        <span className="w-px h-4 bg-border shrink-0" aria-hidden="true" />
+                        <span className="font-heading font-bold text-[13px] text-ink tracking-tight">EISF&nbsp;/&nbsp;Studio</span>
                     </Link>
 
                     {/* Nav */}
                     <nav className="hidden md:flex items-center gap-1 ml-2">
                         <Link
                             to="/dashboard"
-                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-sm font-medium transition-colors ${
                                 location.pathname === '/dashboard'
-                                    ? 'bg-[#E6E2E6] text-foreground'
-                                    : 'text-muted-foreground hover:text-foreground hover:bg-[#F0EEF0]'
+                                    ? 'bg-canvas text-ink'
+                                    : 'text-ink-soft hover:text-ink hover:bg-canvas'
                             }`}
                         >
                             <LayoutGrid className="h-3.5 w-3.5" />
@@ -59,23 +58,23 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     <div className="hidden md:flex items-center gap-2">
                         <Link
                             to="/new-project"
-                            className="flex items-center gap-1.5 bg-[#D6475B] text-white px-4 py-1.5 rounded-lg text-sm font-semibold hover:bg-[#c03d50] transition-colors"
+                            className="flex items-center gap-1.5 bg-primary text-white px-4 py-1.5 rounded text-sm font-medium hover:opacity-90 transition-all"
                         >
                             <Plus className="h-4 w-4" />
                             Nouveau projet
                         </Link>
-                        <button className="p-2 text-muted-foreground hover:text-foreground hover:bg-[#F0EEF0] rounded-lg transition-colors">
+                        <button className="p-2 text-ink-soft hover:text-ink hover:bg-canvas rounded transition-colors">
                             <Bell className="h-4 w-4" />
                         </button>
                         <div className="relative group">
-                            <button className="flex h-8 w-8 items-center justify-center rounded-full bg-[#E6E2E6] border-2 border-white text-xs font-bold text-foreground hover:border-[#D6475B] transition-colors overflow-hidden">
+                            <button className="flex h-8 w-8 items-center justify-center rounded-full bg-primary border-2 border-surface text-xs font-bold text-white hover:opacity-90 transition-all overflow-hidden">
                                 {initials}
                             </button>
                             {/* Dropdown */}
-                            <div className="absolute right-0 top-full mt-1 w-40 bg-white border border-[#E0DCE0] rounded-xl shadow-lg py-1 invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-all">
+                            <div className="absolute right-0 top-full mt-1 w-40 bg-surface border border-border rounded-lg shadow-pop py-1 invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-all">
                                 <button
                                     onClick={handleLogout}
-                                    className="flex w-full items-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:text-destructive hover:bg-[#FFF0F2] transition-colors"
+                                    className="flex w-full items-center gap-2 px-3 py-2 text-sm text-ink-soft hover:text-danger hover:bg-danger/8 transition-colors"
                                 >
                                     <LogOut className="h-3.5 w-3.5" />
                                     Déconnexion
@@ -86,7 +85,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
                     {/* Mobile */}
                     <button
-                        className="md:hidden p-2 text-foreground hover:bg-[#F0EEF0] rounded-lg"
+                        className="md:hidden p-2 text-ink hover:bg-canvas rounded"
                         onClick={() => setIsMobileMenuOpen(true)}
                     >
                         <Menu size={20} />
@@ -109,26 +108,26 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                             animate={{ x: 0 }}
                             exit={{ x: '100%' }}
                             transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                            className="absolute right-0 top-0 h-full w-72 bg-white border-l border-[#E0DCE0] p-6 shadow-2xl"
+                            className="absolute right-0 top-0 h-full w-72 bg-surface border-l border-border p-6 shadow-pop"
                             onClick={(e) => e.stopPropagation()}
                         >
                             <div className="flex justify-between items-center mb-8">
-                                <span className="font-bold text-foreground">Menu</span>
-                                <button onClick={() => setIsMobileMenuOpen(false)} className="p-1.5 rounded-lg hover:bg-[#F0EEF0]">
+                                <span className="font-heading font-bold text-ink">Menu</span>
+                                <button onClick={() => setIsMobileMenuOpen(false)} className="p-1.5 rounded hover:bg-canvas">
                                     <X size={18} />
                                 </button>
                             </div>
                             <nav className="flex flex-col gap-2">
-                                <Link to="/dashboard" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium text-foreground hover:bg-[#F0EEF0]">
+                                <Link to="/dashboard" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-2 px-3 py-2.5 rounded text-sm font-medium text-ink hover:bg-canvas">
                                     <LayoutGrid size={16} />
                                     Tableau de bord
                                 </Link>
-                                <Link to="/new-project" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium text-foreground hover:bg-[#F0EEF0]">
+                                <Link to="/new-project" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-2 px-3 py-2.5 rounded text-sm font-medium text-ink hover:bg-canvas">
                                     <Plus size={16} />
                                     Nouveau projet
                                 </Link>
-                                <hr className="my-3 border-[#E0DCE0]" />
-                                <button onClick={handleLogout} className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium text-destructive hover:bg-red-50 w-full text-left">
+                                <hr className="my-3 border-border" />
+                                <button onClick={handleLogout} className="flex items-center gap-2 px-3 py-2.5 rounded text-sm font-medium text-danger hover:bg-danger/8 w-full text-left">
                                     <LogOut size={16} />
                                     Déconnexion
                                 </button>

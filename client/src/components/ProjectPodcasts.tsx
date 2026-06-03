@@ -107,7 +107,7 @@ export default function ProjectPodcasts() {
     if (loading) return (
         <AppLayout>
             <div className="h-[60vh] flex items-center justify-center">
-                <Loader2 className="animate-spin text-[#E63337]" size={32} />
+                <Loader2 className="animate-spin text-primary" size={32} />
             </div>
         </AppLayout>
     );
@@ -119,12 +119,12 @@ export default function ProjectPodcasts() {
                 {/* ── Header ── */}
                 <div className="flex items-start justify-between gap-4 mb-6">
                     <div>
-                        <nav className="flex items-center gap-1 text-xs text-muted-foreground mb-2">
-                            <Link to="/dashboard" className="hover:text-foreground transition-colors">Projets</Link>
+                        <nav className="flex items-center gap-1 text-xs text-ink-soft mb-2">
+                            <Link to="/dashboard" className="hover:text-ink transition-colors">Projets</Link>
                             <span>/</span>
-                            <span className="text-foreground/70">{projectTitle}</span>
+                            <span className="text-ink/70">{projectTitle}</span>
                             <span>/</span>
-                            <span className="text-foreground font-medium">Podcasts</span>
+                            <span className="text-ink font-medium">Podcasts</span>
                         </nav>
                         {editingTitle ? (
                             <input
@@ -137,39 +137,39 @@ export default function ProjectPodcasts() {
                                     if (e.key === 'Enter') handleSaveTitle();
                                     if (e.key === 'Escape') setEditingTitle(false);
                                 }}
-                                className="text-2xl font-bold text-foreground bg-transparent border-b-2 border-[#E63337] outline-none w-full"
+                                className="text-2xl font-heading font-bold text-ink bg-transparent border-b-2 border-primary outline-none w-full"
                             />
                         ) : (
                             <h1
-                                className="text-2xl font-bold text-foreground cursor-pointer hover:text-[#E63337] transition-colors group flex items-center gap-2"
+                                className="text-2xl font-heading font-bold text-ink cursor-pointer hover:text-primary transition-colors group flex items-center gap-2"
                                 onClick={() => { setTitleDraft(projectData?.title || ''); setEditingTitle(true); }}
                             >
                                 {projectTitle}
                                 <Pencil className="h-4 w-4 opacity-0 group-hover:opacity-40 transition-opacity flex-shrink-0" />
                             </h1>
                         )}
-                        <p className="text-sm text-muted-foreground mt-1">
+                        <p className="text-sm text-ink-soft mt-1">
                             Récapitulatif des contenus audio générés pour ce projet
                         </p>
                     </div>
                     <div className="flex items-center gap-2 mt-1 flex-shrink-0">
                         <button
                             onClick={() => navigate(`/editor/${projectId}`, { state: { step: 2 } })}
-                            className="flex items-center gap-1.5 px-4 py-2 border border-[#E0DCE0] rounded-lg text-sm font-semibold text-muted-foreground hover:text-foreground hover:border-[#E63337]/30 bg-white transition-colors"
+                            className="flex items-center gap-1.5 px-4 py-2 border border-border rounded text-sm font-medium text-ink-soft hover:text-ink hover:border-primary/30 bg-surface transition-colors"
                         >
                             <LayoutList className="h-4 w-4" />
                             Voir la structure
                         </button>
                         <button
                             onClick={() => navigate(`/editor/${projectId}`)}
-                            className="flex items-center gap-1.5 px-4 py-2 border border-[#E0DCE0] rounded-lg text-sm font-semibold text-muted-foreground hover:text-foreground hover:border-[#E63337]/30 bg-white transition-colors"
+                            className="flex items-center gap-1.5 px-4 py-2 border border-border rounded text-sm font-medium text-ink-soft hover:text-ink hover:border-primary/30 bg-surface transition-colors"
                         >
                             <ChevronLeft className="h-4 w-4" />
                             Aperçu source
                         </button>
                         <button
                             onClick={() => navigate('/dashboard')}
-                            className="flex items-center gap-1.5 px-4 py-2 border border-[#E0DCE0] rounded-lg text-sm font-semibold text-muted-foreground hover:text-foreground hover:border-[#3465AE]/30 bg-white transition-colors"
+                            className="flex items-center gap-1.5 px-4 py-2 border border-border rounded text-sm font-medium text-ink-soft hover:text-ink hover:border-primary/30 bg-surface transition-colors"
                         >
                             <ChevronLeft className="h-4 w-4" />
                             Tableau de bord
@@ -177,29 +177,34 @@ export default function ProjectPodcasts() {
                     </div>
                 </div>
 
-                {/* ── Analyse globale banner ── */}
-                <div className="bg-white rounded-xl border border-[#E0DCE0] shadow-sm p-5 mb-6 flex gap-6 items-start">
+                {/* ── Analyse globale banner — masqué si pas encore d'analyse ── */}
+                {(macroScore !== null || macroFeedback.length > 0) && (
+                <div className="bg-surface rounded-lg border border-border shadow-card p-5 mb-6 flex gap-6 items-start">
                     {/* Left — score gauge */}
                     <div className="flex-shrink-0 flex flex-col items-center gap-1.5">
-                        <div className="relative w-[80px] h-[80px]">
-                            <svg className="w-[80px] h-[80px] -rotate-90" viewBox="0 0 100 100">
-                                <circle cx="50" cy="50" r="35" fill="none" stroke="#E6E2E6" strokeWidth="10" />
-                                {macroScore !== null && (
+                        {macroScore === null ? (
+                            <div className="w-[80px] h-[80px] flex items-center justify-center">
+                                <span className="text-2xl font-heading text-ink-faint">—</span>
+                            </div>
+                        ) : (
+                            <div className="relative w-[80px] h-[80px]">
+                                <svg className="w-[80px] h-[80px] -rotate-90" viewBox="0 0 100 100">
+                                    <circle cx="50" cy="50" r="35" fill="none" stroke="var(--border)" strokeWidth="10" />
                                     <circle cx="50" cy="50" r="35" fill="none"
-                                        stroke={macroScore >= 90 ? '#22c55e' : macroScore >= 70 ? '#E6A440' : '#E63337'}
+                                        stroke={macroScore >= 90 ? 'var(--emerald)' : macroScore >= 70 ? 'var(--amber)' : 'var(--danger)'}
                                         strokeWidth="10" strokeLinecap="round"
                                         strokeDasharray={`${220 * macroScore / 100} 220`}
                                     />
-                                )}
-                            </svg>
-                            <div className="absolute inset-0 flex items-center justify-center">
-                                <span className="text-lg font-extrabold text-foreground leading-none">
-                                    {macroScore !== null ? `${macroScore}%` : '—'}
-                                </span>
+                                </svg>
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                    <span className="text-lg font-heading font-bold text-ink leading-none">
+                                        {macroScore}%
+                                    </span>
+                                </div>
                             </div>
-                        </div>
-                        <p className="text-xs font-bold text-foreground">Analyse globale</p>
-                        <p className="text-[10px] text-muted-foreground text-center leading-relaxed">
+                        )}
+                        <p className="text-xs font-medium text-ink">Analyse globale</p>
+                        <p className="text-[10px] text-ink-soft text-center leading-relaxed">
                             {podcasts.length} podcast{podcasts.length > 1 ? 's' : ''} généré{podcasts.length > 1 ? 's' : ''}
                             {meanScore !== null && (
                                 <> · Score de fidélité moyen&nbsp;: {meanScore}%</>
@@ -209,7 +214,7 @@ export default function ProjectPodcasts() {
 
                     {/* Middle — key observations */}
                     <div className="flex-1 min-w-0">
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">
+                        <p className="text-[10px] font-semibold text-ink-faint mb-2">
                             Observations clés
                         </p>
                         {macroFeedback.length > 0 ? (
@@ -219,16 +224,16 @@ export default function ProjectPodcasts() {
                                     return (
                                         <li key={i} className="flex items-start gap-2 text-[13px]">
                                             {warn
-                                                ? <AlertTriangle className="h-3.5 w-3.5 text-amber-500 flex-shrink-0 mt-0.5" />
-                                                : <CheckCircle className="h-3.5 w-3.5 text-green-500 flex-shrink-0 mt-0.5" />
+                                                ? <AlertTriangle className="h-3.5 w-3.5 text-amber flex-shrink-0 mt-0.5" />
+                                                : <CheckCircle className="h-3.5 w-3.5 text-emerald flex-shrink-0 mt-0.5" />
                                             }
-                                            <span className={warn ? 'text-amber-800' : 'text-foreground/80'}>{item}</span>
+                                            <span className={warn ? 'text-amber-ink' : 'text-ink/80'}>{item}</span>
                                         </li>
                                     );
                                 })}
                             </ul>
                         ) : (
-                            <p className="text-sm text-muted-foreground italic">
+                            <p className="text-sm text-ink-soft italic">
                                 Aucune analyse disponible pour ce projet.
                             </p>
                         )}
@@ -237,22 +242,23 @@ export default function ProjectPodcasts() {
                     {/* Right — health badge */}
                     <div className="flex-shrink-0 self-center">
                         {(macroScore === null || macroScore >= 70) ? (
-                            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-50 border border-green-200 rounded-full text-xs font-bold text-green-700 whitespace-nowrap">
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald/12 border border-emerald/30 rounded-full text-xs font-bold text-emerald-ink whitespace-nowrap">
                                 <CheckCircle className="h-3.5 w-3.5" />
                                 Projet en bonne santé
                             </span>
                         ) : (
-                            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-full text-xs font-bold text-amber-700 whitespace-nowrap">
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber/12 border border-amber/30 rounded-full text-xs font-bold text-amber-ink whitespace-nowrap">
                                 <AlertTriangle className="h-3.5 w-3.5" />
                                 À améliorer
                             </span>
                         )}
                     </div>
                 </div>
+                )}
 
                 {/* ── Prénoms des personnages ── */}
-                <div className={`bg-white rounded-xl border border-[#E0DCE0] shadow-sm p-5 mb-6 ${locked ? 'opacity-60' : ''}`}>
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">
+                <div className={`bg-surface rounded-lg border border-border shadow-card p-5 mb-6 ${locked ? 'opacity-60' : ''}`}>
+                    <p className="text-[10px] font-semibold text-ink-faint mb-3">
                         Prénoms des personnages
                     </p>
                     <div className="flex gap-3">
@@ -263,7 +269,7 @@ export default function ProjectPodcasts() {
                             onChange={(e) => setChar1Name(e.target.value)}
                             onBlur={handleSaveCharacterNames}
                             placeholder="Inès"
-                            className="flex-1 text-sm font-semibold border border-[#E0DCE0] rounded-lg px-3 py-2 bg-white focus:outline-none focus:border-[#E63337] disabled:cursor-not-allowed"
+                            className="flex-1 text-sm font-semibold border border-border rounded px-3 py-2 bg-surface focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/30 disabled:cursor-not-allowed"
                         />
                         <input
                             type="text"
@@ -272,12 +278,12 @@ export default function ProjectPodcasts() {
                             onChange={(e) => setChar2Name(e.target.value)}
                             onBlur={handleSaveCharacterNames}
                             placeholder="Yannick"
-                            className="flex-1 text-sm font-semibold border border-[#E0DCE0] rounded-lg px-3 py-2 bg-white focus:outline-none focus:border-[#E63337] disabled:cursor-not-allowed"
+                            className="flex-1 text-sm font-semibold border border-border rounded px-3 py-2 bg-surface focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/30 disabled:cursor-not-allowed"
                         />
                     </div>
                     {locked
-                        ? <p className="text-[11px] text-muted-foreground italic mt-2">Non modifiable — des podcasts ont déjà été générés.</p>
-                        : <p className="text-[11px] text-muted-foreground mt-2">Ces prénoms seront utilisés dans tous les dialogues générés pour ce projet.</p>
+                        ? <p className="text-[11px] text-ink-soft italic mt-2">Non modifiable — des podcasts ont déjà été générés.</p>
+                        : <p className="text-[11px] text-ink-soft mt-2">Ces prénoms seront utilisés dans tous les dialogues générés pour ce projet.</p>
                     }
                 </div>
 
@@ -289,46 +295,46 @@ export default function ProjectPodcasts() {
                         const score = podcast.fidelity_score;
                         return (
                             <div key={podcast.id}
-                                className="bg-white rounded-xl border border-[#E0DCE0] shadow-sm p-4 flex flex-col hover:shadow-md transition-shadow">
+                                className="bg-surface rounded-lg border border-border shadow-card p-4 flex flex-col hover:shadow-pop transition-shadow">
                                 {/* Top row */}
                                 <div className="flex items-start justify-between mb-3">
-                                    <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-[#FDDEDE]">
-                                        <Mic size={18} className="text-[#E63337]" />
+                                    <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-border-soft">
+                                        <Mic size={18} className="text-ink-soft" />
                                     </div>
                                     {score != null ? (
                                         <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
                                             score >= 90
-                                                ? 'bg-green-50 text-green-700 border-green-200'
+                                                ? 'bg-emerald/12 text-emerald-ink border-emerald/30'
                                                 : score >= 70
-                                                ? 'bg-amber-50 text-amber-700 border-amber-200'
-                                                : 'bg-red-50 text-[#E63337] border-red-200'
+                                                ? 'bg-amber/12 text-amber-ink border-amber/30'
+                                                : 'bg-danger/12 text-danger-ink border-danger/30'
                                         }`}>
                                             {Math.round(score)}%
                                         </span>
                                     ) : (
-                                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border border-[#E0DCE0] bg-white text-muted-foreground">
+                                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border border-border bg-surface text-ink-faint">
                                             —
                                         </span>
                                     )}
                                 </div>
 
                                 {/* Title */}
-                                <h3 className="font-bold text-sm text-foreground leading-snug mb-2">{displayTitle}</h3>
+                                <h3 className="font-heading font-bold text-sm text-ink leading-snug mb-2">{displayTitle}</h3>
 
                                 {/* Pills */}
                                 <div className="flex flex-wrap gap-1.5 mb-2">
                                     {(podcast.word_count ?? 0) > 0 && (
-                                        <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[#DEE9FD] text-[#3465AE]">
+                                        <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-ines-soft text-ines-ink">
                                             {podcast.word_count!.toLocaleString('fr-FR')} mots
                                         </span>
                                     )}
                                     {mins > 0 && (
-                                        <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[#FDDEDE] text-[#E63337]">
+                                        <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-border-soft text-ink-soft">
                                             ~{mins} min
                                         </span>
                                     )}
                                     {podcast.audio_url && (
-                                        <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-700">
+                                        <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald/12 text-emerald-ink">
                                             Audio ✓
                                         </span>
                                     )}
@@ -336,22 +342,22 @@ export default function ProjectPodcasts() {
 
                                 {/* Date */}
                                 {podcast.updated_at && (
-                                    <p className="text-[10px] text-muted-foreground mb-3">
+                                    <p className="text-[10px] text-ink-faint mb-3">
                                         {formatDateParis(podcast.updated_at)}
                                     </p>
                                 )}
 
                                 {/* CTA */}
-                                <div className="mt-auto pt-3 border-t border-[#F0EEF0] flex flex-col gap-2">
+                                <div className="mt-auto pt-3 border-t border-border-soft flex flex-col gap-2">
                                     <button
                                         onClick={() => navigate(`/project/${projectId}/podcast/${podcast.id}/edit`)}
-                                        className="w-full py-2 rounded-lg text-xs font-semibold bg-[#FDDEDE] text-[#E63337] hover:bg-[#FECECE] transition-colors"
+                                        className="w-full py-2 rounded text-xs font-medium bg-primary text-white hover:opacity-90 transition-all"
                                     >
                                         Ouvrir l'éditeur
                                     </button>
                                     <button
                                         onClick={() => handleDelete(podcast.id)}
-                                        className="w-full py-2 rounded-lg text-xs font-semibold text-muted-foreground hover:bg-red-50 hover:text-[#E63337] border border-[#E0DCE0] hover:border-[#E63337]/30 transition-colors"
+                                        className="w-full py-2 rounded text-xs font-medium text-ink-soft hover:bg-danger/10 hover:text-danger border border-border hover:border-danger/30 transition-colors"
                                     >
                                         Supprimer
                                     </button>
@@ -363,13 +369,13 @@ export default function ProjectPodcasts() {
                     {/* + card — generate new chapter */}
                     <div
                         onClick={() => navigate(`/editor/${projectId}`, { state: { step: 2 } })}
-                        className="bg-white rounded-xl border-2 border-dashed border-[#D4D0D4] p-4 flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-[#E63337]/50 hover:bg-[#FFF8F8] transition-all min-h-[180px]"
+                        className="bg-surface rounded-lg border-2 border-dashed border-border p-4 flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-primary hover:bg-black/[.03] transition-all min-h-[180px] group"
                     >
-                        <div className="w-10 h-10 rounded-full bg-[#F0EEF0] flex items-center justify-center">
-                            <Plus className="h-5 w-5 text-muted-foreground" />
+                        <div className="w-10 h-10 rounded-full bg-border-soft flex items-center justify-center">
+                            <Plus className="h-5 w-5 text-ink-faint group-hover:text-primary transition-colors" />
                         </div>
-                        <p className="text-sm font-bold text-foreground text-center">Générer un nouveau chapitre</p>
-                        <p className="text-[11px] text-muted-foreground text-center">Ajoutez un segment audio à ce projet</p>
+                        <p className="text-sm font-heading font-bold text-ink text-center">Générer un nouveau chapitre</p>
+                        <p className="text-[11px] text-ink-soft text-center">Ajoutez un segment audio à ce projet</p>
                     </div>
                 </div>
             </div>
