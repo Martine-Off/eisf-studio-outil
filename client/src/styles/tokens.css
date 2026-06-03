@@ -5,12 +5,11 @@
 @font-face { font-family:'Sansation'; src:url('/fonts/Sansation_Bold.woff2')    format('woff2'); font-weight:700; font-display:swap; }
 @font-face { font-family:'Sansation'; src:url('/fonts/Sansation_Light.woff2')   format('woff2'); font-weight:300; font-display:swap; }
 */
-@import url('https://fonts.googleapis.com/css2?family=Jost:wght@300;400;700&family=Open+Sans:wght@400;500;600&display=swap');
 
 /* ─── Tailwind v4 — tokens générateurs de classes utilitaires ─────────────── */
 @theme {
   --font-heading: 'Sansation', 'Jost', sans-serif;
-  --font-body:    'Open Sans', sans-serif;
+  --font-body:    Verdana, Geneva, sans-serif;
 
   --color-canvas:       #FBFCFD;
   --color-surface:      #FFFFFF;
@@ -48,7 +47,7 @@
 /* ─── Aliases courts — pour var(--canvas) dans styles inline et CSS custom ── */
 :root {
   --font-heading: 'Sansation', 'Jost', sans-serif;
-  --font-body:    'Open Sans', sans-serif;
+  --font-body:    Verdana, Geneva, sans-serif;
 
   --canvas:      #FBFCFD;
   --surface:     #FFFFFF;

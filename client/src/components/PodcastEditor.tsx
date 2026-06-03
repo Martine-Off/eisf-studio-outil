@@ -199,7 +199,7 @@ function SortableDialogue({
                             data-no-dnd="true"
                             onPointerDown={e => e.stopPropagation()}
                             className={[
-                                'w-full bg-canvas border border-border rounded-lg px-3 py-2 text-[13px] text-ink leading-relaxed resize-none focus:outline-none focus:ring-2 focus:ring-offset-0 focus:border-transparent',
+                                'w-full bg-canvas border border-border rounded-lg px-3 py-2 text-[14px] text-ink leading-[1.8] resize-none focus:outline-none focus:ring-2 focus:ring-offset-0 focus:border-transparent',
                                 isInes ? 'focus:ring-ines/40' : 'focus:ring-yannick/40',
                             ].join(' ')}
                             value={cleanStudio(dialogue.text_studio)}
@@ -911,7 +911,7 @@ export default function PodcastEditor() {
                                         onKeyDown={e => { if (e.key === 'Escape') { setIsAddingDialogue(false); setNewDialogueText(''); setInsertAfterId(null); } }}
                                         placeholder="Saisissez la réplique…" rows={3}
                                         className={[
-                                            'w-full bg-canvas border border-border rounded-lg px-3 py-2 text-[13px] text-ink leading-relaxed resize-none focus:outline-none focus:ring-2 focus:ring-offset-0 focus:border-transparent',
+                                            'w-full bg-canvas border border-border rounded-lg px-3 py-2 text-[14px] text-ink leading-[1.8] resize-none focus:outline-none focus:ring-2 focus:ring-offset-0 focus:border-transparent',
                                             newDialogueChar === 'ines' ? 'focus:ring-ines/40' : 'focus:ring-yannick/40',
                                         ].join(' ')}
                                     />
