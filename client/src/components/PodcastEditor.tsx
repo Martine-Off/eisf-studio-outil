@@ -722,7 +722,7 @@ export default function PodcastEditor() {
                 )}
                 {verification.status === 'success' && (
                     <motion.div initial={{ y: -48, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: -48, opacity: 0 }}
-                        className="fixed top-14 left-0 right-0 z-50 bg-surface px-6 py-2 flex items-center justify-between"
+                        className="fixed top-14 left-0 right-0 z-50 bg-ines-soft px-6 py-2 flex items-center justify-between"
                         style={{ borderBottom: '1.5px solid var(--emerald)' }}>
                         <span className="flex items-center gap-2 text-sm font-semibold text-emerald-ink">
                             <CheckCircle className="h-4 w-4" />
@@ -733,7 +733,7 @@ export default function PodcastEditor() {
                 )}
                 {verification.status === 'insufficient' && (
                     <motion.div initial={{ y: -48, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: -48, opacity: 0 }}
-                        className="fixed top-14 left-0 right-0 z-50 bg-surface px-6 py-2 flex items-center justify-between"
+                        className="fixed top-14 left-0 right-0 z-50 bg-ines-soft px-6 py-2 flex items-center justify-between"
                         style={{ borderBottom: '1.5px solid var(--amber)' }}>
                         <span className="flex items-center gap-2 text-sm font-semibold text-amber-ink">
                             <AlertTriangle className="h-4 w-4" />
