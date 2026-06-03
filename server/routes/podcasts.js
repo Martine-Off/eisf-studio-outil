@@ -54,6 +54,46 @@ function trimMp3(inputPath, outputPath, durationSeconds) {
     });
 }
 
+// ─── Break-time helpers ──────────────────────────────────────────────────────
+
+const BREAK_DURATIONS = { xs: 0.3, s: 0.5, m: 1.0, l: 1.5, xl: 2.0 };
+
+function parseBreakDuration(timeStr) {
+    if (BREAK_DURATIONS[timeStr] !== undefined) return BREAK_DURATIONS[timeStr];
+    const ms = timeStr.match(/^([\d.]+)ms$/);
+    if (ms) return parseFloat(ms[1]) / 1000;
+    const sec = timeStr.match(/^([\d.]+)s?$/);
+    return sec ? parseFloat(sec[1]) : 0.5;
+}
+
+function splitOnBreaks(text) {
+    const segments = [];
+    const regex = /<break\s+time="([^"]+)"\s*\/>/g;
+    let lastIndex = 0, match;
+    while ((match = regex.exec(text)) !== null) {
+        const chunk = text.slice(lastIndex, match.index).trim();
+        if (chunk) segments.push({ type: 'text', content: chunk });
+        segments.push({ type: 'break', duration: parseBreakDuration(match[1]) });
+        lastIndex = match.index + match[0].length;
+    }
+    const tail = text.slice(lastIndex).trim();
+    if (tail) segments.push({ type: 'text', content: tail });
+    return segments;
+}
+
+function generateSilenceMp3(durationSec, outputPath) {
+    return new Promise((resolve, reject) => {
+        ffmpeg()
+            .input('anullsrc=r=44100:cl=mono')
+            .inputOptions(['-f', 'lavfi'])
+            .audioCodec('libmp3lame')
+            .outputOptions(['-t', String(durationSec), '-ar', '44100', '-ac', '1', '-b:a', '128k'])
+            .output(outputPath)
+            .on('error', reject)
+            .on('end', resolve)
+            .run();
+    });
+}
 
 const router = express.Router();
 
@@ -407,9 +447,22 @@ router.post('/:id/generate-audio', authMiddleware, async (req, res) => {
                 trimPaths.push(trimPath);
             }
 
-            const cleanedText = rawText.replace(/<break\s+time="[^"]*"\s*\/?>/gi, '...');
-            const filePath = await generateDialogueMp3(cleanedText, d.character, podcastId, d.id);
-            mp3Paths.push(filePath);
+            const segments = splitOnBreaks(rawText);
+            let partIdx = 0;
+            for (const seg of segments) {
+                if (seg.type === 'text') {
+                    const segId = segments.length === 1 ? d.id : `${d.id}_p${partIdx}`;
+                    const filePath = await generateDialogueMp3(seg.content, d.character, podcastId, segId);
+                    mp3Paths.push(filePath);
+                    if (partIdx + 1 < segments.length) await new Promise(r => setTimeout(r, 300));
+                } else {
+                    const silPath = path.join(__dirname, '../audio', `sil_${podcastId}_${d.id}_${partIdx}.mp3`);
+                    await generateSilenceMp3(seg.duration, silPath);
+                    mp3Paths.push(silPath);
+                    trimPaths.push(silPath);
+                }
+                partIdx++;
+            }
             await new Promise(r => setTimeout(r, 500));
         }
 
