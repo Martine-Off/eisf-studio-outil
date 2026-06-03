@@ -20,6 +20,8 @@ import { useKeyboardNav } from '../hooks/useKeyboardNav';
 import AppLayout from '../components/AppLayout';
 import ErrorModal from '../components/ErrorModal';
 import { motion, AnimatePresence } from 'framer-motion';
+import { ProgressMeter } from './ui/ProgressMeter';
+import { ChecklistItem } from './ui/ChecklistItem';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -72,35 +74,8 @@ function fmtDuration(secs: number) {
 // ─── Score gauge ──────────────────────────────────────────────────────────────
 
 function ScoreGauge({ score }: { score: number | null }) {
-    const pct = score ?? 0;
-    const color = pct >= 95 ? '#BDD145' : pct >= 70 ? '#E6A440' : '#E63337';
-    const dashArray = 220;
-    const dashOffset = dashArray * (1 - pct / 100);
-    return (
-        <div className="flex flex-col items-center gap-1">
-            <div className="relative w-24 h-24">
-                <svg className="w-24 h-24 -rotate-90" viewBox="0 0 100 100">
-                    <circle cx="50" cy="50" r="35" fill="none" stroke="#E6E2E6" strokeWidth="8" />
-                    <circle cx="50" cy="50" r="35" fill="none" stroke={color} strokeWidth="8"
-                        strokeLinecap="round"
-                        strokeDasharray={`${dashArray} 220`}
-                        strokeDashoffset={dashOffset}
-                        style={{ transition: 'stroke-dashoffset 0.8s ease' }}
-                    />
-                </svg>
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                    {score === null ? (
-                        <span className="text-sm text-muted-foreground font-medium">—</span>
-                    ) : (
-                        <>
-                            <span className="text-xl font-extrabold text-foreground leading-none">{score}%</span>
-                            <span className="text-[9px] uppercase tracking-widest text-muted-foreground mt-0.5">Fidélité</span>
-                        </>
-                    )}
-                </div>
-            </div>
-        </div>
-    );
+    if (score === null) return null;
+    return <ProgressMeter value={score} threshold={95} label="Fidélité" className="w-full max-w-[220px]" />;
 }
 
 // ─── Dialogue card ────────────────────────────────────────────────────────────
@@ -143,76 +118,68 @@ function SortableDialogue({
         elementRef(el);
     }, [setNodeRef, elementRef]);
 
-    const borderColor = isInes ? '#E63337' : '#3465AE';
-
     return (
         <div
             ref={mergedRef}
-            style={style}
+            style={{
+                ...style,
+                ...(isUngrounded ? {
+                    backgroundColor: '#F4F2F5',
+                    backgroundImage: 'repeating-linear-gradient(135deg, transparent, transparent 6px, rgba(0,0,0,.04) 6px, rgba(0,0,0,.04) 8px)',
+                } : {}),
+            }}
             {...attributes}
-            className={`group relative bg-white rounded-xl border transition-all duration-150 ${
-                isDragging ? 'shadow-xl scale-[1.01]' :
-                isUngrounded ? 'border-red-300 bg-red-50' :
-                isUncertain  ? 'border-orange-300 bg-orange-50' :
-                hasProps ? 'border-[#E6A440]/50 bg-[#FFF8EE]' :
-                'border-[#E0DCE0]'
-            }`}
-            onMouseEnter={e => { if (!isDragging && !hasProps) e.currentTarget.style.boxShadow = `inset 3px 0 0 ${borderColor}`; }}
-            onMouseLeave={e => { e.currentTarget.style.boxShadow = ''; }}
+            className={[
+                'group relative rounded-xl border transition-all duration-150',
+                isDragging ? 'shadow-xl scale-[1.01]' : isInes ? 'shadow-[inset_3px_0_0_var(--ines)]' : 'shadow-[inset_3px_0_0_var(--yannick)]',
+                isUngrounded ? 'border-border' : isUncertain ? 'bg-amber/12 border-amber/30' : hasProps ? 'bg-amber/12 border-amber/30' : 'bg-surface border-border',
+                isInes ? '' : 'ml-10',
+            ].filter(Boolean).join(' ')}
         >
             <div className="flex items-start gap-3 px-3 py-3">
                 {/* Drag handle */}
                 <div
-                    className="mt-2 cursor-grab text-muted-foreground/30 hover:text-muted-foreground transition-colors flex-shrink-0 opacity-0 group-hover:opacity-100"
+                    className="mt-2 cursor-grab text-ink-faint/50 hover:text-ink-soft transition-colors flex-shrink-0 opacity-0 group-hover:opacity-100"
                     {...listeners}
                 >
                     <GripVertical className="h-4 w-4" />
                 </div>
 
-                {/* Avatar */}
-                <div
-                    className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-[12px] font-bold mt-0.5"
-                    style={isInes ? { backgroundColor: '#FDDEDE', color: '#E63337' } : { backgroundColor: '#DEE9FD', color: '#3465AE' }}
-                >
-                    {isInes ? 'I' : 'Y'}
-                </div>
-
-                <div className="flex-1 min-w-0">
+<div className="flex-1 min-w-0">
                     {/* Character name — small caps */}
                     <div className="flex items-center gap-2 mb-1.5">
-                        <p className="text-[10px] font-bold uppercase tracking-widest"
-                            style={{ color: isInes ? '#E63337' : '#3465AE' }}>
+                        <p className={['font-heading text-[11px] tracking-[.18em] uppercase', isInes ? 'text-ines-ink' : 'text-yannick-ink'].join(' ')}>
                             {isInes ? 'Inès' : 'Yannick'}
                         </p>
                         {isUngrounded && (
                             <>
-                                <span className="text-[9px] font-semibold uppercase tracking-wide bg-red-100 text-red-600 border border-red-300 rounded px-1.5 py-0.5">Inventé</span>
+                                <span className="text-[9px] font-semibold uppercase tracking-wide bg-border text-ink-soft border border-border-soft rounded px-1.5 py-0.5">Ancre brisée</span>
                                 <button
                                     onClick={() => onValidate(dialogue.id)}
-                                    className="text-[9px] font-semibold uppercase tracking-wide bg-white text-red-600 border border-red-300 rounded px-1.5 py-0.5 hover:bg-red-50 transition-colors"
+                                    className="text-[9px] font-semibold uppercase tracking-wide bg-surface text-ink-soft border border-border rounded px-1.5 py-0.5 hover:bg-canvas transition-colors"
                                 >✓ Valider malgré tout</button>
                             </>
                         )}
                         {isUncertain && (
-                            <span className="text-[9px] font-semibold uppercase tracking-wide bg-orange-100 text-orange-700 border border-orange-300 rounded px-1.5 py-0.5">À vérifier</span>
+                            <span className="text-[9px] font-semibold uppercase tracking-wide bg-amber/12 text-amber-ink border border-amber/30 rounded px-1.5 py-0.5">À vérifier</span>
                         )}
                         {dialogue.sound_before
                             ? <button onClick={() => onToggleSoundBefore(dialogue.id, true)}
-                                className="text-[9px] font-semibold uppercase tracking-wide bg-purple-50 text-purple-600 border border-purple-200 rounded px-1.5 py-0.5 hover:bg-purple-100 hover:border-purple-300 transition-colors">
+                                className="text-[9px] font-semibold uppercase tracking-wide bg-surface text-ink-soft border border-border rounded px-1.5 py-0.5 hover:bg-canvas transition-colors">
                                 ♪ Transition ×
                               </button>
                             : <button onClick={() => onToggleSoundBefore(dialogue.id, false)}
-                                className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground/40 hover:text-purple-500 hover:bg-purple-50 border border-transparent hover:border-purple-200 rounded px-1.5 py-0.5 transition-colors">
+                                className="text-[9px] font-semibold uppercase tracking-wide text-ink-faint hover:text-ink-soft hover:bg-canvas border border-transparent hover:border-border rounded px-1.5 py-0.5 transition-colors">
                                 ♪+
                               </button>
                         }
                         {!isUngrounded && !isUncertain && hasProps && (
-                            <span className="text-[9px] font-semibold uppercase tracking-wide bg-[#FFF0D0] text-[#7a5200] border border-[#E6A440]/50 rounded px-1.5 py-0.5">Proposition IA</span>
+                            <span className="text-[9px] font-semibold uppercase tracking-wide bg-amber/12 text-amber-ink border border-amber/30 rounded px-1.5 py-0.5">Proposition IA</span>
                         )}
                     </div>
 
                     {isUngrounded && (
-                        <p className="text-[10px] text-red-400 mb-1">
+                        <p className="text-[10px] text-ink-faint mb-1">
                             ⚠️ Information absente du source — à vérifier manuellement
                         </p>
                     )}
@@ -222,7 +189,7 @@ function SortableDialogue({
                         <button
                             onMouseDown={e => e.preventDefault()}
                             onClick={() => onRevert(dialogue.id)}
-                            className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-[#E63337] mb-1 transition-colors"
+                            className="flex items-center gap-1 text-[10px] text-ink-faint hover:text-danger mb-1 transition-colors"
                         >
                             <RotateCcw className="h-3 w-3" /> Annuler les modifications
                         </button>
@@ -231,8 +198,10 @@ function SortableDialogue({
                         <textarea
                             data-no-dnd="true"
                             onPointerDown={e => e.stopPropagation()}
-                            className="w-full bg-[#F8F7F8] border border-[#E0DCE0] rounded-lg px-3 py-2 text-[13px] leading-relaxed resize-none focus:outline-none focus:ring-2 focus:border-transparent"
-                            style={{ '--tw-ring-color': borderColor } as React.CSSProperties}
+                            className={[
+                                'w-full bg-canvas border border-border rounded-lg px-3 py-2 text-[13px] text-ink leading-relaxed resize-none focus:outline-none focus:ring-2 focus:ring-offset-0 focus:border-transparent',
+                                isInes ? 'focus:ring-ines/40' : 'focus:ring-yannick/40',
+                            ].join(' ')}
                             value={cleanStudio(dialogue.text_studio)}
                             onChange={e => onUpdate(dialogue.id, 'studio', e.target.value)}
                             onBlur={() => setEditing(false)}
@@ -242,35 +211,36 @@ function SortableDialogue({
                         />
                     ) : (
                         <div
-                            className="text-[13px] text-foreground/90 leading-relaxed whitespace-pre-wrap cursor-text"
+                            className="text-[13px] text-ink leading-relaxed whitespace-pre-wrap cursor-text"
                             onClick={() => setEditing(true)}
                             title="Cliquez pour éditer"
                         >
                             {textParts.map((part, i) =>
                                 part.type === 'proposition' ? (
-                                    <span key={i} className={`inline-flex items-baseline gap-1 rounded px-1.5 py-0.5 mx-0.5 text-[#7a5200] font-medium ${
+                                    <span key={i} className={[
+                                        'inline-flex items-baseline gap-1 rounded px-1.5 py-0.5 mx-0.5 text-amber-ink font-medium',
                                         part.fullMatch === activePropositionMatch
-                                            ? 'bg-[#E6A440]/40 ring-2 ring-[#E6A440]'
-                                            : 'bg-[#E6A440]/20 border border-[#E6A440]/40'
-                                    }`}>
+                                            ? 'bg-amber/30 ring-2 ring-amber'
+                                            : 'bg-amber/12 border border-amber/30',
+                                    ].join(' ')}>
                                         <span>{part.content}</span>
-                                        <button onClick={e => { e.stopPropagation(); onAccept(dialogue.id, part.fullMatch); }} className="ml-1 text-[#BDD145] hover:text-green-700 font-bold text-sm">✓</button>
-                                        <button onClick={e => { e.stopPropagation(); onReject(dialogue.id, part.fullMatch); }} className="text-[#D6475B] hover:text-red-700 font-bold text-sm">✗</button>
+                                        <button onClick={e => { e.stopPropagation(); onAccept(dialogue.id, part.fullMatch); }} className="ml-1 text-emerald-ink hover:text-emerald font-bold text-sm">✓</button>
+                                        <button onClick={e => { e.stopPropagation(); onReject(dialogue.id, part.fullMatch); }} className="text-danger hover:text-danger-ink font-bold text-sm">✗</button>
                                     </span>
                                 ) : part.type === 'break' ? (
-                                    <span key={i} className="inline-flex items-center mx-0.5 px-1.5 py-px rounded text-[10px] font-mono font-semibold bg-slate-100 text-slate-500 border border-slate-200 select-none">
+                                    <span key={i} className="inline-flex items-center mx-0.5 px-1.5 py-px rounded-pill text-[10px] font-mono text-ink-faint border border-dashed border-border select-none">
                                         ⏸ {part.content}
                                     </span>
                                 ) : <span key={i}>{part.content}</span>
                             )}
                             {!dialogue.text_studio && (
-                                <span className="text-muted-foreground italic">Cliquez pour saisir une réplique…</span>
+                                <span className="text-ink-faint italic">Cliquez pour saisir une réplique…</span>
                             )}
                         </div>
                     )}
 
                     {/* Duration */}
-                    <div className="flex items-center gap-1 mt-2 text-[11px] text-muted-foreground">
+                    <div className="flex items-center gap-1 mt-2 text-[11px] text-ink-faint">
                         <Clock className="h-3 w-3" />
                         <span>Durée estimée : {dialogue.duration_seconds > 0 ? fmtDuration(dialogue.duration_seconds) : '—'}</span>
                     </div>
@@ -280,7 +250,7 @@ function SortableDialogue({
                 <div className="flex-shrink-0 flex flex-col gap-1">
                     <button
                         onClick={e => { e.stopPropagation(); onAddAfter(dialogue.id); }}
-                        className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-[#F0EEF0] rounded-lg transition-all"
+                        className="p-1.5 text-ink-faint hover:text-ink hover:bg-canvas rounded-lg transition-all"
                         title="Ajouter une réplique après"
                     >
                         <Plus className="h-3.5 w-3.5" />
@@ -288,7 +258,7 @@ function SortableDialogue({
                     <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-all">
                         <button
                             onClick={() => setEditing(v => !v)}
-                            className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-[#F0EEF0] rounded-lg transition-all"
+                            className="p-1.5 text-ink-faint hover:text-ink hover:bg-canvas rounded-lg transition-all"
                             title={editing ? 'Fermer' : 'Éditer'}
                         >
                             {editing ? <X className="h-3.5 w-3.5" /> : <Pencil className="h-3.5 w-3.5" />}
@@ -296,12 +266,12 @@ function SortableDialogue({
                         {confirmDelete ? (
                             <button
                                 onClick={() => onDelete(dialogue.id)}
-                                className="p-1.5 bg-[#E63337] text-white rounded-lg text-[9px] font-bold px-1.5 py-1 whitespace-nowrap"
+                                className="p-1.5 bg-danger text-white rounded-lg text-[9px] font-bold px-1.5 py-1 whitespace-nowrap"
                             >Suppr.</button>
                         ) : (
                             <button
                                 onClick={() => setConfirmDelete(true)}
-                                className="p-1.5 text-muted-foreground hover:text-[#E63337] hover:bg-[#E63337]/10 rounded-lg transition-all"
+                                className="p-1.5 text-ink-faint hover:text-danger hover:bg-danger/10 rounded-lg transition-all"
                                 title="Supprimer"
                             >
                                 <Trash2 className="h-3.5 w-3.5" />
@@ -723,17 +693,17 @@ export default function PodcastEditor() {
     const yannickRatio = 100 - inesRatio;
 
     if (loading) return (
-        <div className="h-screen flex items-center justify-center bg-[#E6E2E6]">
-            <Loader2 className="animate-spin text-[#E63337]" size={32} />
+        <div className="h-screen flex items-center justify-center bg-canvas">
+            <Loader2 className="animate-spin text-primary" size={32} />
         </div>
     );
 
     return (
         <AppLayout>
             {/* ── Bandeau avertissement IA permanent ── */}
-            <div className="w-full bg-amber-50 border-b border-amber-200 px-6 py-2.5 flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4 text-amber-600 flex-shrink-0" />
-                <p className="text-sm font-semibold text-amber-800">
+            <div className="w-full bg-amber/10 border-b border-amber/20 px-6 py-2.5 flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 text-amber flex-shrink-0" />
+                <p className="text-sm font-semibold text-amber-ink">
                     Ce script est généré par IA. Il doit être relu par l'ingénieur pédagogique avant export.
                 </p>
             </div>
@@ -741,33 +711,36 @@ export default function PodcastEditor() {
             <AnimatePresence>
                 {verification.status === 'running' && (
                     <motion.div initial={{ y: -48, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: -48, opacity: 0 }}
-                        className="fixed top-14 left-0 right-0 z-40 bg-[#6BB8CD] text-white px-6 py-2.5 flex items-center justify-between">
-                        <span className="flex items-center gap-2 text-sm font-semibold">
+                        className="fixed top-14 left-0 right-0 z-50 bg-surface px-6 py-2.5 flex items-center justify-between"
+                        style={{ borderBottom: '1.5px solid var(--border)' }}>
+                        <span className="flex items-center gap-2 text-sm font-semibold text-ink">
                             <Loader2 className="h-4 w-4 animate-spin" />
                             Vérification en cours… analyse du chapitre
                         </span>
-                        <span className="text-xs opacity-80">Traitement des concepts pédagogiques</span>
+                        <span className="text-xs text-ink-soft">Traitement des concepts pédagogiques</span>
                     </motion.div>
                 )}
                 {verification.status === 'success' && (
                     <motion.div initial={{ y: -48, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: -48, opacity: 0 }}
-                        className="fixed top-14 left-0 right-0 z-40 bg-[#F0F7E0] border-b border-[#BDD145]/40 px-6 py-2 flex items-center justify-between">
-                        <span className="flex items-center gap-2 text-sm font-semibold text-[#5a6e00]">
+                        className="fixed top-14 left-0 right-0 z-50 bg-surface px-6 py-2 flex items-center justify-between"
+                        style={{ borderBottom: '1.5px solid var(--emerald)' }}>
+                        <span className="flex items-center gap-2 text-sm font-semibold text-emerald-ink">
                             <CheckCircle className="h-4 w-4" />
                             VÉRIFICATION RÉUSSIE — Fidélité : {verification.score}%
                         </span>
-                        <span className="text-xs font-semibold text-[#5a6e00]">Statut : Validé</span>
+                        <span className="text-xs font-semibold text-emerald-ink">Statut : Validé</span>
                     </motion.div>
                 )}
                 {verification.status === 'insufficient' && (
                     <motion.div initial={{ y: -48, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: -48, opacity: 0 }}
-                        className="fixed top-14 left-0 right-0 z-40 bg-amber-50 border-b border-amber-200 px-6 py-2 flex items-center justify-between">
-                        <span className="flex items-center gap-2 text-sm font-semibold text-amber-800">
+                        className="fixed top-14 left-0 right-0 z-50 bg-surface px-6 py-2 flex items-center justify-between"
+                        style={{ borderBottom: '1.5px solid var(--amber)' }}>
+                        <span className="flex items-center gap-2 text-sm font-semibold text-amber-ink">
                             <AlertTriangle className="h-4 w-4" />
                             Fidélité : {verification.score}% — {verification.missingConcepts.length} concept{verification.missingConcepts.length > 1 ? 's' : ''} manquant{verification.missingConcepts.length > 1 ? 's' : ''} détecté{verification.missingConcepts.length > 1 ? 's' : ''}.
                         </span>
                         <button onClick={handleAutoFix}
-                            className="flex items-center gap-1.5 text-xs font-semibold text-amber-800 hover:text-amber-900 bg-amber-100 hover:bg-amber-200 border border-amber-300 rounded-lg px-3 py-1.5 transition-colors">
+                            className="flex items-center gap-1.5 text-xs font-semibold text-amber-ink hover:opacity-80 bg-amber/12 hover:bg-amber/20 border border-amber/30 rounded-lg px-3 py-1.5 transition-colors">
                             <RotateCcw className="h-3.5 w-3.5" />
                             Corriger automatiquement
                         </button>
@@ -775,18 +748,19 @@ export default function PodcastEditor() {
                 )}
                 {hasPendingPropositions && (
                     <motion.div initial={{ y: -48, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: -48, opacity: 0 }}
-                        className="fixed top-14 left-0 right-0 z-50 bg-[#FFF3DB] border-b-2 border-[#E6A440]/50 px-6 py-2.5 flex items-center gap-4 flex-wrap">
-                        <span className="text-[#7a5200] font-bold text-sm">⚠ {allPropositions.length} proposition{allPropositions.length > 1 ? 's' : ''} à valider</span>
+                        className="fixed top-14 left-0 right-0 z-50 bg-surface px-6 py-2.5 flex items-center gap-4 flex-wrap"
+                        style={{ borderBottom: '1.5px solid var(--amber)' }}>
+                        <span className="text-amber-ink font-bold text-sm">⚠ {allPropositions.length} proposition{allPropositions.length > 1 ? 's' : ''} à valider</span>
                         <div className="flex items-center gap-2">
-                            <button onClick={() => { const i = Math.max(0, currentPropIdx - 1); setCurrentPropIdx(i); scrollToProp(i); }} disabled={currentPropIdx === 0} className="p-1.5 rounded-lg border border-[#E6A440]/50 text-[#7a5200] hover:bg-[#E6A440]/10 disabled:opacity-30"><ChevronLeft className="h-4 w-4" /></button>
-                            <span className="text-sm font-bold text-[#7a5200] tabular-nums min-w-[52px] text-center">{currentPropIdx + 1} / {allPropositions.length}</span>
-                            <button onClick={() => { const i = Math.min(allPropositions.length - 1, currentPropIdx + 1); setCurrentPropIdx(i); scrollToProp(i); }} disabled={currentPropIdx >= allPropositions.length - 1} className="p-1.5 rounded-lg border border-[#E6A440]/50 text-[#7a5200] hover:bg-[#E6A440]/10 disabled:opacity-30"><ChevronRight className="h-4 w-4" /></button>
+                            <button onClick={() => { const i = Math.max(0, currentPropIdx - 1); setCurrentPropIdx(i); scrollToProp(i); }} disabled={currentPropIdx === 0} className="p-1.5 rounded-lg border border-amber/30 text-amber-ink hover:bg-amber/10 disabled:opacity-30"><ChevronLeft className="h-4 w-4" /></button>
+                            <span className="text-sm font-bold text-amber-ink tabular-nums min-w-[52px] text-center">{currentPropIdx + 1} / {allPropositions.length}</span>
+                            <button onClick={() => { const i = Math.min(allPropositions.length - 1, currentPropIdx + 1); setCurrentPropIdx(i); scrollToProp(i); }} disabled={currentPropIdx >= allPropositions.length - 1} className="p-1.5 rounded-lg border border-amber/30 text-amber-ink hover:bg-amber/10 disabled:opacity-30"><ChevronRight className="h-4 w-4" /></button>
                         </div>
                         {activeProp && (
                             <>
-                                <button onClick={() => handleAccept(activeProp.dialogueId, activeProp.fullMatch)} className="px-3 py-1.5 rounded-lg bg-[#BDD145]/20 border border-[#BDD145]/40 text-[#5a6e00] font-bold text-sm hover:bg-[#BDD145]/30">✓ Garder</button>
-                                <button onClick={() => handleReject(activeProp.dialogueId, activeProp.fullMatch)} className="px-3 py-1.5 rounded-lg bg-[#E63337]/10 border border-[#E63337]/20 text-[#E63337] font-bold text-sm hover:bg-[#E63337]/20">✗ Supprimer</button>
-                                <span className="text-xs text-[#7a5200] italic truncate max-w-xs">«&nbsp;{activeProp.content.slice(0, 60)}{activeProp.content.length > 60 ? '…' : ''}&nbsp;»</span>
+                                <button onClick={() => handleAccept(activeProp.dialogueId, activeProp.fullMatch)} className="px-3 py-1.5 rounded-lg bg-emerald/12 border border-emerald/30 text-emerald-ink font-bold text-sm hover:bg-emerald/20">✓ Garder</button>
+                                <button onClick={() => handleReject(activeProp.dialogueId, activeProp.fullMatch)} className="px-3 py-1.5 rounded-lg bg-danger/10 border border-danger/20 text-danger font-bold text-sm hover:bg-danger/20">✗ Supprimer</button>
+                                <span className="text-xs text-amber-ink italic truncate max-w-xs">«&nbsp;{activeProp.content.slice(0, 60)}{activeProp.content.length > 60 ? '…' : ''}&nbsp;»</span>
                             </>
                         )}
                     </motion.div>
@@ -807,17 +781,17 @@ export default function PodcastEditor() {
                             <div key={i} className="flex items-center gap-2">
                                 {isDone ? (
                                     <Link to={s.href!} state={s.navState}
-                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-white text-foreground border border-[#E0DCE0] hover:border-[#E63337] transition-colors">
-                                        <span className="w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold bg-green-100 text-green-600">✓</span>
+                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-surface text-ink border border-border hover:border-primary transition-colors">
+                                        <span className="w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold bg-emerald/12 text-emerald-ink">✓</span>
                                         {s.label}
                                     </Link>
                                 ) : (
-                                    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-[#E63337] text-white shadow-sm">
+                                    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-primary text-white shadow-sm">
                                         <span className="w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold bg-white/25 text-white">{i + 1}</span>
                                         {s.label}
                                     </div>
                                 )}
-                                {i < 2 && <div className={`w-8 h-px ${isDone ? 'bg-[#E63337]/40' : 'bg-[#E0DCE0]'}`} />}
+                                {i < 2 && <div className={`w-8 h-px ${isDone ? 'bg-primary/30' : 'bg-border'}`} />}
                             </div>
                         );
                     })}
@@ -825,24 +799,24 @@ export default function PodcastEditor() {
 
                 {/* ── Header ── */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, overflow: 'hidden' }}>
+                    <div className="flex items-center gap-3 min-w-0 overflow-hidden">
                         <button
                             onClick={() => { handleSaveAction(dialogues); navigate(`/project/${projectId}/podcasts`); }}
                             disabled={verification.status === 'running'}
-                            className="p-2 bg-white border border-[#E0DCE0] rounded-lg text-muted-foreground hover:text-foreground hover:border-[#E63337]/30 transition-all flex-shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
+                            className="p-2 bg-surface border border-border rounded-lg text-ink-faint hover:text-ink hover:border-primary/30 transition-all flex-shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
                         >
                             <ChevronLeft className="h-4 w-4" />
                         </button>
-                        <div style={{ overflow: 'hidden', minWidth: 0, flex: 1 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
-                                <h1 style={{ fontSize: '1.25rem', fontWeight: 'bold', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: '100%' }}>
+                        <div className="overflow-hidden min-w-0 flex-1">
+                            <div className="flex items-center gap-2 min-w-0">
+                                <h1 className="font-heading text-xl font-bold text-ink whitespace-nowrap overflow-hidden text-ellipsis block max-w-full">
                                     Éditeur de Dialogue
                                 </h1>
                                 {fidelityScore !== null && (
                                     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold flex-shrink-0 ${
-                                        fidelityScore >= 95 ? 'bg-[#BDD145]/20 text-[#5a6e00]' :
-                                        fidelityScore >= 70 ? 'bg-[#E6A440]/20 text-[#b37a00]' :
-                                        'bg-[#E63337]/15 text-[#E63337]'
+                                        fidelityScore >= 95 ? 'bg-emerald/12 text-emerald-ink' :
+                                        fidelityScore >= 70 ? 'bg-amber/12 text-amber-ink' :
+                                        'bg-danger/12 text-danger'
                                     }`}>{fidelityScore}%</span>
                                 )}
                             </div>
@@ -851,10 +825,10 @@ export default function PodcastEditor() {
                                     onChange={e => setTitleDraft(e.target.value)}
                                     onBlur={handleRenameTitle}
                                     onKeyDown={e => { if (e.key === 'Enter') handleRenameTitle(); if (e.key === 'Escape') setIsEditingTitle(false); }}
-                                    className="text-sm border border-[#E63337]/40 rounded px-2 py-0.5 focus:outline-none focus:ring-2 focus:ring-[#E63337]/30 bg-white text-muted-foreground w-full max-w-sm mt-0.5"
+                                    className="text-sm border border-border rounded px-2 py-0.5 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-canvas text-ink w-full max-w-sm mt-0.5"
                                 />
                             ) : (
-                                <p style={{ fontSize: '0.875rem', color: '#6b7280', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: '100%', marginTop: '2px', cursor: 'text' }}
+                                <p className="text-sm text-ink-soft whitespace-nowrap overflow-hidden text-ellipsis block max-w-full mt-0.5 cursor-text"
                                     onClick={() => { setTitleDraft(podcastInfo.title); setIsEditingTitle(true); }}>
                                     {podcastInfo.title}
                                 </p>
@@ -863,24 +837,24 @@ export default function PodcastEditor() {
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
                         <button onClick={handleShowSource}
-                            className="flex items-center gap-1.5 bg-white border border-[#E0DCE0] rounded-lg px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors">
+                            className="flex items-center gap-1.5 bg-surface border border-border rounded-lg px-3 py-1.5 text-xs font-semibold text-ink-soft hover:text-ink transition-colors">
                             <Clock className="h-3.5 w-3.5" />
                             Historique
                         </button>
                         <button
                             onClick={() => { setIsAddingDialogue(true); setInsertAfterId(null); setNewDialogueChar(dialogues[dialogues.length - 1]?.character === 'ines' ? 'yannick' : 'ines'); }}
-                            className="flex items-center gap-1.5 bg-white border border-[#E0DCE0] rounded-lg px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground hover:border-[#3465AE]/30 transition-colors">
+                            className="flex items-center gap-1.5 bg-surface border border-border rounded-lg px-3 py-1.5 text-xs font-semibold text-ink-soft hover:text-ink hover:border-yannick/30 transition-colors">
                             <Plus className="h-3.5 w-3.5" />
                             Ajouter une réplique
                         </button>
                         <button
                             onClick={() => handleSaveAction(dialogues)}
                             disabled={saveStatus === 'saving'}
-                            className="flex items-center gap-1.5 bg-white border border-[#E0DCE0] rounded-lg px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground transition-all"
+                            className="flex items-center gap-1.5 bg-surface border border-border rounded-lg px-3 py-1.5 text-xs font-semibold text-ink-soft hover:text-ink transition-all"
                         >
                             {saveStatus === 'saving' && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                            {saveStatus === 'saved' && <CheckCircle className="h-3.5 w-3.5 text-green-500" />}
-                            {saveStatus === 'saving' ? 'Sauvegarde en cours…' : saveStatus === 'saved' ? 'Sauvegardé ✅' : 'Sauvegarder'}
+                            {saveStatus === 'saved' && <CheckCircle className="h-3.5 w-3.5 text-emerald-ink" />}
+                            {saveStatus === 'saving' ? 'Sauvegarde en cours…' : saveStatus === 'saved' ? 'Sauvegardé' : 'Sauvegarder'}
                         </button>
                     </div>
                 </div>
@@ -916,17 +890,16 @@ export default function PodcastEditor() {
                         <AnimatePresence>
                             {isAddingDialogue ? (
                                 <motion.div key="add-form" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8 }}
-                                    className="bg-white border-2 border-[#E63337]/30 rounded-xl p-4 space-y-3">
+                                    className="bg-surface border border-border shadow-card rounded-xl p-4 space-y-3">
                                     <div className="flex gap-2">
                                         {(['ines', 'yannick'] as const).map(char => (
                                             <button key={char} type="button" onClick={() => setNewDialogueChar(char)}
                                                 className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-semibold border transition-all ${
                                                     newDialogueChar === char
-                                                        ? char === 'ines' ? 'bg-[#E63337]/10 border-[#E63337]/40 text-[#E63337]' : 'bg-[#3465AE]/10 border-[#3465AE]/40 text-[#3465AE]'
-                                                        : 'border-[#E0DCE0] text-muted-foreground'
+                                                        ? char === 'ines' ? 'bg-ines-soft border-ines/40 text-ines-ink' : 'bg-yannick-soft border-yannick/40 text-yannick-ink'
+                                                        : 'border-border text-ink-faint'
                                                 }`}>
-                                                <span className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold"
-                                                    style={char === 'ines' ? { backgroundColor: '#FDDEDE', color: '#E63337' } : { backgroundColor: '#DEE9FD', color: '#3465AE' }}>
+                                                <span className={['w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold', char === 'ines' ? 'bg-ines-soft text-ines-ink' : 'bg-yannick-soft text-yannick-ink'].join(' ')}>
                                                     {char === 'ines' ? 'I' : 'Y'}
                                                 </span>
                                                 {char === 'ines' ? 'Inès' : 'Yannick'}
@@ -937,17 +910,20 @@ export default function PodcastEditor() {
                                         onChange={e => setNewDialogueText(e.target.value)}
                                         onKeyDown={e => { if (e.key === 'Escape') { setIsAddingDialogue(false); setNewDialogueText(''); setInsertAfterId(null); } }}
                                         placeholder="Saisissez la réplique…" rows={3}
-                                        className="w-full bg-[#F8F7F8] border border-[#E0DCE0] rounded-lg px-3 py-2 text-[13px] leading-relaxed resize-none focus:outline-none focus:ring-2 focus:ring-[#E63337]/30 focus:border-[#E63337]"
+                                        className={[
+                                            'w-full bg-canvas border border-border rounded-lg px-3 py-2 text-[13px] text-ink leading-relaxed resize-none focus:outline-none focus:ring-2 focus:ring-offset-0 focus:border-transparent',
+                                            newDialogueChar === 'ines' ? 'focus:ring-ines/40' : 'focus:ring-yannick/40',
+                                        ].join(' ')}
                                     />
                                     <div className="flex gap-2">
                                         <button onClick={() => { setIsAddingDialogue(false); setNewDialogueText(''); setInsertAfterId(null); }}
-                                            className="flex-1 py-2 rounded-lg text-xs font-semibold border border-[#E0DCE0] text-muted-foreground hover:bg-[#F0EEF0] transition-colors">
+                                            className="flex-1 py-2 rounded-lg text-xs font-semibold border border-border text-ink-soft hover:bg-canvas transition-colors">
                                             Annuler
                                         </button>
                                         <button
                                             onClick={() => newDialogueText.trim() && handleAddDialogue(newDialogueChar, newDialogueText.trim())}
                                             disabled={!newDialogueText.trim() || isSubmittingNew}
-                                            className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold bg-[#E63337] text-white hover:bg-[#c92d31] disabled:opacity-40 transition-colors">
+                                            className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold bg-primary text-white hover:opacity-90 disabled:opacity-40 transition-colors">
                                             {isSubmittingNew ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
                                             Ajouter
                                         </button>
@@ -956,7 +932,7 @@ export default function PodcastEditor() {
                             ) : (
                                 <motion.button key="add-btn" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                                     onClick={() => { setIsAddingDialogue(true); setInsertAfterId(null); setNewDialogueChar(dialogues[dialogues.length - 1]?.character === 'ines' ? 'yannick' : 'ines'); }}
-                                    className="flex w-full items-center justify-center gap-2 text-sm text-muted-foreground border-2 border-dashed border-[#D4D0D4] rounded-xl py-3 hover:border-[#E63337]/50 hover:text-[#E63337] transition-all">
+                                    className="flex w-full items-center justify-center gap-2 text-sm text-ink-faint border-2 border-dashed border-border rounded-xl py-3 hover:border-primary/50 hover:text-primary transition-all">
                                     <Plus className="h-4 w-4" />
                                     Ajouter une réplique
                                 </motion.button>
@@ -968,29 +944,29 @@ export default function PodcastEditor() {
                     <div className="space-y-4">
 
                         {/* Card 1 — Vérification de fidélité */}
-                        <div className="bg-white rounded-xl border border-[#E0DCE0] shadow-sm p-5">
-                            <h3 className="font-bold text-sm text-foreground mb-1">VÉRIFICATION DE FIDÉLITÉ</h3>
-                            <p className="text-xs text-muted-foreground mb-4">
+                        <div className="bg-surface rounded-xl border border-border shadow-card p-5">
+                            <h3 className="font-heading font-bold text-sm text-ink mb-1">VÉRIFICATION DE FIDÉLITÉ</h3>
+                            <p className="text-xs text-ink-soft mb-4">
                                 L'IA analyse votre script par rapport au contenu source (.docx) pour s'assurer qu'aucune information clé n'a été oubliée ou déformée.
                             </p>
 
                             {verifyError && (
-                                <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2.5 mb-3">
-                                    <AlertTriangle className="h-3.5 w-3.5 text-red-500 flex-shrink-0 mt-0.5" />
-                                    <p className="text-xs text-red-700 leading-snug">{verifyError}</p>
+                                <div className="flex items-start gap-2 bg-danger/8 border border-danger/20 rounded-lg px-3 py-2.5 mb-3">
+                                    <AlertTriangle className="h-3.5 w-3.5 text-danger flex-shrink-0 mt-0.5" />
+                                    <p className="text-xs text-danger-ink leading-snug">{verifyError}</p>
                                 </div>
                             )}
 
                             {verification.status === 'idle' && (
                                 <>
-                                    <p className="text-xs italic text-muted-foreground text-center py-3 mb-2">
+                                    <p className="text-xs italic text-ink-faint text-center py-3 mb-2">
                                         Le script n'a pas encore été analysé.
                                     </p>
                                     <button onClick={handleVerify}
-                                        className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold bg-[#E63337] text-white hover:bg-[#c92d31] transition-all">
-                                        ⚡ Analyser le script
+                                        className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold bg-primary text-white hover:opacity-90 transition-all">
+                                        Analyser le script
                                     </button>
-                                    <p className="text-xs text-muted-foreground text-center mt-2">
+                                    <p className="text-xs text-ink-faint text-center mt-2">
                                         L'analyse prend environ 15-30 secondes.
                                     </p>
                                 </>
@@ -998,8 +974,8 @@ export default function PodcastEditor() {
 
                             {verification.status === 'running' && (
                                 <div className="flex flex-col items-center py-6 gap-2">
-                                    <Loader2 className="animate-spin text-[#E63337]" size={28} />
-                                    <p className="text-xs text-muted-foreground">Analyse en cours…</p>
+                                    <Loader2 className="animate-spin text-primary" size={28} />
+                                    <p className="text-xs text-ink-faint">Analyse en cours…</p>
                                 </div>
                             )}
 
@@ -1015,60 +991,60 @@ export default function PodcastEditor() {
                                             {inv > 0 && (
                                                 <button
                                                     onClick={scrollToFirstUngrounded}
-                                                    className="w-full flex items-start gap-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-800 hover:bg-red-100 transition-colors text-left cursor-pointer"
+                                                    className="w-full flex items-start gap-2 bg-danger/10 border border-danger/20 rounded-lg px-3 py-2 text-xs text-danger-ink hover:bg-danger/12 transition-colors text-left cursor-pointer"
                                                 >
-                                                    🔴 <span><strong>{inv} réplique{inv > 1 ? 's' : ''}</strong> contiennent des informations potentiellement inventées — cliquez pour y accéder.</span>
+                                                    <span><strong>{inv} réplique{inv > 1 ? 's' : ''}</strong> contiennent des informations potentiellement inventées — cliquez pour y accéder.</span>
                                                 </button>
                                             )}
                                             {inc > 0 && (
-                                                <div className="flex items-start gap-2 bg-orange-50 border border-orange-200 rounded-lg px-3 py-2 text-xs text-orange-800">
-                                                    🟠 <span><strong>{inc} réplique{inc > 1 ? 's' : ''}</strong> à vérifier — vérifiez les passages en orange dans l'éditeur.</span>
+                                                <div className="flex items-start gap-2 bg-amber/10 border border-amber/20 rounded-lg px-3 py-2 text-xs text-amber-ink">
+                                                    <span><strong>{inc} réplique{inc > 1 ? 's' : ''}</strong> à vérifier — vérifiez les passages en orange dans l'éditeur.</span>
                                                 </div>
                                             )}
                                         </>);
                                     })()}
                                     {groundingStatus !== 'idle' && (
-                                        <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-xs text-blue-800">
+                                        <div className="flex items-center gap-2 bg-surface border border-border rounded-lg px-3 py-2 text-xs text-ink-soft">
                                             {groundingStatus === 'checking' ? (
-                                                <><Loader2 className="h-3.5 w-3.5 animate-spin flex-shrink-0" /><span>🔍 Vérification des inventions potentielles en cours...</span></>
+                                                <><Loader2 className="h-3.5 w-3.5 animate-spin flex-shrink-0" /><span>Vérification des inventions potentielles en cours…</span></>
                                             ) : (
-                                                <span>✅ Vérification complète</span>
+                                                <span>Vérification complète</span>
                                             )}
                                         </div>
                                     )}
                                     {verification.missingConcepts.length > 0 && (
-                                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-                                            <p className="text-[10px] font-bold uppercase tracking-wide text-amber-700 mb-1.5">
+                                        <div className="bg-amber/10 border border-amber/20 rounded-lg p-3">
+                                            <p className="text-[10px] font-heading font-bold uppercase tracking-wide text-amber-ink mb-1.5">
                                                 {verification.missingConcepts.length} concept{verification.missingConcepts.length > 1 ? 's' : ''} manquant{verification.missingConcepts.length > 1 ? 's' : ''}
                                             </p>
-                                            <ul className="space-y-1 max-h-48 overflow-y-auto">
+                                            <div className="space-y-1.5 max-h-48 overflow-y-auto">
                                                 {verification.missingConcepts.map((c, i) => (
-                                                    <li key={i} className="text-xs text-amber-800">• {c}</li>
+                                                    <ChecklistItem key={i}>{c}</ChecklistItem>
                                                 ))}
-                                            </ul>
+                                            </div>
                                         </div>
                                     )}
                                     {verification.status === 'insufficient' && (
                                         <button onClick={handleAutoFix}
-                                            className="w-full flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-semibold bg-amber-500 text-white hover:bg-amber-600 transition-all">
+                                            className="w-full flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-semibold bg-primary text-white hover:opacity-90 transition-all">
                                             <RotateCcw className="h-3.5 w-3.5" />
                                             Corriger automatiquement
                                         </button>
                                     )}
                                     <button onClick={handleVerify}
-                                        className="w-full py-2 rounded-lg text-xs font-semibold border border-[#E0DCE0] text-muted-foreground hover:text-foreground hover:bg-[#F0EEF0] transition-all">
-                                        ⚡ Ré-analyser
+                                        className="w-full py-2 rounded-lg text-xs font-semibold border border-border text-ink-soft hover:text-ink hover:bg-canvas transition-all">
+                                        Ré-analyser
                                     </button>
                                 </div>
                             )}
                         </div>
 
                         {/* Card 2 — Détails du projet */}
-                        <div className="bg-white rounded-xl border border-[#E0DCE0] shadow-sm p-5 space-y-4">
-                            <h3 className="font-bold text-sm text-foreground">DÉTAILS DU PROJET</h3>
+                        <div className="bg-surface rounded-xl border border-border shadow-card p-5 space-y-4">
+                            <h3 className="font-heading font-bold text-sm text-ink">DÉTAILS DU PROJET</h3>
 
                             <div className="flex items-center justify-between text-sm">
-                                <span className="flex items-center gap-2 text-muted-foreground">
+                                <span className="flex items-center gap-2 text-ink-soft">
                                     <FileText className="h-4 w-4" />
                                     Mots
                                 </span>
@@ -1076,59 +1052,52 @@ export default function PodcastEditor() {
                             </div>
 
                             <div className="flex items-center justify-between text-sm">
-                                <span className="flex items-center gap-2 text-muted-foreground">
+                                <span className="flex items-center gap-2 text-ink-soft">
                                     <Clock className="h-4 w-4" />
                                     Durée estimée
                                 </span>
-                                <span className="font-bold text-[#3465AE]">
+                                <span className="font-bold text-yannick-ink">
                                     {totalMins > 0 ? `${totalMins}:${String(totalSecs % 60).padStart(2, '0')} min` : '—'}
                                 </span>
                             </div>
 
                             {/* Speech ratio */}
                             <div>
-                                <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">
+                                <p className="text-[10px] font-heading font-bold uppercase tracking-widest text-ink-faint mb-2">
                                     RATIO DE PAROLE
                                 </p>
                                 <div className="h-2.5 rounded-full overflow-hidden flex">
-                                    <div className="bg-[#E63337] transition-all" style={{ width: `${inesRatio}%` }} />
-                                    <div className="bg-[#3465AE] transition-all" style={{ width: `${yannickRatio}%` }} />
+                                    <div className="bg-ines transition-all" style={{ width: `${inesRatio}%` }} />
+                                    <div className="bg-yannick transition-all" style={{ width: `${yannickRatio}%` }} />
                                 </div>
                                 <div className="flex justify-between mt-1.5">
-                                    <span className="text-[10px] font-semibold text-[#E63337]">Inès {inesRatio}%</span>
-                                    <span className="text-[10px] font-semibold text-[#3465AE]">Yannick {yannickRatio}%</span>
+                                    <span className="text-[10px] font-semibold text-ines-ink">Inès {inesRatio}%</span>
+                                    <span className="text-[10px] font-semibold text-yannick-ink">Yannick {yannickRatio}%</span>
                                 </div>
                             </div>
 
-                            {/* Conseil PRO */}
-                            <div className="bg-blue-50 border border-blue-100 rounded-xl p-3">
-                                <p className="text-[10px] font-bold text-blue-700 mb-1 uppercase tracking-wide">CONSEIL PRO</p>
-                                <p className="text-[11px] text-blue-600 leading-relaxed">
-                                    Utilisez des pauses (indiquées par "...") pour rendre le dialogue plus naturel entre Inès et Yannick.
-                                </p>
-                            </div>
                         </div>
                     </div>
                 </div>
             </div>
 
             {/* ── Sticky bottom bar ── */}
-            <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-[#E0DCE0] z-30 flex items-center justify-between px-8 py-3 shadow-[0_-2px_12px_0_rgba(0,0,0,0.06)]">
+            <div className="fixed bottom-0 left-0 right-0 bg-surface border-t border-border z-30 flex items-center justify-between px-8 py-3 shadow-pop">
                 {/* Left — chapter navigation */}
                 <div className="flex items-center gap-3">
                     <button onClick={handleNavigateBack}
                         disabled={verification.status === 'running'}
-                        className="p-2 rounded-lg border border-[#E0DCE0] text-muted-foreground hover:text-foreground hover:border-[#E63337]/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                        className="p-2 rounded-lg border border-border text-ink-faint hover:text-ink hover:border-primary/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
                         <ChevronLeft className="h-4 w-4" />
                     </button>
-                    <button disabled className="p-2 rounded-lg border border-[#E0DCE0] text-muted-foreground opacity-40 cursor-not-allowed">
+                    <button disabled className="p-2 rounded-lg border border-border text-ink-faint opacity-40 cursor-not-allowed">
                         <ChevronRight className="h-4 w-4" />
                     </button>
                     <div>
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground leading-none mb-0.5">
+                        <p className="text-[10px] font-heading font-bold uppercase tracking-widest text-ink-faint leading-none mb-0.5">
                             CHAPITRE ACTUEL
                         </p>
-                        <p className="text-sm font-semibold text-foreground truncate max-w-[220px]">
+                        <p className="text-sm font-semibold text-ink truncate max-w-[220px]">
                             {podcastInfo.title}
                         </p>
                     </div>
@@ -1140,15 +1109,15 @@ export default function PodcastEditor() {
                         onClick={() => {
                             window.open(`/api/podcasts/${podcastId}/source`, '_blank');
                         }}
-                        className="flex items-center gap-1.5 px-3 py-2 border border-[#E0DCE0] rounded-lg text-xs font-semibold text-muted-foreground hover:text-foreground hover:border-[#3465AE]/30 bg-white transition-colors"
+                        className="flex items-center gap-1.5 px-3 py-2 border border-border rounded-lg text-xs font-semibold text-ink-soft hover:text-ink hover:border-yannick/30 bg-surface transition-colors"
                     >
                         <FileText className="h-3.5 w-3.5" />
                         Voir le source
                     </button>
-                    <span className="text-xs font-bold text-muted-foreground mr-1 uppercase tracking-wide">Exporter :</span>
+                    <span className="text-xs font-bold text-ink-faint mr-1 uppercase tracking-wide">Exporter :</span>
                     {(['word'] as const).map(fmt => (
                         <button key={fmt} onClick={() => handleExport(fmt)}
-                            className="flex items-center gap-1.5 px-3 py-2 border border-[#E0DCE0] rounded-lg text-xs font-semibold text-muted-foreground hover:text-foreground hover:border-[#E63337]/30 bg-white transition-colors">
+                            className="flex items-center gap-1.5 px-3 py-2 border border-border rounded-lg text-xs font-semibold text-ink-soft hover:text-ink hover:border-primary/30 bg-surface transition-colors">
                             <FileDown className="h-3.5 w-3.5" />
                             {fmt.charAt(0).toUpperCase() + fmt.slice(1)}
                         </button>
@@ -1156,14 +1125,14 @@ export default function PodcastEditor() {
                     {fidelityScore !== null && fidelityScore >= 95 && !dialogues.some(d => d.is_grounded === false) && (
                         audioUrl ? (
                             <div className="flex items-center gap-1.5 ml-1">
-                                <span className="text-[11px] font-bold text-green-700 bg-[#E6F4EA] border border-green-200 rounded-lg px-3 py-2 flex items-center gap-1.5">
+                                <span className="text-[11px] font-bold text-emerald-ink bg-emerald/12 border border-emerald/30 rounded-lg px-3 py-2 flex items-center gap-1.5">
                                     <CheckCircle className="h-3.5 w-3.5" />
                                     Audio prêt
                                 </span>
                                 <button
                                     onClick={handleRequestAudio}
                                     disabled={isGeneratingAudio}
-                                    className="flex items-center gap-1.5 px-3 py-2 border border-[#E0DCE0] rounded-lg text-xs font-semibold text-muted-foreground hover:text-foreground hover:border-[#E63337]/30 bg-white transition-colors disabled:opacity-60"
+                                    className="flex items-center gap-1.5 px-3 py-2 border border-border rounded-lg text-xs font-semibold text-ink-soft hover:text-ink hover:border-primary/30 bg-surface transition-colors disabled:opacity-60"
                                 >
                                     {isGeneratingAudio ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Volume2 className="h-3.5 w-3.5" />}
                                     Regénérer
@@ -1173,7 +1142,7 @@ export default function PodcastEditor() {
                             <button
                                 onClick={handleRequestAudio}
                                 disabled={isGeneratingAudio}
-                                className="flex items-center gap-2 px-4 py-2 bg-[#E6F4EA] text-green-700 rounded-lg text-xs font-bold hover:bg-[#D4EDD9] disabled:opacity-60 transition-colors ml-1"
+                                className="flex items-center gap-2 px-4 py-2 bg-emerald/12 text-emerald-ink border border-emerald/30 rounded-lg text-xs font-bold hover:bg-emerald/20 disabled:opacity-60 transition-colors ml-1"
                             >
                                 {isGeneratingAudio ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Volume2 className="h-3.5 w-3.5" />}
                                 Générer l'audio
@@ -1185,27 +1154,27 @@ export default function PodcastEditor() {
 
             {/* Audio player (if ready) */}
             {audioUrl && (
-                <div className="fixed bottom-16 left-1/2 -translate-x-1/2 bg-white border border-[#E0DCE0] shadow-xl rounded-full px-5 py-2 flex items-center gap-3 z-20">
-                    <span className="text-xs font-semibold text-muted-foreground">Aperçu audio</span>
+                <div className="fixed bottom-16 left-1/2 -translate-x-1/2 bg-surface border border-border shadow-pop rounded-full px-5 py-2 flex items-center gap-3 z-20">
+                    <span className="text-xs font-semibold text-ink-soft">Aperçu audio</span>
                     <audio src={audioUrl} controls className="h-8" />
                 </div>
             )}
 
             {isGeneratingAudio && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-                    <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full mx-4 text-center">
-                        <Loader2 className="h-10 w-10 text-[#6BB8CD] animate-spin mx-auto mb-4" />
-                        <h3 className="font-bold text-base text-foreground mb-1">Génération audio en cours…</h3>
-                        <p className="text-sm text-muted-foreground mb-5">Ne fermez pas cette fenêtre.</p>
-                        <div className="w-full bg-[#F0EEF0] rounded-full h-1.5 overflow-hidden">
-                            <div className="w-full h-full bg-[#6BB8CD] rounded-full animate-pulse" />
+                    <div className="bg-surface rounded-2xl shadow-2xl p-8 max-w-sm w-full mx-4 text-center">
+                        <Loader2 className="h-10 w-10 text-ines animate-spin mx-auto mb-4" />
+                        <h3 className="font-heading font-bold text-base text-ink mb-1">Génération audio en cours…</h3>
+                        <p className="text-sm text-ink-soft mb-5">Ne fermez pas cette fenêtre.</p>
+                        <div className="w-full bg-canvas rounded-full h-1.5 overflow-hidden">
+                            <div className="w-full h-full bg-ines rounded-full animate-pulse" />
                         </div>
                     </div>
                 </div>
             )}
 
             {audioSuccess && (
-                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-green-600 text-white px-5 py-2.5 rounded-full shadow-xl text-sm font-semibold flex items-center gap-2 pointer-events-none">
+                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-emerald text-white px-5 py-2.5 rounded-full shadow-pop text-sm font-semibold flex items-center gap-2 pointer-events-none">
                     <CheckCircle className="h-4 w-4" />
                     Audio généré avec succès !
                 </div>
@@ -1215,12 +1184,12 @@ export default function PodcastEditor() {
 
             {audioSaveConfirmOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-                    <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full mx-4">
+                    <div className="bg-surface rounded-2xl shadow-2xl p-6 max-w-md w-full mx-4">
                         <div className="flex items-start gap-3 mb-4">
-                            <AlertTriangle className="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5" />
+                            <AlertTriangle className="h-5 w-5 text-amber flex-shrink-0 mt-0.5" />
                             <div>
-                                <h3 className="font-bold text-base text-foreground mb-1">Modifications non sauvegardées</h3>
-                                <p className="text-sm text-muted-foreground leading-relaxed">
+                                <h3 className="font-heading font-bold text-base text-ink mb-1">Modifications non sauvegardées</h3>
+                                <p className="text-sm text-ink-soft leading-relaxed">
                                     Des modifications n'ont pas encore été sauvegardées. Voulez-vous sauvegarder avant de générer l'audio ?
                                 </p>
                             </div>
@@ -1228,13 +1197,13 @@ export default function PodcastEditor() {
                         <div className="flex gap-2 justify-end mt-5 flex-wrap">
                             <button
                                 onClick={() => setAudioSaveConfirmOpen(false)}
-                                className="px-4 py-2 rounded-lg text-sm font-semibold border border-[#E0DCE0] text-muted-foreground hover:bg-[#F0EEF0] transition-colors"
+                                className="px-4 py-2 rounded-lg text-sm font-semibold border border-border text-ink-soft hover:bg-canvas transition-colors"
                             >
                                 Annuler
                             </button>
                             <button
                                 onClick={() => { setAudioSaveConfirmOpen(false); setAudioConfirmOpen(true); }}
-                                className="px-4 py-2 rounded-lg text-sm font-semibold border border-[#E0DCE0] text-foreground hover:bg-[#F0EEF0] transition-colors"
+                                className="px-4 py-2 rounded-lg text-sm font-semibold border border-border text-ink hover:bg-canvas transition-colors"
                             >
                                 Générer sans sauvegarder
                             </button>
@@ -1244,7 +1213,7 @@ export default function PodcastEditor() {
                                     await handleSaveAction(dialogues);
                                     setAudioConfirmOpen(true);
                                 }}
-                                className="px-4 py-2 rounded-lg text-sm font-semibold bg-[#E63337] text-white hover:bg-[#c92d31] transition-colors"
+                                className="px-4 py-2 rounded-lg text-sm font-semibold bg-primary text-white hover:opacity-90 transition-colors"
                             >
                                 Sauvegarder et générer
                             </button>
@@ -1255,23 +1224,23 @@ export default function PodcastEditor() {
 
             {audioConfirmOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-                    <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full mx-4">
+                    <div className="bg-surface rounded-2xl shadow-2xl p-6 max-w-md w-full mx-4">
                         <div className="flex items-start gap-3 mb-4">
-                            <AlertTriangle className="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5" />
+                            <AlertTriangle className="h-5 w-5 text-amber flex-shrink-0 mt-0.5" />
                             <div>
-                                <h3 className="font-bold text-base text-foreground mb-2">Générer l'audio de ce podcast ?</h3>
-                                <p className="text-sm text-muted-foreground leading-relaxed">
+                                <h3 className="font-heading font-bold text-base text-ink mb-2">Générer l'audio de ce podcast ?</h3>
+                                <p className="text-sm text-ink-soft leading-relaxed">
                                     Cette action va générer les fichiers audio via ElevenLabs et a un coût. Assurez-vous que le script a été relu et validé par l'ingénieur pédagogique avant de lancer — cette action ne peut pas être annulée.
                                 </p>
                             </div>
                         </div>
                         <div className="flex gap-3 justify-end mt-6">
                             <button onClick={() => setAudioConfirmOpen(false)}
-                                className="px-4 py-2 rounded-lg text-sm font-semibold border border-[#E0DCE0] text-muted-foreground hover:bg-[#F0EEF0] transition-colors">
+                                className="px-4 py-2 rounded-lg text-sm font-semibold border border-border text-ink-soft hover:bg-canvas transition-colors">
                                 Annuler
                             </button>
                             <button onClick={handleGenerateAudio}
-                                className="px-4 py-2 rounded-lg text-sm font-semibold bg-[#E63337] text-white hover:bg-[#C62828] transition-colors">
+                                className="px-4 py-2 rounded-lg text-sm font-semibold bg-primary text-white hover:opacity-90 transition-colors">
                                 Générer l'audio
                             </button>
                         </div>
@@ -1286,23 +1255,23 @@ export default function PodcastEditor() {
                         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                             onClick={() => setShowSourceModal(false)} className="fixed inset-0 bg-black/45 z-40" />
                         <motion.div initial={{ scale: 0.96, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.96, opacity: 0 }}
-                            className="fixed inset-x-4 top-[8%] bottom-[8%] max-w-3xl mx-auto bg-white border border-[#E0DCE0] shadow-2xl rounded-2xl z-50 flex flex-col">
-                            <div className="p-5 border-b border-[#E0DCE0] flex items-center justify-between flex-shrink-0">
+                            className="fixed inset-x-4 top-[8%] bottom-[8%] max-w-3xl mx-auto bg-surface border border-border shadow-pop rounded-2xl z-50 flex flex-col">
+                            <div className="p-5 border-b border-border flex items-center justify-between flex-shrink-0">
                                 <div>
-                                    <h2 className="font-bold text-base">Texte source — {podcastInfo.title}</h2>
-                                    <p className="text-xs text-muted-foreground mt-0.5">Contenu du cours correspondant à ce chapitre</p>
+                                    <h2 className="font-heading font-bold text-base text-ink">Texte source — {podcastInfo.title}</h2>
+                                    <p className="text-xs text-ink-soft mt-0.5">Contenu du cours correspondant à ce chapitre</p>
                                 </div>
-                                <button onClick={() => setShowSourceModal(false)} className="p-2 hover:bg-[#F0EEF0] rounded-lg text-muted-foreground">
+                                <button onClick={() => setShowSourceModal(false)} className="p-2 hover:bg-canvas rounded-lg text-ink-faint">
                                     <X className="h-4 w-4" />
                                 </button>
                             </div>
                             <div className="flex-1 overflow-y-auto p-5">
                                 {loadingSource ? (
                                     <div className="flex items-center justify-center py-16">
-                                        <Loader2 className="animate-spin text-[#E63337]" size={28} />
+                                        <Loader2 className="animate-spin text-primary" size={28} />
                                     </div>
                                 ) : (
-                                    <pre className="whitespace-pre-wrap text-sm text-foreground font-sans leading-relaxed">{sourceText || 'Aucun texte source disponible.'}</pre>
+                                    <pre className="whitespace-pre-wrap text-sm text-ink font-sans leading-relaxed">{sourceText || 'Aucun texte source disponible.'}</pre>
                                 )}
                             </div>
                         </motion.div>
