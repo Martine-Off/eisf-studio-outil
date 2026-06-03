@@ -181,23 +181,27 @@ export default function ProjectPodcasts() {
                 <div className="bg-surface rounded-lg border border-border shadow-card p-5 mb-6 flex gap-6 items-start">
                     {/* Left — score gauge */}
                     <div className="flex-shrink-0 flex flex-col items-center gap-1.5">
-                        <div className="relative w-[80px] h-[80px]">
-                            <svg className="w-[80px] h-[80px] -rotate-90" viewBox="0 0 100 100">
-                                <circle cx="50" cy="50" r="35" fill="none" stroke="var(--border)" strokeWidth="10" />
-                                {macroScore !== null && (
+                        {macroScore === null ? (
+                            <div className="w-[80px] h-[80px] flex items-center justify-center">
+                                <span className="text-2xl font-heading text-ink-faint">—</span>
+                            </div>
+                        ) : (
+                            <div className="relative w-[80px] h-[80px]">
+                                <svg className="w-[80px] h-[80px] -rotate-90" viewBox="0 0 100 100">
+                                    <circle cx="50" cy="50" r="35" fill="none" stroke="var(--border)" strokeWidth="10" />
                                     <circle cx="50" cy="50" r="35" fill="none"
                                         stroke={macroScore >= 90 ? 'var(--emerald)' : macroScore >= 70 ? 'var(--amber)' : 'var(--danger)'}
                                         strokeWidth="10" strokeLinecap="round"
                                         strokeDasharray={`${220 * macroScore / 100} 220`}
                                     />
-                                )}
-                            </svg>
-                            <div className="absolute inset-0 flex items-center justify-center">
-                                <span className="text-lg font-heading font-bold text-ink leading-none">
-                                    {macroScore !== null ? `${macroScore}%` : '—'}
-                                </span>
+                                </svg>
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                    <span className="text-lg font-heading font-bold text-ink leading-none">
+                                        {macroScore}%
+                                    </span>
+                                </div>
                             </div>
-                        </div>
+                        )}
                         <p className="text-xs font-medium text-ink">Analyse globale</p>
                         <p className="text-[10px] text-ink-soft text-center leading-relaxed">
                             {podcasts.length} podcast{podcasts.length > 1 ? 's' : ''} généré{podcasts.length > 1 ? 's' : ''}
