@@ -4,6 +4,28 @@
 //
 // Appel centralisé vers Make — toute la génération et vérification IA
 // MAKE_WEBHOOK_URL absent → retourne null (fonctionnalités IA désactivées)
+
+// Répare un JSON tronqué en fermant les strings et structures ouvertes
+function repairTruncatedJson(text) {
+    let t = text.trimEnd();
+    let inStr = false, esc = false;
+    const stack = [];
+    for (const ch of t) {
+        if (esc)                           { esc = false; continue; }
+        if (ch === '\\' && inStr)          { esc = true; continue; }
+        if (ch === '"')                    { inStr = !inStr; continue; }
+        if (inStr)                         continue;
+        if (ch === '{' || ch === '[')      stack.push(ch);
+        else if (ch === '}' || ch === ']') stack.pop();
+    }
+    if (!inStr && stack.length === 0) return t;
+    if (inStr) t += '"';
+    t = t.replace(/,\s*$/, '');
+    for (let i = stack.length - 1; i >= 0; i--)
+        t += stack[i] === '{' ? '}' : ']';
+    return t;
+}
+
 async function callWebhook(payload, timeoutMs = 60_000) {
   const url = process.env.MAKE_WEBHOOK_URL;
   if (!url) {
@@ -37,8 +59,11 @@ async function callWebhook(payload, timeoutMs = 60_000) {
 
     let text = await response.text();
     text = text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
-    text = text.replace(/[“”]/g, '"').replace(/[‘’]/g, "'");
+    text = text.replace(/[""]/g, '"').replace(/['']/g, "'");
     console.log(`[callWebhook] Resp brute type=${payload.type} (${text.length} car.): ${text.substring(0,400)}`);
+
+    text = repairTruncatedJson(text);
+
     try {
       return JSON.parse(text);
     } catch {

@@ -21,7 +21,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
     const initials = [user?.first_name, user?.last_name]
         .filter(Boolean)
-        .map((s: string) => s.charAt(0).toUpperCase())
+        .map((s) => (s as string).charAt(0).toUpperCase())
         .join('') || 'U';
 
     return (
