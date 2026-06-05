@@ -29,7 +29,7 @@ function concatenateMp3s(inputPaths, outputPath) {
         ffmpeg()
             .input(listPath)
             .inputOptions(['-f', 'concat', '-safe', '0'])
-            .outputOptions(['-c', 'copy'])
+            .outputOptions(['-ar', '44100', '-ac', '1', '-b:a', '128k'])
             .output(outputPath)
             .on('error', (err) => { try { fs.unlinkSync(listPath); } catch {} reject(err); })
             .on('end',   ()    => { try { fs.unlinkSync(listPath); } catch {} resolve(); })
@@ -56,7 +56,7 @@ function trimMp3(inputPath, outputPath, durationSeconds) {
 
 // ─── Break-time helpers ──────────────────────────────────────────────────────
 
-const BREAK_DURATIONS = { xs: 0.3, s: 0.5, m: 1.0, l: 1.5, xl: 2.0 };
+const BREAK_DURATIONS = { xs: 0.15, s: 0.25, m: 0.5, l: 0.8, xl: 1.2 };
 
 function parseBreakDuration(timeStr) {
     if (BREAK_DURATIONS[timeStr] !== undefined) return BREAK_DURATIONS[timeStr];
@@ -447,12 +447,18 @@ router.post('/:id/generate-audio', authMiddleware, async (req, res) => {
                 trimPaths.push(trimPath);
             }
 
-            const segments = splitOnBreaks(rawText);
+            const processedText = rawText.replace(/<break\s+time="([^"]+)"\s*\/?>/gi, (match, time) => {
+                const sec = parseBreakDuration(time);
+                return sec < 1.2 ? '...' : match;
+            });
+            const segments = splitOnBreaks(processedText);
             let partIdx = 0;
             for (const seg of segments) {
                 if (seg.type === 'text') {
                     const segId = segments.length === 1 ? d.id : `${d.id}_p${partIdx}`;
-                    const filePath = await generateDialogueMp3(seg.content, d.character, podcastId, segId);
+                    const prevSeg = segments.slice(0, partIdx).filter(s => s.type === 'text').pop();
+                    const nextSeg = segments.slice(partIdx + 1).find(s => s.type === 'text');
+                    const filePath = await generateDialogueMp3(seg.content, d.character, podcastId, segId, prevSeg?.content ?? null, nextSeg?.content ?? null);
                     mp3Paths.push(filePath);
                     if (partIdx + 1 < segments.length) await new Promise(r => setTimeout(r, 300));
                 } else {
@@ -683,7 +689,7 @@ router.get('/:id/export-word/:mode', authMiddleware, async (req, res) => {
         const buffer = await Packer.toBuffer(doc);
         
         // 3. Send Buffer
-        res.setHeader('Content-Disposition', `attachment; filename="${docTitle.replace(/[^a-z0-9_]/gi, '_')}.docx"`);
+        res.setHeader('Content-Disposition', `attachment; filename="${docTitle.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9_\-]/g, '_')}.docx"`);
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
         res.send(buffer);
         

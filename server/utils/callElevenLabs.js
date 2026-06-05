@@ -8,7 +8,7 @@ const path = require('path');
 const VOICE_CONFIG = {
     ines: {
         voiceId:          process.env.ELEVENLABS_VOICE_INES       || 'd3AXX0BlgJHYFCuH9X88',
-        stability:        parseFloat(process.env.ELEVENLABS_STABILITY_INES)   || 0.32,
+        stability:        parseFloat(process.env.ELEVENLABS_STABILITY_INES)   || 0.82,
         similarity_boost: parseFloat(process.env.ELEVENLABS_SIMILARITY_INES)  || 0.90,
         style:            parseFloat(process.env.ELEVENLABS_STYLE_INES)       || 0.45,
         speed:            parseFloat(process.env.ELEVENLABS_SPEED_INES)       || 1.03,
@@ -22,7 +22,7 @@ const VOICE_CONFIG = {
     },
 };
 
-async function generateDialogueMp3(text, character, podcastId, dialogueId) {
+async function generateDialogueMp3(text, character, podcastId, dialogueId, previousText = null, nextText = null) {
     const apiKey = process.env.ELEVENLABS_API_KEY;
     if (!apiKey) throw new Error('ELEVENLABS_API_KEY manquante');
 
@@ -43,6 +43,8 @@ async function generateDialogueMp3(text, character, podcastId, dialogueId) {
             },
             body: JSON.stringify({
                 text,
+                ...(previousText && { previous_text: previousText }),
+                ...(nextText     && { next_text:      nextText }),
                 model_id: 'eleven_multilingual_v2',
                 voice_settings: {
                     stability:         config.stability,
