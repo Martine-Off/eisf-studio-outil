@@ -22,7 +22,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import {
-    FileDown, FileText, Clock, LayoutGrid, Loader2, CheckCircle, ArrowUp, ArrowDown, ChevronLeft, RefreshCw, ChevronRight, GripVertical
+    FileDown, FileText, Clock, LayoutGrid, Loader2, CheckCircle, ArrowUp, ArrowDown, ChevronLeft, RefreshCw, ChevronRight, GripVertical, AlertTriangle
 } from 'lucide-react';
 import api from '../utils/api';
 import { useKeyboardNav } from '../hooks/useKeyboardNav';
@@ -210,6 +210,7 @@ export default function Editor() {
     const [autoFixing, setAutoFixing] = useState(false);
     const [autoFixProgress, setAutoFixProgress] = useState('');
     const [autoFixToastMsg, setAutoFixToastMsg] = useState('');
+    const [errorToastMsg, setErrorToastMsg] = useState('');
     const [exporting, setExporting] = useState(false);
 
     const [selectedPodcastId, setSelectedPodcastId] = useState<number | null>(null);
@@ -532,7 +533,8 @@ export default function Editor() {
             return newPodcastId;
         } catch (error) {
             console.error('Erreur génération unitaire:', error);
-            throw error;
+            setErrorToastMsg('La génération a rencontré un problème temporaire. Réessayez dans quelques secondes.');
+            throw new Error('La génération a rencontré un problème temporaire. Réessayez dans quelques secondes.');
         } finally {
             inFlightChapters.current.delete(index);
             setGeneratingChapters(prev => {
@@ -1336,6 +1338,22 @@ export default function Editor() {
                             <CheckCircle size={14} className="text-white" />
                         </div>
                         Sauvegarde avec succès
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Toast erreur génération */}
+            <AnimatePresence>
+                {errorToastMsg && (
+                    <motion.div
+                        initial={{ opacity: 0, y: 50, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 20, scale: 0.95 }}
+                        className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-danger/10 border border-danger/30 text-danger-ink px-6 py-3.5 rounded-lg shadow-pop flex items-center gap-3 z-[100] font-medium max-w-sm text-center text-sm"
+                    >
+                        <AlertTriangle size={16} className="flex-shrink-0 text-danger" />
+                        {errorToastMsg}
+                        <button onClick={() => setErrorToastMsg('')} className="ml-2 text-danger hover:opacity-70">✕</button>
                     </motion.div>
                 )}
             </AnimatePresence>
