@@ -10,6 +10,10 @@ const path = require('path');
 const cookieParser = require('cookie-parser');
 require('dotenv').config();
 
+if (!process.env.NODE_ENV) {
+    console.warn('[server] NODE_ENV non défini — comportement development appliqué par défaut');
+}
+
 const { generalLimiter, authLimiter, aiLimiter } = require('./middleware/rateLimiter');
 const { queryFallback: authQueryMiddleware } = require('./middleware/auth');
 const { csrfMiddleware } = require('./middleware/csrf');
@@ -44,6 +48,7 @@ app.use(cors({
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token'],
+    exposedHeaders: ['Content-Type'],
 }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
