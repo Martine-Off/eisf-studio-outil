@@ -46,8 +46,6 @@ export default function Create() {
             const text = result.value;
             const words = text.trim().split(/\s+/).filter(Boolean).length;
             const paragraphs = text.split(/\n\s*\n/).filter(s => s.trim().length > 0);
-            const htmlResult = await mammoth.convertToHtml({ arrayBuffer: buffer });
-            const headingMatches = (htmlResult.value.match(/<h[1-2]/gi) ?? []).length;
             setStats({
                 wordCount: words,
                 estimatedChapters: Math.ceil(words / 700),

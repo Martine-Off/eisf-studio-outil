@@ -199,7 +199,6 @@ export default function Editor() {
     const [loading, setLoading] = useState(true);
     const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved');
     const [showToast, setShowToast] = useState(false);
-    const [generating, setGenerating] = useState(false);
     const [step, setStep] = useState<Step>('editor');
     const [previewData, setPreviewData] = useState<PreviewData | null>(null);
     const [previewing, setPreviewing] = useState(false);
@@ -225,7 +224,7 @@ export default function Editor() {
     const [generatedIdMap, setGeneratedIdMap] = useState<Record<number, number>>({});
     const [chapterScores, setChapterScores] = useState<Record<number, number>>({});
     const [chapterWordCounts, setChapterWordCounts] = useState<Record<number, number>>({});
-    const [isGeneratingAll, setIsGeneratingAll] = useState(false);
+    const isGeneratingAll = false;
     const [isNavigating, setIsNavigating] = useState(false);
     const [selectedChapterIndex, setSelectedChapterIndex] = useState<number>(0);
 
@@ -465,25 +464,6 @@ export default function Editor() {
                 return arrayMove(items, oldIndex, newIndex);
             });
             setSaveStatus('unsaved');
-        }
-    };
-
-    const handleGenerate = async () => {
-        if (isGeneratingAll) return;
-        setIsGeneratingAll(true);
-        setGenerating(true);
-
-        try {
-            for (let i = 0; i < editableChapters.length; i++) {
-                if (generatedChapters.has(i)) continue;
-                await handleGenerateSingle(i);
-            }
-            navigate(`/project/${projectId}/podcasts`);
-        } catch (error) {
-            console.error('Erreur génération globale:', error);
-        } finally {
-            setGenerating(false);
-            setIsGeneratingAll(false);
         }
     };
 

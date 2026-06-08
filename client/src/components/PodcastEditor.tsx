@@ -364,6 +364,7 @@ export default function PodcastEditor() {
                 score: infoRes.data.fidelity_score,
                 missingConcepts: feedback.concepts_manquants ?? [],
                 confusingElements: feedback.informations_erronees ?? [],
+                passCount: 0,
               });
             }
             if (infoRes.data.audio_url) {
