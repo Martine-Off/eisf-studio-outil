@@ -810,7 +810,7 @@ export default function PodcastEditor() {
                         <div className="overflow-hidden min-w-0 flex-1">
                             <div className="flex items-center gap-2 min-w-0">
                                 <h1 className="font-heading text-xl font-bold text-ink whitespace-nowrap overflow-hidden text-ellipsis block max-w-full">
-                                    Éditeur de Dialogue
+                                    {podcastInfo.project_title ?? 'Éditeur de Dialogue'}
                                 </h1>
                                 {fidelityScore !== null && (
                                     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold flex-shrink-0 ${
