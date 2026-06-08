@@ -10,10 +10,7 @@ const generalLimiter = rateLimit({
     standardHeaders: true,
     legacyHeaders: false,
     keyGenerator: (req) => req.userId || ipKeyGenerator(req),
-    handler: (req, res) => {
-        const minutes = Math.ceil((parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000) / 60000);
-        res.status(429).json({ error: `Trop de requêtes, réessayez dans ${minutes} minutes.` });
-    },
+    message: { error: 'Trop de requêtes, veuillez réessayer dans quelques minutes.' },
 });
 
 const authLimiter = rateLimit({
@@ -21,10 +18,7 @@ const authLimiter = rateLimit({
     max: parseInt(process.env.RATE_LIMIT_AUTH_MAX) || 10,
     standardHeaders: true,
     legacyHeaders: false,
-    handler: (req, res) => {
-        const minutes = Math.ceil((parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000) / 60000);
-        res.status(429).json({ error: `Trop de requêtes, réessayez dans ${minutes} minutes.` });
-    },
+    message: { error: 'Trop de tentatives de connexion, veuillez réessayer dans 15 minutes.' },
 });
 
 const aiLimiter = rateLimit({

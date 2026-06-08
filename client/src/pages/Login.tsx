@@ -27,7 +27,11 @@ export default function Login() {
             login(res.data.user);
             navigate('/dashboard');
         } catch (err: any) {
-            setError(err.response?.data?.message || 'Identifiants incorrects.');
+            if (err.response?.status === 429) {
+                setError('Trop de tentatives de connexion. Réessayez dans 15 minutes.');
+            } else {
+                setError(err.response?.data?.error || 'Identifiants incorrects.');
+            }
         } finally {
             setLoading(false);
         }

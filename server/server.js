@@ -80,9 +80,9 @@ if (process.env.NODE_ENV === 'production') {
 app.use('/api', csrfMiddleware);
 
 // Rate limiting (avant les routes, /health exclu)
+app.use(generalLimiter);
 app.use('/api/auth', authLimiter);
 app.use('/api/ai', aiLimiter);
-app.use('/api', generalLimiter);
 
 // Logging Middleware
 app.use((req, res, next) => {
