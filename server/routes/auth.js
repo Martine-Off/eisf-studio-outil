@@ -60,8 +60,23 @@ router.post('/login', async (req, res) => {
     }
 });
 
-// Déconnexion — efface les cookies JWT et CSRF
-router.post('/logout', (req, res) => {
+// Déconnexion — inscrit le token en blacklist puis efface les cookies
+router.post('/logout', async (req, res) => {
+    try {
+        const token = req.cookies?.token || req.headers.authorization?.split(' ')[1];
+        if (token) {
+            const decoded = jwt.decode(token);
+            if (decoded?.exp) {
+                const expiresAt = new Date(decoded.exp * 1000);
+                await pool.query(
+                    'INSERT INTO revoked_tokens (token, expires_at) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+                    [token, expiresAt]
+                );
+            }
+        }
+    } catch (err) {
+        console.error('[AUTH] Erreur blacklist logout:', err.message);
+    }
     const clearOpts = {
         secure:   process.env.NODE_ENV === 'production',
         sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',

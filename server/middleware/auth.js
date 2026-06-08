@@ -3,6 +3,7 @@
 // Auteur : Martine Desmaroux — martine.desmaroux@gmail.com / contact@eisf.fr
 //
 const jwt = require('jsonwebtoken');
+const pool = require('../models/db');
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
@@ -10,7 +11,12 @@ if (!JWT_SECRET) {
     process.exit(1);
 }
 
-const authMiddleware = (req, res, next) => {
+const isRevoked = async (token) => {
+    const { rows } = await pool.query('SELECT 1 FROM revoked_tokens WHERE token = $1', [token]);
+    return rows.length > 0;
+};
+
+const authMiddleware = async (req, res, next) => {
     try {
         // Cookie HttpOnly en priorité, fallback sur header Authorization (Postman / dev)
         const token = req.cookies?.token || req.headers.authorization?.split(' ')[1];
@@ -20,6 +26,7 @@ const authMiddleware = (req, res, next) => {
         }
 
         const decoded = jwt.verify(token, JWT_SECRET);
+        if (await isRevoked(token)) return res.status(401).json({ error: 'Token révoqué' });
         req.userId = decoded.userId;
         next();
     } catch (error) {
@@ -29,11 +36,12 @@ const authMiddleware = (req, res, next) => {
 };
 
 // Variante acceptant le token en query param ?token= (pour window.open / nouveaux onglets)
-const authQueryMiddleware = (req, res, next) => {
+const authQueryMiddleware = async (req, res, next) => {
     try {
         const token = req.cookies?.token || req.headers.authorization?.split(' ')[1] || req.query.token;
         if (!token) return res.status(401).json({ error: 'Token manquant' });
         const decoded = jwt.verify(token, JWT_SECRET);
+        if (await isRevoked(token)) return res.status(401).json({ error: 'Token révoqué' });
         req.userId = decoded.userId;
         next();
     } catch (error) {

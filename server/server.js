@@ -126,6 +126,11 @@ const server = app.listen(PORT, () => {
     console.log(`📋 Health check: http://localhost:${PORT}/health`);
 });
 
+// Nettoyage des tokens révoqués expirés au démarrage
+pool.query('DELETE FROM revoked_tokens WHERE expires_at < NOW()')
+    .then(r => { if (r.rowCount > 0) console.log(`[AUTH] ${r.rowCount} token(s) révoqué(s) expirés supprimés`); })
+    .catch(err => console.error('[AUTH] Nettoyage revoked_tokens:', err.message));
+
 server.on('error', (err) => {
     if (err.code === 'EADDRINUSE') {
         console.error(`❌ Port ${PORT} déjà utilisé. Arrêtez l'autre instance ou changez PORT dans .env`);

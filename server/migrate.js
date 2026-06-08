@@ -16,6 +16,15 @@ const pool = new Pool({
 
 async function run() {
     try {
+        console.log("Creating revoked_tokens table...");
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS revoked_tokens (
+                token TEXT PRIMARY KEY,
+                revoked_at TIMESTAMP DEFAULT NOW(),
+                expires_at TIMESTAMP NOT NULL
+            );
+        `);
+
         console.log("Adding cleaned_text to projects...");
         await pool.query('ALTER TABLE projects ADD COLUMN IF NOT EXISTS cleaned_text TEXT;');
 
