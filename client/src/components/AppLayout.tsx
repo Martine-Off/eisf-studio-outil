@@ -147,6 +147,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     {children}
                 </motion.div>
             </main>
+
+            {/* Footer */}
+            <footer className="border-t border-border py-4 mt-auto">
+                <div className="max-w-[1400px] mx-auto px-6">
+                    <p className="text-xs text-[#5A5963] text-center">
+                        © 2026 EISF — École Internationale du Savoir-Faire Français. Développé par Martine Desmaroux.
+                    </p>
+                </div>
+            </footer>
         </div>
     );
 }

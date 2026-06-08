@@ -3,124 +3,129 @@
 // Auteur : Martine Desmaroux — martine.desmaroux@gmail.com / contact@eisf.fr
 //
 import { Link } from 'react-router-dom';
-import {
-    ArrowRight, GraduationCap, Target, Users,
-    Zap, Award, Shield, Twitter, Linkedin, Youtube, Facebook
-} from 'lucide-react';
+import { ArrowRight, CheckCircle, Sparkles, Download, Pencil, Volume2, FileText, MessageSquare, Music } from 'lucide-react';
 import { motion } from 'framer-motion';
+
+const steps = [
+    {
+        number: '01', title: 'Import',
+        color: 'text-[#3465AE]', bg: 'bg-[#3465AE]/10', icon: Download,
+        description: 'Glissez votre export .docx Articulate Storyline.',
+    },
+    {
+        number: '02', title: 'Génération IA',
+        color: 'text-[#A973AF]', bg: 'bg-[#A973AF]/10', icon: Sparkles,
+        description: "L'IA crée un dialogue naturel entre deux personnages — expert et apprenant.",
+    },
+    {
+        number: '03', title: 'Édition & Vérification',
+        color: 'text-[#6BB8CD]', bg: 'bg-[#6BB8CD]/10', icon: Pencil,
+        description: 'Relisez, éditez, vérifiez la fidélité au contenu source.',
+    },
+    {
+        number: '04', title: 'Export Audio',
+        color: 'text-[#EF804E]', bg: 'bg-[#EF804E]/10', icon: Volume2,
+        description: 'Générez le MP3 final et exportez pour vos apprenants.',
+    },
+];
 
 const features = [
     {
-        icon: GraduationCap,
-        title: 'Cursus Professionnel',
-        description: "Des modules spécialisés par secteur d'activité : business, luxe, gastronomie et diplomatie.",
+        icon: FileText, color: 'bg-[#3465AE]/10', iconColor: 'text-[#3465AE]',
+        title: 'Import Storyline',
+        description: 'Glissez votre export .docx Articulate Storyline pour démarrer instantanément.',
     },
     {
-        icon: Target,
-        title: 'Objectifs Précis',
-        description: 'Un système de suivi intelligent pour mesurer votre progression et accélérer vos paliers de compétence.',
+        icon: MessageSquare, color: 'bg-[#A973AF]/10', iconColor: 'text-[#A973AF]',
+        title: 'Dialogue IA',
+        description: "L'IA génère un dialogue naturel entre deux personnages IA, fidèle à votre contenu source.",
     },
     {
-        icon: Users,
-        title: 'Communauté Active',
-        description: "Échangez avec des experts et d'autres professionnels du monde entier via vos leçons dédiées.",
-    },
-    {
-        icon: Zap,
-        title: 'Micro-learning',
-        description: 'Des sessions courtes de 10 minutes optimisées pour les agendas les plus chargés.',
-    },
-    {
-        icon: Award,
-        title: 'Certificats Reconnus',
-        description: 'Validez vos compétences avec des certificats alignés sur le cadre européen (CECR).',
-    },
-    {
-        icon: Shield,
-        title: 'Sécurité Totale',
-        description: 'Vos données et votre progression sont protégées par les plus hauts standards de sécurité.',
+        icon: Music, color: 'bg-[#BDD145]/20', iconColor: 'text-[#5A5963]',
+        title: 'Audio & Export',
+        description: 'Écoutez, éditez, vérifiez la fidélité et exportez le podcast final pour vos apprenants.',
     },
 ];
 
 export default function Landing() {
     return (
-        <div className="min-h-screen bg-surface text-ink flex flex-col">
-            {/* Top accent bar */}
-            <div className="h-1 w-full bg-primary" />
+        <div className="min-h-screen bg-white text-[#1C1B22] flex flex-col">
+            {/* Liseré tricolore */}
+            <div className="flex h-1 w-full">
+                <div className="flex-1 bg-[#3465AE]" />
+                <div className="flex-1 bg-white border-y border-[#E8E6EA]" />
+                <div className="flex-1 bg-[#E63337]" />
+            </div>
 
             {/* Navbar */}
-            <header className="sticky top-0 z-50 bg-surface border-b border-border">
+            <header className="sticky top-0 z-50 bg-white/90 backdrop-blur border-b border-[#E8E6EA]">
                 <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <img src="/logo-eisf.png" className="h-7 w-auto" alt="EISF" />
-                        <span className="font-heading font-bold text-base text-ink tracking-tight">Studio EISF</span>
+                    <div className="flex items-center gap-2.5">
+                        <img src="/logo-eisf.png" className="h-9 w-auto" alt="EISF" />
+                        <span className="font-heading font-bold text-base text-[#1C1B22] tracking-tight">
+                            Studio <span className="text-[#3465AE]">EISF</span>
+                        </span>
                     </div>
-                    <div className="flex items-center gap-3">
-                        <Link
-                            to="/login"
-                            className="text-sm font-medium text-ink-soft hover:text-primary transition-colors px-3 py-1.5"
-                        >
-                            Se connecter
-                        </Link>
-                        <Link
-                            to="/register"
-                            className="text-sm font-medium bg-primary text-white px-4 py-1.5 rounded hover:opacity-90 transition-all"
-                        >
-                            S'inscrire
-                        </Link>
-                    </div>
+                    <Link
+                        to="/login"
+                        className="text-sm font-bold bg-[#3465AE] text-white px-5 py-2 rounded-lg hover:bg-[#007BC1] transition-colors"
+                    >
+                        Se connecter
+                    </Link>
                 </div>
             </header>
 
             {/* Hero */}
-            <section className="bg-canvas py-16 lg:py-24">
-                <div className="max-w-6xl mx-auto px-6 grid lg:grid-cols-2 gap-12 items-center">
+            <section className="relative overflow-hidden bg-white py-16 lg:py-24">
+                <div className="pointer-events-none absolute -top-24 -left-24 h-96 w-96 rounded-full bg-[#6BB8CD]/10 blur-3xl" />
+                <div className="pointer-events-none absolute -bottom-24 right-0 h-96 w-96 rounded-full bg-[#FECD32]/10 blur-3xl" />
+
+                <div className="relative max-w-6xl mx-auto px-6 grid lg:grid-cols-[1.05fr_.95fr] gap-12 items-center">
                     {/* Left */}
                     <motion.div
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ duration: 0.5 }}
                     >
-                        <span className="inline-flex items-center gap-1.5 bg-ines-soft text-ines-ink text-xs font-semibold px-3 py-1 rounded-full mb-5">
-                            <span className="w-1.5 h-1.5 rounded-full bg-ines" />
-                            Assistant d'apprentissage
-                        </span>
-
-                        <h1 className="text-4xl lg:text-5xl font-heading font-bold text-ink leading-tight mb-4">
-                            Maîtrisez le Français avec{' '}
-                            <span className="text-ines-ink">Studio EISF</span>
-                        </h1>
-
-                        <p className="text-base text-ink-soft leading-relaxed mb-8 max-w-md">
-                            Une plateforme d'apprentissage immersive conçue pour les professionnels aguerris.
-                            Apprenez à votre rythme avec des outils modernes et un contenu pédagogique d'excellence.
-                        </p>
-
-                        <div className="flex flex-wrap gap-3 mb-6">
-                            <Link
-                                to="/register"
-                                className="inline-flex items-center gap-2 bg-primary text-white font-medium px-5 py-2.5 rounded hover:opacity-90 transition-all text-sm"
-                            >
-                                Commencer l'aventure
-                                <ArrowRight className="h-4 w-4" />
-                            </Link>
-                            <Link
-                                to="/login"
-                                className="inline-flex items-center gap-2 bg-surface text-ink-soft font-medium px-5 py-2.5 rounded border border-border hover:border-primary hover:text-primary transition-colors text-sm"
-                            >
-                                Se connecter
-                            </Link>
+                        <div className="flex flex-wrap gap-2 mb-6">
+                            <span className="inline-flex items-center gap-1.5 bg-[#3465AE]/10 text-[#3465AE] border border-[#3465AE]/20 text-xs font-semibold px-3 py-1 rounded-full">
+                                <CheckCircle className="h-3.5 w-3.5" />
+                                Contenu certifié EISF
+                            </span>
+                            <span className="inline-flex items-center gap-1.5 bg-[#A973AF]/10 text-[#A973AF] border border-[#A973AF]/25 text-xs font-semibold px-3 py-1 rounded-full">
+                                <Sparkles className="h-3.5 w-3.5" />
+                                Généré par IA
+                            </span>
                         </div>
 
-                        <div className="flex items-center gap-4 text-xs text-ink-soft">
-                            <span className="flex items-center gap-1">
-                                <span className="w-1.5 h-1.5 rounded-full bg-emerald" />
-                                Sans engagement
-                            </span>
-                            <span className="flex items-center gap-1">
-                                <span className="w-1.5 h-1.5 rounded-full bg-emerald" />
-                                Contenus certifiés
-                            </span>
+                        <h1 className="text-4xl lg:text-5xl font-heading font-bold text-[#1C1B22] leading-tight mb-5">
+                            Transformez vos cours en{' '}
+                            <span className="text-[#3465AE]">podcasts pédagogiques</span>
+                        </h1>
+
+                        <p className="text-base text-[#5A5963] leading-relaxed mb-8 max-w-xl">
+                            Studio EISF génère automatiquement des dialogues audio à partir de vos exports Storyline (.docx).
+                            Fidélité au contenu source garantie, prêt à écouter en quelques clics.
+                        </p>
+
+                        <div className="flex flex-wrap items-center gap-4">
+                            <Link
+                                to="/login"
+                                className="inline-flex items-center gap-2 bg-[#3465AE] hover:bg-[#007BC1] text-white font-bold px-6 py-3.5 rounded-lg transition-colors text-sm"
+                            >
+                                Se connecter
+                                <ArrowRight className="h-4 w-4" />
+                            </Link>
+                            <div className="flex items-center gap-4 text-xs text-[#5A5963]">
+                                <span className="flex items-center gap-1.5">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-[#BDD145]" />
+                                    Sans installation
+                                </span>
+                                <span className="flex items-center gap-1.5">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-[#BDD145]" />
+                                    Export .mp3
+                                </span>
+                            </div>
                         </div>
                     </motion.div>
 
@@ -131,168 +136,124 @@ export default function Landing() {
                         transition={{ duration: 0.5, delay: 0.15 }}
                         className="hidden lg:block"
                     >
-                        <div className="bg-surface rounded-lg shadow-pop overflow-hidden border border-border">
-                            {/* Mock top bar */}
-                            <div className="flex items-center gap-2 px-4 py-3 border-b border-border bg-surface">
-                                <div className="h-2.5 w-2.5 rounded-full bg-danger/40" />
-                                <div className="h-2.5 w-2.5 rounded-full bg-amber/40" />
-                                <div className="h-2.5 w-2.5 rounded-full bg-emerald/40" />
+                        <div className="relative rounded-2xl border border-[#E8E6EA] shadow-2xl bg-white overflow-hidden">
+                            {/* Mac bar */}
+                            <div className="flex items-center gap-2 px-4 py-3 border-b border-[#E8E6EA] bg-[#F5F4F7]">
+                                <div className="h-3 w-3 rounded-full bg-[#E63337]/60" />
+                                <div className="h-3 w-3 rounded-full bg-[#FECD32]/60" />
+                                <div className="h-3 w-3 rounded-full bg-[#BDD145]/60" />
+                                <span className="ml-3 text-xs font-medium text-[#5A5963]">Studio EISF · La crème pâtissière</span>
                             </div>
-                            {/* Mock content */}
-                            <div className="p-5 bg-border-soft space-y-3">
-                                <div className="bg-surface rounded-lg p-4 shadow-card space-y-2">
-                                    <div className="flex items-center justify-between">
-                                        <div className="h-3 w-32 bg-border rounded-full" />
-                                        <div className="h-5 w-14 bg-emerald/30 rounded-full" />
-                                    </div>
-                                    <div className="h-2 w-full bg-border rounded-full" />
-                                    <div className="h-2 w-3/4 bg-border rounded-full" />
-                                    <div className="flex gap-3 pt-1">
-                                        <div className="h-2 w-16 bg-ines/30 rounded-full" />
-                                        <div className="h-2 w-12 bg-ines/30 rounded-full" />
-                                    </div>
+
+                            <div className="p-5 space-y-3">
+                                {/* Réplique Inès */}
+                                <div className="border-l-[3px] border-[#6BB8CD] pl-4 py-1">
+                                    <p className="text-xs font-bold text-[#6BB8CD] mb-1.5">Inès</p>
+                                    <div className="h-2 w-full bg-[#E8E6EA] rounded-full mb-1.5" />
+                                    <div className="h-2 w-4/5 bg-[#E8E6EA] rounded-full" />
                                 </div>
-                                <div className="grid grid-cols-3 gap-3">
-                                    {[1,2,3].map(i => (
-                                        <div key={i} className="bg-surface rounded-lg p-3 shadow-card space-y-2">
-                                            <div className="h-8 w-8 rounded-lg bg-primary/10" />
-                                            <div className="h-2 w-full bg-border rounded-full" />
-                                            <div className="h-2 w-2/3 bg-border rounded-full" />
+                                {/* Réplique Yannick */}
+                                <div className="border-l-[3px] border-[#A973AF] pl-4 py-1 ml-6">
+                                    <p className="text-xs font-bold text-[#A973AF] mb-1.5">Yannick</p>
+                                    <div className="h-2 w-full bg-[#E8E6EA] rounded-full mb-1.5" />
+                                    <div className="h-2 w-3/5 bg-[#E8E6EA] rounded-full" />
+                                </div>
+                                {/* Réplique Inès */}
+                                <div className="border-l-[3px] border-[#6BB8CD] pl-4 py-1">
+                                    <p className="text-xs font-bold text-[#6BB8CD] mb-1.5">Inès</p>
+                                    <div className="h-2 w-full bg-[#E8E6EA] rounded-full mb-1.5" />
+                                    <div className="h-2 w-2/3 bg-[#E8E6EA] rounded-full" />
+                                </div>
+
+                                {/* Mini-player */}
+                                <div className="mt-2 flex items-center gap-3 bg-[#F5F4F7] rounded-xl px-4 py-3">
+                                    <div className="h-8 w-8 rounded-full bg-[#3465AE] flex items-center justify-center flex-shrink-0">
+                                        <svg className="h-4 w-4 text-white" fill="currentColor" viewBox="0 0 24 24">
+                                            <path d="M8 5v14l11-7z" />
+                                        </svg>
+                                    </div>
+                                    <div className="flex-1 space-y-1.5">
+                                        <div className="h-1.5 w-full bg-[#E8E6EA] rounded-full overflow-hidden">
+                                            <div className="h-full w-1/6 bg-[#3465AE] rounded-full" />
                                         </div>
-                                    ))}
-                                </div>
-                                <div className="bg-surface rounded-lg p-4 shadow-card">
-                                    <div className="flex items-center gap-3">
-                                        <div className="h-10 w-10 rounded-full bg-primary/15 flex-shrink-0" />
-                                        <div className="flex-1 space-y-1.5">
-                                            <div className="h-2 w-3/4 bg-border rounded-full" />
-                                            <div className="h-2 w-1/2 bg-border rounded-full" />
-                                        </div>
-                                        <div className="h-6 w-16 bg-emerald/30 rounded-full" />
+                                        <p className="text-[10px] text-[#5A5963]">1:24 / 8:42</p>
                                     </div>
                                 </div>
+                            </div>
+
+                            {/* Pastille fidélité */}
+                            <div className="absolute top-14 right-4 bg-[#BDD145] text-[#1C1B22] text-[11px] font-bold px-2.5 py-1 rounded-full shadow">
+                                Fidélité 97%
                             </div>
                         </div>
                     </motion.div>
                 </div>
             </section>
 
-            {/* Features */}
-            <section className="py-16 lg:py-20 bg-surface">
+            {/* Comment ça marche */}
+            <section className="py-16 bg-[#F5F4F7] border-y border-[#E8E6EA]">
                 <div className="max-w-6xl mx-auto px-6">
-                    <div className="text-center mb-12">
-                        <h2 className="text-2xl lg:text-3xl font-heading font-bold text-ink mb-3">
-                            Pourquoi choisir Studio EISF ?
+                    <div className="text-center mb-10">
+                        <p className="text-sm font-bold text-[#3465AE] uppercase tracking-widest mb-2">Le parcours</p>
+                        <h2 className="text-2xl lg:text-3xl font-heading font-bold text-[#1C1B22]">
+                            Comment ça marche
                         </h2>
-                        <p className="text-ink-soft max-w-xl mx-auto text-sm leading-relaxed">
-                            Nous combinons l'excellence académique française avec la puissance technologique
-                            pour une expérience d'apprentissage inégalée.
-                        </p>
                     </div>
-
-                    <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                        {features.map((f, i) => (
+                    <div className="grid sm:grid-cols-2 md:grid-cols-4 gap-5">
+                        {steps.map((step, i) => (
                             <motion.div
-                                key={f.title}
+                                key={step.number}
                                 initial={{ opacity: 0, y: 12 }}
                                 animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: 0.1 + i * 0.07 }}
-                                className="bg-surface rounded-lg p-5 border border-border hover:shadow-card transition-shadow"
+                                transition={{ delay: 0.1 + i * 0.08 }}
+                                className="relative bg-white rounded-xl border border-[#E8E6EA] p-6"
                             >
-                                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-ines-soft mb-4">
-                                    <f.icon className="h-5 w-5 text-ines-ink" />
+                                <span className="absolute top-4 right-5 text-3xl font-heading font-bold text-[#E8E6EA] leading-none select-none">
+                                    {step.number}
+                                </span>
+                                <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${step.bg} mb-4`}>
+                                    <step.icon className={`h-4 w-4 ${step.color}`} />
                                 </div>
-                                <h3 className="font-heading font-bold text-sm text-ink mb-2">{f.title}</h3>
-                                <p className="text-xs text-ink-soft leading-relaxed">{f.description}</p>
+                                <h3 className={`font-heading font-bold text-sm mb-2 ${step.color}`}>{step.title}</h3>
+                                <p className="text-xs text-[#5A5963] leading-relaxed">{step.description}</p>
                             </motion.div>
                         ))}
                     </div>
                 </div>
             </section>
 
-            {/* CTA Banner */}
-            <section className="bg-primary py-14">
-                <div className="max-w-6xl mx-auto px-6 flex flex-col lg:flex-row items-center justify-between gap-8">
-                    <div className="text-white text-center lg:text-left">
-                        <h2 className="text-2xl lg:text-3xl font-heading font-bold mb-2 leading-snug">
-                            Prêt à transformer votre carrière<br className="hidden lg:block" /> avec le français ?
-                        </h2>
-                        <p className="text-white/80 text-sm">
-                            Rejoignez les milliers de professionnels qui font confiance à<br className="hidden lg:block" />
-                            Studio EISF pour leur développement linguistique.
-                        </p>
-                    </div>
-                    <div className="flex items-center gap-3 flex-shrink-0">
-                        <Link
-                            to="/register"
-                            className="inline-flex items-center gap-2 bg-surface text-primary font-medium px-6 py-2.5 rounded hover:opacity-95 transition-all text-sm whitespace-nowrap"
-                        >
-                            Créer un compte gratuit
-                        </Link>
-                        <Link
-                            to="/login"
-                            className="inline-flex items-center gap-2 border border-white/50 text-white font-medium px-6 py-2.5 rounded hover:border-white hover:bg-white/10 transition-colors text-sm whitespace-nowrap"
-                        >
-                            Se connecter
-                        </Link>
+            {/* Feature Cards */}
+            <section className="py-16 lg:py-20 bg-white">
+                <div className="max-w-6xl mx-auto px-6">
+                    <div className="grid md:grid-cols-3 gap-6">
+                        {features.map((f, i) => (
+                            <motion.div
+                                key={f.title}
+                                initial={{ opacity: 0, y: 12 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: 0.1 + i * 0.07 }}
+                                className="rounded-2xl border border-[#E8E6EA] p-7 hover:shadow-xl transition-shadow"
+                            >
+                                <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${f.color} mb-5`}>
+                                    <f.icon className={`h-5 w-5 ${f.iconColor}`} />
+                                </div>
+                                <h3 className="font-heading font-bold text-base text-[#1C1B22] mb-2">{f.title}</h3>
+                                <p className="text-sm text-[#5A5963] leading-relaxed">{f.description}</p>
+                            </motion.div>
+                        ))}
                     </div>
                 </div>
             </section>
 
             {/* Footer */}
-            <footer className="bg-surface border-t border-border py-10">
-                <div className="max-w-6xl mx-auto px-6 grid grid-cols-2 lg:grid-cols-4 gap-8">
-                    {/* Brand */}
-                    <div className="col-span-2 lg:col-span-1">
-                        <div className="flex items-center gap-2 mb-3">
-                            <img src="/logo-eisf.png" className="h-7 w-auto" alt="EISF" />
-                            <span className="font-heading font-bold text-sm text-ink">Studio EISF</span>
-                        </div>
-                        <p className="text-xs text-ink-soft leading-relaxed max-w-[200px]">
-                            La plateforme d'excellence pour l'apprentissage du français professionnel.
-                        </p>
+            <footer className="bg-white border-t border-[#E8E6EA] py-6 mt-auto">
+                <div className="max-w-6xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                        <img src="/logo-eisf.png" className="h-5 w-auto" alt="EISF" />
+                        <span className="font-heading font-bold text-xs text-[#1C1B22]">Studio EISF</span>
                     </div>
-
-                    {/* Produit */}
-                    <div>
-                        <p className="text-xs font-semibold text-ink mb-3">Produit</p>
-                        <ul className="space-y-2 text-xs text-ink-soft">
-                            <li><a href="#" className="hover:text-ink transition-colors">Fonctionnalités</a></li>
-                            <li><a href="#" className="hover:text-ink transition-colors">Tarifs</a></li>
-                            <li><a href="#" className="hover:text-ink transition-colors">Témoignages</a></li>
-                        </ul>
-                    </div>
-
-                    {/* Support */}
-                    <div>
-                        <p className="text-xs font-semibold text-ink mb-3">Support</p>
-                        <ul className="space-y-2 text-xs text-ink-soft">
-                            <li><a href="#" className="hover:text-ink transition-colors">Aide</a></li>
-                            <li><a href="#" className="hover:text-ink transition-colors">Contact</a></li>
-                            <li><a href="#" className="hover:text-ink transition-colors">Confidentialité</a></li>
-                        </ul>
-                    </div>
-
-                    {/* Social */}
-                    <div>
-                        <p className="text-xs font-semibold text-ink mb-3">Suivez-nous</p>
-                        <div className="flex gap-2">
-                            {[Twitter, Linkedin, Youtube, Facebook].map((Icon, i) => (
-                                <a
-                                    key={i}
-                                    href="#"
-                                    className="flex h-7 w-7 items-center justify-center rounded bg-border-soft hover:bg-primary hover:text-white text-ink-soft transition-colors"
-                                >
-                                    <Icon className="h-3.5 w-3.5" />
-                                </a>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-
-                <div className="max-w-6xl mx-auto px-6 mt-8 pt-6 border-t border-border">
-                    <p className="text-xs text-ink-faint text-center">
-                        © 2026 Studio EISF — Tous droits réservés.
+                    <p className="text-xs text-[#5A5963] text-center">
+                        © 2026 EISF — École Internationale du Savoir-Faire Français. Développé par Martine Desmaroux.
                     </p>
                 </div>
             </footer>

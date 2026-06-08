@@ -8,8 +8,8 @@
 
 /* ─── Tailwind v4 — tokens générateurs de classes utilitaires ─────────────── */
 @theme {
-  --font-heading: 'Sansation', 'Jost', sans-serif;
-  --font-body:    Verdana, Geneva, sans-serif;
+  --font-heading: 'Plus Jakarta Sans', system-ui, sans-serif;
+  --font-body:    'Plus Jakarta Sans', system-ui, sans-serif;
 
   --color-canvas:       #FBFCFD;
   --color-surface:      #FFFFFF;
@@ -46,8 +46,8 @@
 
 /* ─── Aliases courts — pour var(--canvas) dans styles inline et CSS custom ── */
 :root {
-  --font-heading: 'Sansation', 'Jost', sans-serif;
-  --font-body:    Verdana, Geneva, sans-serif;
+  --font-heading: 'Plus Jakarta Sans', system-ui, sans-serif;
+  --font-body:    'Plus Jakarta Sans', system-ui, sans-serif;
 
   --canvas:      #FBFCFD;
   --surface:     #FFFFFF;
