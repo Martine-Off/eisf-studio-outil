@@ -81,12 +81,7 @@ export default function Login() {
 
                             {/* Password */}
                             <div>
-                                <div className="flex items-center justify-between mb-1.5">
-                                    <label className="block text-sm font-medium text-ink">Mot de passe</label>
-                                    <a href="#" className="text-xs text-primary hover:underline font-medium">
-                                        Mot de passe oublié ?
-                                    </a>
-                                </div>
+                                <label className="block text-sm font-medium text-ink mb-1.5">Mot de passe</label>
                                 <div className="relative">
                                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-ink-soft" />
                                     <input
@@ -121,22 +116,6 @@ export default function Login() {
                             </button>
                         </form>
 
-                        {/* Divider */}
-                        <div className="flex items-center gap-3 my-5">
-                            <hr className="flex-1 border-border" />
-                            <span className="text-xs text-ink-faint">ou</span>
-                            <hr className="flex-1 border-border" />
-                        </div>
-
-                        <p className="text-sm text-ink-soft text-center mb-3">
-                            Pas encore de compte sur Studio EISF ?
-                        </p>
-                        <Link
-                            to="/register"
-                            className="flex w-full items-center justify-center rounded border border-primary px-4 py-2.5 text-sm font-medium text-primary transition-all hover:bg-primary/5 active:scale-[0.99]"
-                        >
-                            Créer un compte gratuitement
-                        </Link>
                     </div>
                 </motion.div>
             </div>
