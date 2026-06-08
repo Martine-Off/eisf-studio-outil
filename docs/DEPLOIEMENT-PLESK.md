@@ -63,8 +63,10 @@ node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
 - Mettre à jour `DATABASE_URL` avec les credentials Plesk
 - Lancer les migrations :
 ```bash
-cd server && node scripts/migrate.js
-# ou équivalent selon la config du projet
+cd server
+node migrate.js      # crée/met à jour les tables
+node initDB.js       # initialise les données de base
+node initUser.js     # crée l'utilisateur initial (APP_LOGIN / APP_PASSWORD)
 ```
 
 ## 5. Installer les dépendances serveur
