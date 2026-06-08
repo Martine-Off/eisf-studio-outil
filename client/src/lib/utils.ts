@@ -1,3 +1,12 @@
+/**
+ * Studio EISF — Plateforme de génération de podcasts pédagogiques
+ *
+ * © 2026 EISF — École Internationale du Savoir-Faire Français
+ * Tous droits réservés / All Rights Reserved.
+ *
+ * @author  Martine Desmaroux <contact@eisf.fr>
+ * @license Propriétaire — EISF
+ */
 /** Formate une date ISO en heure Paris (Europe/Paris), format fr-FR.
  *  Normalise la chaîne en UTC si elle ne porte pas de suffixe timezone. */
 export function formatDateParis(dateStr: string): string {

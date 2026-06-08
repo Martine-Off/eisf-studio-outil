@@ -1,3 +1,12 @@
+/**
+ * Studio EISF — Plateforme de génération de podcasts pédagogiques
+ *
+ * © 2026 EISF — École Internationale du Savoir-Faire Français
+ * Tous droits réservés / All Rights Reserved.
+ *
+ * @author  Martine Desmaroux <contact@eisf.fr>
+ * @license Propriétaire — EISF
+ */
 export interface IAFeedback {
   concepts_manquants: string[];
   informations_erronees: string[];
