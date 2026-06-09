@@ -7,7 +7,7 @@ function toTextString(result) {
   return result?.text || result?.output || JSON.stringify(result);
 }
 
-async function verifyScriptAgainstSource(segmentContent, scriptText, cachedConcepts = null) {
+async function verifyScriptAgainstSource(segmentContent, scriptText, cachedConcepts = null, onConceptsExtracted = null) {
   let concepts = cachedConcepts && cachedConcepts.length > 0 ? cachedConcepts : null;
 
   // ─── Appel 1 : extraction des concepts (sauté si cache présent) ──────────
@@ -24,6 +24,7 @@ async function verifyScriptAgainstSource(segmentContent, scriptText, cachedConce
       .map(l => l.slice(2).trim())
       .filter(Boolean);
     if (concepts.length === 0) throw new Error('Aucun concept extrait du source');
+    if (onConceptsExtracted) await onConceptsExtracted(concepts);
   }
 
   // ─── Appel 2 : vérification binaire présent/absent dans le script ─────────

@@ -367,9 +367,20 @@ router.post('/:id/verify', authMiddleware, async (req, res) => {
             .map(item => `${item.character || 'Intervenant'}: ${item.text_studio || ''}`)
             .join('\n');
 
-        // 2. Vérification déterministe via Anthropic (extraction + vérification binaire)
-        console.log('[VERIFY] Lancement verifyScriptAgainstSource...');
-        const result = await verifyScriptAgainstSource(cleanedText, scriptText, null);
+        // 2. Vérification déterministe (extraction + vérification binaire)
+        // Charger les concepts en cache pour reprendre après un dépassement de quota
+        const feedbackRow = await pool.query('SELECT ia_feedback FROM podcasts WHERE id = $1', [id]);
+        const cachedConcepts = feedbackRow.rows[0]?.ia_feedback?.cached_concepts || null;
+        if (cachedConcepts) console.log(`[VERIFY] ${cachedConcepts.length} concepts en cache — appel 1 Make ignoré`);
+        else console.log('[VERIFY] Lancement verifyScriptAgainstSource...');
+
+        const result = await verifyScriptAgainstSource(cleanedText, scriptText, cachedConcepts, async (concepts) => {
+            await pool.query(
+                "UPDATE podcasts SET ia_feedback = COALESCE(ia_feedback, '{}'::jsonb) || $1::jsonb WHERE id = $2",
+                [JSON.stringify({ cached_concepts: concepts }), id]
+            );
+            console.log(`[VERIFY] ${concepts.length} concepts sauvegardés en DB (protection quota)`);
+        });
 
         // Pénalité -5% par réplique is_grounded = false (données du grounding check précédent)
         const ungroundedRes = await pool.query(
