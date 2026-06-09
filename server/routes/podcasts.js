@@ -420,7 +420,10 @@ router.post('/:id/verify', authMiddleware, async (req, res) => {
 
         res.json({ success: true, ia_feedback: iaFeedback, fidelity_score: finalScore });
     } catch (error) {
-        console.error('Erreur vérification GPT:', error);
+        if (error.code === 'MAKE_QUOTA_EXCEEDED') {
+            return res.status(429).json({ error: 'Quota Make dépassé — réessayez dans quelques minutes.' });
+        }
+        console.error('Erreur vérification IA:', error);
         res.status(500).json({ error: 'Erreur serveur lors de la vérification IA' });
     }
 });

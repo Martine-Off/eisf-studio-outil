@@ -121,21 +121,30 @@ app.use((err, req, res, next) => {
     res.status(500).json({ error: 'Erreur interne du serveur' });
 });
 
-const server = app.listen(PORT, () => {
-    console.log(`🚀 Studio EISF API running on http://localhost:${PORT}`);
-    console.log(`📋 Health check: http://localhost:${PORT}/health`);
-});
-
 // Nettoyage des tokens révoqués expirés au démarrage
 pool.query('DELETE FROM revoked_tokens WHERE expires_at < NOW()')
     .then(r => { if (r.rowCount > 0) console.log(`[AUTH] ${r.rowCount} token(s) révoqué(s) expirés supprimés`); })
     .catch(err => console.error('[AUTH] Nettoyage revoked_tokens:', err.message));
 
-server.on('error', (err) => {
-    if (err.code === 'EADDRINUSE') {
-        console.error(`❌ Port ${PORT} déjà utilisé. Arrêtez l'autre instance ou changez PORT dans .env`);
-        process.exit(1);
-    } else {
-        throw err;
-    }
-});
+function startServer(attempt = 1) {
+    const maxAttempts = 3;
+    const srv = app.listen(PORT, () => {
+        console.log(`🚀 Studio EISF API running on http://localhost:${PORT}`);
+        console.log(`📋 Health check: http://localhost:${PORT}/health`);
+    });
+    srv.on('error', (err) => {
+        if (err.code === 'EADDRINUSE') {
+            if (attempt < maxAttempts) {
+                console.warn(`⚠️ Port ${PORT} occupé — nouvelle tentative ${attempt + 1}/${maxAttempts} dans 2s...`);
+                setTimeout(() => startServer(attempt + 1), 2000);
+            } else {
+                console.error(`❌ Port ${PORT} toujours occupé après ${maxAttempts} tentatives. Arrêtez l'autre instance ou changez PORT dans .env`);
+                process.exit(1);
+            }
+        } else {
+            throw err;
+        }
+    });
+}
+
+startServer();
