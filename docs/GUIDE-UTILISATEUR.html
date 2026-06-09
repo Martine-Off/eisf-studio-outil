@@ -10,38 +10,30 @@
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --blue:#3465AE;--blue-vif:#007BC1;--red:#E63337;
-  --cyan:#6BB8CD;--mauve:#A973AF;--anis:#BDD145;
-  --ink:#1C1B22;--gray:#5A5963;--border:#E8E6EA;
-  --bg:#F5F4F7;--white:#ffffff;
+  --blue:#3465AE;--red:#E63337;--ink:#1C1B22;
+  --gray:#5A5963;--border:#E8E6EA;--bg:#F5F4F7;--white:#ffffff;
 }
 body{font-family:'Plus Jakarta Sans',system-ui,sans-serif;color:var(--ink);background:var(--bg);min-height:100vh;}
-
 .tricolor{display:flex;height:4px;width:100%;position:fixed;top:0;left:0;z-index:100;}
 .tricolor div:nth-child(1){flex:1;background:var(--blue);}
 .tricolor div:nth-child(2){flex:1;background:var(--white);border-top:1px solid var(--border);}
 .tricolor div:nth-child(3){flex:1;background:var(--red);}
-
 .header{position:fixed;top:4px;left:0;right:0;z-index:99;background:rgba(255,255,255,0.97);backdrop-filter:blur(8px);border-bottom:1px solid var(--border);padding:0.75rem 2rem;display:flex;align-items:center;gap:1rem;}
 .header-logo{font-weight:800;font-size:1.05rem;color:var(--ink);text-decoration:none;}
 .header-logo span{color:var(--blue);}
 .header-sep{width:1px;height:20px;background:var(--border);}
 .header-title{font-size:0.85rem;font-weight:600;color:var(--gray);}
-.header-badge{margin-left:auto;background:var(--blue);color:white;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;letter-spacing:0.03em;}
-
+.header-badge{margin-left:auto;background:var(--blue);color:white;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;}
 .layout{display:flex;min-height:100vh;padding-top:64px;}
-
 .sidebar{width:240px;flex-shrink:0;background:var(--white);border-right:1px solid var(--border);position:fixed;top:64px;bottom:0;overflow-y:auto;padding:1.5rem 0;}
 .sidebar-section{padding:0 1rem 1rem;}
 .sidebar-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--gray);padding:0 0.75rem 0.5rem;display:block;}
-.sidebar a{display:flex;align-items:center;gap:0.6rem;padding:0.5rem 0.75rem;border-radius:8px;font-size:13.5px;font-weight:500;color:var(--gray);text-decoration:none;transition:all 0.15s;cursor:pointer;}
+.sidebar a{display:flex;align-items:center;gap:0.6rem;padding:0.5rem 0.75rem;border-radius:8px;font-size:13.5px;font-weight:500;color:var(--gray);text-decoration:none;cursor:pointer;}
 .sidebar a:hover{background:var(--bg);color:var(--ink);}
 .sidebar a.active{background:#EDF2FA;color:var(--blue);font-weight:700;}
 .num{width:20px;height:20px;border-radius:50%;background:var(--border);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;}
 .sidebar a.active .num{background:var(--blue);color:white;}
-
 .main{margin-left:240px;flex:1;padding:2.5rem 3rem;max-width:860px;}
-
 .hero{background:var(--white);border:1px solid var(--border);border-radius:16px;padding:2rem 2.5rem;margin-bottom:2.5rem;}
 .hero-pills{display:flex;gap:0.5rem;margin-bottom:1rem;flex-wrap:wrap;}
 .pill{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;padding:4px 12px;border-radius:20px;}
@@ -51,74 +43,49 @@ body{font-family:'Plus Jakarta Sans',system-ui,sans-serif;color:var(--ink);backg
 .hero h1 span{color:var(--blue);}
 .hero p{font-size:0.95rem;color:var(--gray);line-height:1.7;max-width:520px;}
 .hero-url{display:inline-flex;align-items:center;gap:6px;margin-top:1rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:6px 14px;font-size:13px;font-weight:600;color:var(--blue);text-decoration:none;}
-
-.section{display:none;}
-.section.active{display:block;}
-
+.section{display:none;}.section.active{display:block;}
 .step-header{display:flex;align-items:center;gap:1rem;margin-bottom:1.5rem;}
 .step-num{width:40px;height:40px;border-radius:50%;background:var(--blue);color:white;font-weight:800;font-size:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 2px 8px rgba(52,101,174,0.3);}
 .step-header-text h2{font-size:1.2rem;font-weight:800;color:var(--ink);}
 .step-header-text p{font-size:13px;color:var(--gray);margin-top:2px;}
-
 .card{background:var(--white);border:1px solid var(--border);border-radius:12px;padding:1.5rem;margin-bottom:1.25rem;}
-
 .steps-list{list-style:none;counter-reset:steps;}
 .steps-list li{counter-increment:steps;display:flex;gap:0.75rem;align-items:flex-start;padding:0.6rem 0;border-bottom:1px solid var(--bg);font-size:14px;color:var(--ink);line-height:1.6;}
 .steps-list li:last-child{border-bottom:none;}
 .steps-list li::before{content:counter(steps);min-width:24px;height:24px;border-radius:50%;background:var(--bg);color:var(--blue);font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;}
 .steps-list li strong{color:var(--ink);font-weight:700;}
-
-.capture{background:var(--bg);border:2px dashed var(--border);border-radius:10px;padding:1.5rem;margin:1rem 0;text-align:center;}
-.capture img{max-width:100%;border-radius:8px;border:1px solid var(--border);box-shadow:0 2px 12px rgba(0,0,0,0.08);}
-.capture-placeholder{font-size:13px;color:var(--gray);padding:1rem;}
-.capture-placeholder span{display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#B0AEBC;margin-bottom:0.25rem;}
-
+.capture{margin:1rem 0;border-radius:10px;overflow:hidden;border:1px solid var(--border);}
+.capture img{width:100%;display:block;border-radius:9px;}
 .alert{display:flex;gap:0.75rem;align-items:flex-start;border-radius:10px;padding:0.9rem 1.1rem;margin:1rem 0;font-size:13.5px;line-height:1.6;}
 .alert-icon{font-size:18px;flex-shrink:0;margin-top:1px;}
 .alert-warning{background:#FFF8E6;border:1px solid #F5D98A;color:#7A5A0A;}
 .alert-info{background:#EDF6FF;border:1px solid #B5D4F4;color:#185FA5;}
 .alert-block{background:#FEECEC;border:1px solid #F5BABA;color:#A32D2D;}
-
 .score-row{display:flex;gap:0.75rem;flex-wrap:wrap;margin:0.75rem 0;}
 .score-badge{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:8px;font-size:13px;font-weight:700;border:1px solid;}
 .score-ok{background:#EAF3DE;color:#3B6D11;border-color:#C0DD97;}
 .score-warn{background:#FFF8E6;color:#7A5A0A;border-color:#F5D98A;}
-
 .proposition-demo{background:#FFF3EC;border:1px solid #F5C4A0;border-radius:10px;padding:1.25rem 1.5rem;margin:1rem 0;}
 .prop-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#C05A0A;margin-bottom:0.6rem;}
 .proposition-demo code{display:block;font-family:'Courier New',monospace;font-size:13px;background:white;border:1px solid #F5C4A0;border-radius:6px;padding:10px 14px;color:#7A3A0A;margin-bottom:0.75rem;}
 .prop-buttons{display:flex;gap:0.5rem;}
 .btn-garder{background:#3B6D11;color:white;border:none;border-radius:6px;padding:6px 16px;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;}
 .btn-suppr{background:#A32D2D;color:white;border:none;border-radius:6px;padding:6px 16px;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;}
-
 .subsection-title{font-size:14px;font-weight:700;color:var(--ink);margin:1.25rem 0 0.75rem;padding-bottom:0.4rem;border-bottom:2px solid var(--bg);}
-
 .data-table{width:100%;border-collapse:collapse;font-size:13.5px;margin:0.75rem 0;}
 .data-table th{background:var(--bg);color:var(--gray);font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:0.06em;padding:10px 14px;text-align:left;border-bottom:1px solid var(--border);}
 .data-table td{padding:10px 14px;border-bottom:1px solid var(--border);color:var(--ink);vertical-align:top;line-height:1.5;}
 .data-table tr:last-child td{border-bottom:none;}
 .data-table td:first-child{font-weight:600;}
-.format-badge{display:inline-block;background:#EDF2FA;border:1px solid #C5D6EF;border-radius:6px;padding:2px 10px;font-size:12px;font-weight:700;color:var(--blue);}
 .format-badge-main{display:inline-block;background:var(--blue);border-radius:6px;padding:2px 10px;font-size:12px;font-weight:700;color:white;}
-
+.format-badge{display:inline-block;background:#EDF2FA;border:1px solid #C5D6EF;border-radius:6px;padding:2px 10px;font-size:12px;font-weight:700;color:var(--blue);}
 .contact-block{background:var(--white);border:1px solid var(--border);border-radius:12px;padding:1.25rem 1.5rem;display:flex;align-items:center;gap:1rem;margin-top:1.5rem;}
 .contact-icon{width:42px;height:42px;background:var(--blue);border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
 .contact-icon svg{width:20px;height:20px;stroke:white;stroke-width:2;fill:none;}
 .contact-text p{font-size:13px;color:var(--gray);margin-bottom:2px;}
 .contact-text a{color:var(--blue);font-weight:700;font-size:14px;text-decoration:none;}
-
-.captures-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:0.75rem;margin-top:1rem;}
-.capture-item{background:var(--white);border:1px solid var(--border);border-radius:10px;padding:0.9rem 1rem;display:flex;gap:0.75rem;align-items:flex-start;}
-.capture-ref{background:var(--blue);color:white;font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;white-space:nowrap;flex-shrink:0;margin-top:2px;}
-.capture-desc{font-size:13px;color:var(--gray);line-height:1.5;}
-
 .footer{margin-left:240px;border-top:1px solid var(--border);padding:1.5rem 3rem;font-size:12px;color:var(--gray);background:var(--white);}
-
-@media(max-width:768px){
-  .sidebar{display:none;}
-  .main{margin-left:0;padding:1.5rem 1.25rem;}
-  .footer{margin-left:0;}
-}
+@media(max-width:768px){.sidebar{display:none;}.main{margin-left:0;padding:1.5rem 1.25rem;}.footer{margin-left:0;}}
 </style>
 </head>
 <body>
@@ -129,33 +96,24 @@ body{font-family:'Plus Jakarta Sans',system-ui,sans-serif;color:var(--ink);backg
   <a href="#" class="header-logo">Studio <span>EISF</span></a>
   <div class="header-sep"></div>
   <span class="header-title">Guide utilisateur</span>
-  <span class="header-badge">v1.0</span>
+  <span class="header-badge">v1.1</span>
 </header>
 
 <div class="layout">
-
   <nav class="sidebar">
     <div class="sidebar-section">
-      <span class="sidebar-label">Démarrage</span>
+      <span class="sidebar-label">Utilisation</span>
       <a onclick="show('connexion',this)" class="active"><span class="num">1</span> Se connecter</a>
-      <a onclick="show('projet',this)"><span class="num">2</span> Créer un projet</a>
-      <a onclick="show('import',this)"><span class="num">3</span> Importer Storyline</a>
-    </div>
-    <div class="sidebar-section">
-      <span class="sidebar-label">Génération</span>
-      <a onclick="show('generation',this)"><span class="num">4</span> Générer le dialogue</a>
-      <a onclick="show('verification',this)"><span class="num">5</span> Vérifier la fidélité</a>
-      <a onclick="show('edition',this)"><span class="num">6</span> Éditer le dialogue</a>
-    </div>
-    <div class="sidebar-section">
-      <span class="sidebar-label">Finalisation</span>
-      <a onclick="show('audio',this)"><span class="num">7</span> Générer l'audio</a>
-      <a onclick="show('export',this)"><span class="num">8</span> Exporter</a>
+      <a onclick="show('import',this)"><span class="num">2</span> Importer Storyline</a>
+      <a onclick="show('generation',this)"><span class="num">3</span> Générer le dialogue</a>
+      <a onclick="show('verification',this)"><span class="num">4</span> Vérifier la fidélité</a>
+      <a onclick="show('edition',this)"><span class="num">5</span> Éditer le dialogue</a>
+      <a onclick="show('audio',this)"><span class="num">6</span> Générer l'audio</a>
+      <a onclick="show('export',this)"><span class="num">7</span> Exporter</a>
     </div>
     <div class="sidebar-section">
       <span class="sidebar-label">Support</span>
-      <a onclick="show('aide',this)"><span class="num">?</span> Aide &amp; dépannage</a>
-      <a onclick="show('captures',this)"><span class="num">📷</span> Liste captures</a>
+      <a onclick="show('aide',this)"><span class="num">?</span> Aide & dépannage</a>
     </div>
   </nav>
 
@@ -178,7 +136,7 @@ body{font-family:'Plus Jakarta Sans',system-ui,sans-serif;color:var(--ink);backg
         <div class="step-header-text"><h2>Se connecter</h2><p>Accéder à Studio EISF depuis votre navigateur</p></div>
       </div>
       <div class="card">
-        <div class="capture"><div class="capture-placeholder"><span>CAPTURE_01</span>Page de connexion — champs identifiant + mot de passe + bouton Se connecter</div></div>
+        <div class="capture"><img src="captures/CAPTURE_01.png" alt="Page de connexion"></div>
         <ol class="steps-list">
           <li>Ouvrir <strong>https://en.eisf.fr/studio</strong> dans votre navigateur</li>
           <li>Saisir l'identifiant et le mot de passe fournis par votre administrateur</li>
@@ -188,67 +146,55 @@ body{font-family:'Plus Jakarta Sans',system-ui,sans-serif;color:var(--ink);backg
       </div>
     </section>
 
-    <!-- 2. PROJET -->
-    <section id="projet" class="section">
-      <div class="step-header">
-        <div class="step-num">2</div>
-        <div class="step-header-text"><h2>Créer un projet</h2><p>Un projet par cours ou module Storyline</p></div>
-      </div>
-      <div class="card">
-        <div class="capture"><div class="capture-placeholder"><span>CAPTURE_02</span>Tableau de bord avec bouton "Nouveau projet" en évidence</div></div>
-        <ol class="steps-list">
-          <li>Sur le tableau de bord, cliquer sur <strong>Nouveau projet</strong></li>
-          <li>Donner un nom au projet (ex : <em>"La panification — Module 1"</em>)</li>
-          <li>Cliquer sur <strong>Créer</strong></li>
-        </ol>
-        <div class="alert alert-info"><span class="alert-icon">💡</span><div>Les personnages sont prédéfinis : <strong>Inès</strong> (experte, 70% du temps de parole) et <strong>Yannick</strong> (apprenant curieux, 30%).</div></div>
-      </div>
-    </section>
-
-    <!-- 3. IMPORT -->
+    <!-- 2. IMPORT -->
     <section id="import" class="section">
       <div class="step-header">
-        <div class="step-num">3</div>
-        <div class="step-header-text"><h2>Importer votre cours Storyline</h2><p>Format accepté : export Word d'Articulate Storyline (.docx)</p></div>
+        <div class="step-num">2</div>
+        <div class="step-header-text"><h2>Importer votre cours Storyline</h2><p>Format accepté : export Word d'Articulate Storyline (.docx) sans images</p></div>
       </div>
       <div class="card">
-        <div class="capture"><div class="capture-placeholder"><span>CAPTURE_03</span>Zone d'import glisser-déposer avec fichier .docx</div></div>
+        <div class="capture"><img src="captures/CAPTURE_02.png" alt="Tableau de bord"></div>
         <ol class="steps-list">
-          <li>Dans le projet, cliquer sur <strong>Importer un fichier</strong></li>
-          <li>Glisser votre fichier <strong>.docx</strong> dans la zone, ou cliquer pour le sélectionner</li>
+          <li>Sur le tableau de bord, cliquer sur <strong>Nouveau projet</strong></li>
+          <li>Glisser votre fichier <strong>.docx</strong> dans la zone d'import, ou cliquer pour le sélectionner</li>
+        </ol>
+        <div class="capture"><img src="captures/CAPTURE_03.png" alt="Zone d'import"></div>
+        <ol class="steps-list" style="counter-reset: steps 2;">
           <li>L'outil détecte automatiquement les chapitres — vérifier la liste affichée</li>
         </ol>
-        <div class="capture"><div class="capture-placeholder"><span>CAPTURE_04</span>Liste des chapitres détectés après import</div></div>
-        <div class="alert alert-warning"><span class="alert-icon">⚠️</span><div><strong>Prérequis :</strong> Le fichier doit être un <strong>export Word d'Articulate Storyline</strong> (tableau 4 colonnes). Un export PDF ou un document Word classique ne fonctionnera pas.</div></div>
+        <div class="capture"><img src="captures/CAPTURE_04.png" alt="Chapitres détectés"></div>
+        <ol class="steps-list" style="counter-reset: steps 3;">
+          <li>Donner un nom au projet et valider</li>
+        </ol>
+        <div class="alert alert-warning"><span class="alert-icon">⚠️</span><div><strong>Prérequis :</strong> Le fichier doit être un <strong>export Word d'Articulate Storyline sans images</strong> (tableau 4 colonnes). Un export PDF ou un document Word classique ne fonctionnera pas.</div></div>
       </div>
     </section>
 
-    <!-- 4. GÉNÉRATION -->
+    <!-- 3. GÉNÉRATION -->
     <section id="generation" class="section">
       <div class="step-header">
-        <div class="step-num">4</div>
+        <div class="step-num">3</div>
         <div class="step-header-text"><h2>Générer le dialogue IA</h2><p>L'IA crée un dialogue naturel entre Inès et Yannick</p></div>
       </div>
       <div class="card">
-        <div class="capture"><div class="capture-placeholder"><span>CAPTURE_05</span>Sélection d'un chapitre + choix durée + bouton "Générer le dialogue"</div></div>
+        <div class="capture"><img src="captures/CAPTURE_05.png" alt="Génération dialogue"></div>
         <ol class="steps-list">
           <li>Sélectionner un chapitre dans la liste</li>
-          <li>Choisir la durée cible : <strong>4, 5, 6 ou 7 minutes</strong></li>
           <li>Cliquer sur <strong>Générer le dialogue</strong></li>
           <li>Attendre la génération (30 à 60 secondes selon la longueur)</li>
         </ol>
-        <div class="alert alert-info"><span class="alert-icon">💡</span><div>Le dialogue contient automatiquement : une <strong>accroche</strong> (45s), le <strong>contenu pédagogique</strong> avec quiz intégré, une <strong>conclusion</strong> + annonce du prochain épisode, et l'<strong>intro/outro EISF</strong> fixes.</div></div>
+        <div class="alert alert-info"><span class="alert-icon">💡</span><div>Le dialogue contient automatiquement : une <strong>accroche</strong> (45s), le <strong>contenu pédagogique</strong> avec quiz intégré, une <strong>conclusion</strong>, et l'<strong>intro/outro EISF</strong> fixes. Personnages : <strong>Inès</strong> (experte, 70%) et <strong>Yannick</strong> (apprenant, 30%).</div></div>
       </div>
     </section>
 
-    <!-- 5. VÉRIFICATION -->
+    <!-- 4. VÉRIFICATION -->
     <section id="verification" class="section">
       <div class="step-header">
-        <div class="step-num">5</div>
+        <div class="step-num">4</div>
         <div class="step-header-text"><h2>Vérifier la fidélité au contenu</h2><p>Garantir que le dialogue respecte votre cours source</p></div>
       </div>
       <div class="card">
-        <div class="capture"><div class="capture-placeholder"><span>CAPTURE_06</span>Bandeau score de fidélité (ex : 97%) en haut de l'éditeur</div></div>
+        <div class="capture"><img src="captures/CAPTURE_06.png" alt="Score fidélité"></div>
         <p style="font-size:14px;color:var(--gray);margin-bottom:0.75rem;line-height:1.6;">Après génération, l'IA vérifie automatiquement que le dialogue respecte votre cours source.</p>
         <div class="score-row">
           <div class="score-badge score-ok">✅ Score ≥ 95% — vous pouvez générer l'audio</div>
@@ -256,11 +202,12 @@ body{font-family:'Plus Jakarta Sans',system-ui,sans-serif;color:var(--ink);backg
         <div class="score-row">
           <div class="score-badge score-warn">⚠️ Score &lt; 95% — corrections suggérées</div>
         </div>
+        <div class="alert alert-info"><span class="alert-icon">💡</span><div>Vous pouvez consulter le <strong>contenu source</strong> du chapitre directement depuis l'éditeur pour comparer avec le dialogue généré.</div></div>
       </div>
       <div class="subsection-title">Les balises [PROPOSITION]</div>
       <div class="card">
         <p style="font-size:14px;color:var(--gray);margin-bottom:0.75rem;line-height:1.6;">Quand l'IA ajoute du contenu <strong>absent de votre cours source</strong>, elle le signale :</p>
-        <div class="capture"><div class="capture-placeholder"><span>CAPTURE_07</span>Bandeau orange "Propositions en attente" avec boutons ◀ ▶ Garder / Supprimer</div></div>
+        <div class="capture"><img src="captures/CAPTURE_07.png" alt="Propositions en attente"></div>
         <div class="proposition-demo">
           <div class="prop-label">Proposition détectée</div>
           <code>[PROPOSITION: exemple concret que j'ajoute pour illustrer]</code>
@@ -273,30 +220,35 @@ body{font-family:'Plus Jakarta Sans',system-ui,sans-serif;color:var(--ink);backg
       </div>
     </section>
 
-    <!-- 6. ÉDITION -->
+    <!-- 5. ÉDITION -->
     <section id="edition" class="section">
       <div class="step-header">
-        <div class="step-num">6</div>
+        <div class="step-num">5</div>
         <div class="step-header-text"><h2>Éditer le dialogue</h2><p>Modifier les répliques directement dans l'éditeur</p></div>
       </div>
       <div class="card">
-        <div class="capture"><div class="capture-placeholder"><span>CAPTURE_08</span>Éditeur avec une réplique sélectionnée en mode édition</div></div>
+        <div class="capture"><img src="captures/CAPTURE_08.png" alt="Éditeur de dialogue"></div>
         <ol class="steps-list">
           <li>Cliquer sur une réplique pour la modifier directement</li>
           <li>Les modifications sont sauvegardées automatiquement</li>
           <li>Relancer la vérification après toute modification importante</li>
         </ol>
       </div>
+      <div class="subsection-title">Ajouter un son au début d'une réplique</div>
+      <div class="card">
+        <div class="capture"><img src="captures/CAPTURE_08bis.png" alt="Son au début d'une réplique"></div>
+        <p style="font-size:14px;color:var(--gray);line-height:1.6;">Vous pouvez activer un son de transition avant certaines répliques (ex : début de section) en utilisant le bouton son disponible sur chaque réplique.</p>
+      </div>
     </section>
 
-    <!-- 7. AUDIO -->
+    <!-- 6. AUDIO -->
     <section id="audio" class="section">
       <div class="step-header">
-        <div class="step-num">7</div>
+        <div class="step-num">6</div>
         <div class="step-header-text"><h2>Générer l'audio</h2><p>Synthèse vocale par les voix Inès et Yannick (ElevenLabs)</p></div>
       </div>
       <div class="card">
-        <div class="capture"><div class="capture-placeholder"><span>CAPTURE_09</span>Bouton "Générer l'audio" actif + lecteur audio intégré avec waveform</div></div>
+        <div class="capture"><img src="captures/CAPTURE_09.png" alt="Générer l'audio"></div>
         <ol class="steps-list">
           <li>Vérifier que toutes les propositions sont résolues et le score ≥ 95%</li>
           <li>Cliquer sur <strong>Générer l'audio</strong></li>
@@ -307,28 +259,25 @@ body{font-family:'Plus Jakarta Sans',system-ui,sans-serif;color:var(--ink);backg
       </div>
     </section>
 
-    <!-- 8. EXPORT -->
+    <!-- 7. EXPORT -->
     <section id="export" class="section">
       <div class="step-header">
-        <div class="step-num">8</div>
-        <div class="step-header-text"><h2>Exporter le podcast</h2><p>Plusieurs formats disponibles selon l'usage</p></div>
+        <div class="step-num">7</div>
+        <div class="step-header-text"><h2>Exporter le podcast</h2><p>Deux formats disponibles</p></div>
       </div>
       <div class="card">
-        <div class="capture"><div class="capture-placeholder"><span>CAPTURE_10</span>Menu d'export avec les différents formats disponibles</div></div>
+        <div class="capture"><img src="captures/CAPTURE_10.png" alt="Export et vue source"></div>
         <table class="data-table">
           <thead><tr><th>Format</th><th>Usage</th></tr></thead>
           <tbody>
             <tr><td><span class="format-badge-main">MP3</span></td><td>Podcast final à diffuser aux apprenants</td></tr>
-            <tr><td><span class="format-badge">Word Studio</span></td><td>Dialogue avec indications de jeu (usage interne)</td></tr>
-            <tr><td><span class="format-badge">Word Lecture</span></td><td>Texte seul, sans instructions (version apprenant)</td></tr>
-            <tr><td><span class="format-badge">PDF</span></td><td>Version imprimable</td></tr>
-            <tr><td><span class="format-badge">JSON</span></td><td>Données complètes (usage technique)</td></tr>
+            <tr><td><span class="format-badge">Word</span></td><td>Dialogue écrit (usage interne)</td></tr>
           </tbody>
         </table>
       </div>
     </section>
 
-    <!-- 9. AIDE -->
+    <!-- 8. AIDE -->
     <section id="aide" class="section">
       <div class="step-header">
         <div class="step-num">?</div>
@@ -338,7 +287,7 @@ body{font-family:'Plus Jakarta Sans',system-ui,sans-serif;color:var(--ink);backg
         <table class="data-table">
           <thead><tr><th>Problème</th><th>Solution</th></tr></thead>
           <tbody>
-            <tr><td>Le fichier .docx n'est pas reconnu</td><td>Vérifier que c'est un export Storyline, pas un Word classique</td></tr>
+            <tr><td>Le fichier .docx n'est pas reconnu</td><td>Vérifier que c'est un export Storyline sans images, pas un Word classique</td></tr>
             <tr><td>La génération échoue</td><td>Vérifier la connexion internet et relancer</td></tr>
             <tr><td>Score de fidélité bas</td><td>Corriger les passages inventés dans l'éditeur, relancer la vérification</td></tr>
             <tr><td>L'audio est coupé</td><td>Rafraîchir la page et régénérer l'audio</td></tr>
@@ -358,27 +307,6 @@ body{font-family:'Plus Jakarta Sans',system-ui,sans-serif;color:var(--ink);backg
       </div>
     </section>
 
-    <!-- CAPTURES -->
-    <section id="captures" class="section">
-      <div class="step-header">
-        <div class="step-num" style="font-size:20px;">📷</div>
-        <div class="step-header-text"><h2>Liste des captures à réaliser</h2><p>10 captures à faire dans l'outil puis à insérer dans ce guide</p></div>
-      </div>
-      <div class="alert alert-info"><span class="alert-icon">💡</span><div>Remplace chaque placeholder par une vraie capture dans le HTML — balise <code>&lt;img src="captures/CAPTURE_01.png"&gt;</code> dans le div <code>.capture</code>.</div></div>
-      <div class="captures-grid">
-        <div class="capture-item"><span class="capture-ref">CAPTURE_01</span><span class="capture-desc">Page de connexion — champs + bouton Se connecter</span></div>
-        <div class="capture-item"><span class="capture-ref">CAPTURE_02</span><span class="capture-desc">Tableau de bord avec bouton "Nouveau projet"</span></div>
-        <div class="capture-item"><span class="capture-ref">CAPTURE_03</span><span class="capture-desc">Zone d'import glisser-déposer .docx</span></div>
-        <div class="capture-item"><span class="capture-ref">CAPTURE_04</span><span class="capture-desc">Liste des chapitres détectés après import</span></div>
-        <div class="capture-item"><span class="capture-ref">CAPTURE_05</span><span class="capture-desc">Sélection chapitre + durée + bouton Générer</span></div>
-        <div class="capture-item"><span class="capture-ref">CAPTURE_06</span><span class="capture-desc">Bandeau score de fidélité (ex : 97%)</span></div>
-        <div class="capture-item"><span class="capture-ref">CAPTURE_07</span><span class="capture-desc">Bandeau orange propositions + boutons ◀ ▶</span></div>
-        <div class="capture-item"><span class="capture-ref">CAPTURE_08</span><span class="capture-desc">Éditeur avec réplique en mode édition</span></div>
-        <div class="capture-item"><span class="capture-ref">CAPTURE_09</span><span class="capture-desc">Bouton "Générer l'audio" + lecteur audio</span></div>
-        <div class="capture-item"><span class="capture-ref">CAPTURE_10</span><span class="capture-desc">Menu d'export avec formats disponibles</span></div>
-      </div>
-    </section>
-
   </main>
 </div>
 
@@ -387,9 +315,9 @@ body{font-family:'Plus Jakarta Sans',system-ui,sans-serif;color:var(--ink);backg
 </footer>
 
 <script>
-function show(id, el) {
-  document.querySelectorAll('.section').forEach(function(s){ s.classList.remove('active'); });
-  document.querySelectorAll('.sidebar a').forEach(function(a){ a.classList.remove('active'); });
+function show(id,el){
+  document.querySelectorAll('.section').forEach(function(s){s.classList.remove('active');});
+  document.querySelectorAll('.sidebar a').forEach(function(a){a.classList.remove('active');});
   document.getElementById(id).classList.add('active');
   el.classList.add('active');
 }
