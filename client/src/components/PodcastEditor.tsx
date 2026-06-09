@@ -13,7 +13,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import {
     Loader2, CheckCircle, ChevronLeft, ChevronRight, GripVertical, Pencil,
-    X, FileDown, Plus, AlertTriangle, RotateCcw, Clock, FileText, Trash2, Volume2
+    X, FileDown, Plus, AlertTriangle, RotateCcw, Clock, FileText, Trash2, Volume2, Unlink
 } from 'lucide-react';
 import api from '../utils/api';
 import { useKeyboardNav } from '../hooks/useKeyboardNav';
@@ -153,7 +153,10 @@ function SortableDialogue({
                         </p>
                         {isUngrounded && (
                             <>
-                                <span className="text-[9px] font-semibold uppercase tracking-wide bg-border text-ink-soft border border-border-soft rounded px-1.5 py-0.5">Ancre brisée</span>
+                                <span className="inline-flex items-center gap-1 text-[9px] font-semibold uppercase tracking-wide bg-border text-ink-soft border border-border-soft rounded px-1.5 py-0.5">
+                                    <Unlink className="h-2.5 w-2.5" />
+                                    Ancre brisée
+                                </span>
                                 <button
                                     onClick={() => onValidate(dialogue.id)}
                                     className="text-[9px] font-semibold uppercase tracking-wide bg-surface text-ink-soft border border-border rounded px-1.5 py-0.5 hover:bg-canvas transition-colors"
