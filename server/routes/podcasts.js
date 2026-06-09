@@ -385,8 +385,12 @@ router.post('/:id/verify', authMiddleware, async (req, res) => {
         // Grounding check AVANT le calcul du score pour que is_grounded = false soit inclus
         if (result.fidelityScore >= 95) {
             console.log('[VERIFY] Lancement grounding check...');
-            await groundingCheck(id, cleanedText);
-            console.log('[VERIFY] Grounding check terminé');
+            try {
+                await groundingCheck(id, cleanedText);
+                console.log('[VERIFY] Grounding check terminé');
+            } catch (gcErr) {
+                console.error('[VERIFY] Grounding check échoué — pénalité sur données existantes:', gcErr.message);
+            }
         }
 
         // Pénalité -5% par réplique is_grounded = false (grounding check ci-dessus)
