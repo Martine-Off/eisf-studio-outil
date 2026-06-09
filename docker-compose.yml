@@ -3,7 +3,6 @@ version: '3.8'
 services:
   postgres:
     image: postgres:15
-    container_name: studio_eisf_db
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: martine
