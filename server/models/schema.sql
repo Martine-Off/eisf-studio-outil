@@ -25,7 +25,9 @@ CREATE TABLE IF NOT EXISTS projects (
   updated_at TIMESTAMP DEFAULT NOW(),
   last_opened_at TIMESTAMP,
   macro_score INTEGER,
-  macro_feedback JSONB
+  macro_feedback JSONB,
+  character_1_name VARCHAR(100) DEFAULT 'Inès',
+  character_2_name VARCHAR(100) DEFAULT 'Yannick'
 );
 
 -- Table podcasts

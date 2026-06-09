@@ -79,6 +79,10 @@ async function run() {
         console.log("Adding segment_content to podcasts...");
         await pool.query('ALTER TABLE podcasts ADD COLUMN IF NOT EXISTS segment_content TEXT;');
 
+        console.log("Adding character names to projects...");
+        await pool.query("ALTER TABLE projects ADD COLUMN IF NOT EXISTS character_1_name VARCHAR(100) DEFAULT 'Inès';");
+        await pool.query("ALTER TABLE projects ADD COLUMN IF NOT EXISTS character_2_name VARCHAR(100) DEFAULT 'Yannick';");
+
         console.log("All migrations OK!");
     } catch (e) {
         console.error("Error:", e);
