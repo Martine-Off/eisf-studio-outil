@@ -1121,8 +1121,7 @@ router.post("/auto-verify-and-fix", async (req, res) => {
         missing: verif.missingConcepts
       });
 
-      if (lastScore >= targetScore) break;
-      if (verif.missingConcepts.length === 0) break;
+      if (lastScore >= targetScore && verif.missingConcepts.length === 0) break;
 
       // ─── APPEL DE CORRECTION (Make) ──────────────────────────────────────
       const fixText = await callWebhook({
