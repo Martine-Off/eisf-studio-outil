@@ -1202,17 +1202,17 @@ router.post("/auto-verify-and-fix", async (req, res) => {
     );
     console.log(`[auto-verify-and-fix] ia_feedback mis à jour — ${finalVerif.missingConcepts.length} concept(s) manquant(s) conservé(s) en DB`);
 
-    if (lastScore >= targetScore) {
-      console.log('[groundingCheck] Déclenchement — lastScore:', lastScore, 'targetScore:', targetScore);
+    if (savedScore >= targetScore) {
+      console.log('[groundingCheck] Déclenchement — savedScore:', savedScore, 'targetScore:', targetScore);
       await groundingCheck(podcastId, segmentContent);
       console.log('[groundingCheck] Terminé');
     }
 
     return res.json({
       success: true,
-      finalScore: lastScore,
+      finalScore: savedScore,
       passCount: passHistory.length,
-      targetReached: lastScore >= targetScore,
+      targetReached: savedScore >= targetScore,
       passHistory
     });
 
