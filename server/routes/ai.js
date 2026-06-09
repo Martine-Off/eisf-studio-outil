@@ -1190,6 +1190,18 @@ router.post("/auto-verify-and-fix", async (req, res) => {
     console.log(`[auto-verify-and-fix] Vérif finale — ratio=${lastScore}%, sauvegardé=${savedScore}%, manquants=${finalVerif.missingConcepts.length}`);
     await pool.query('UPDATE podcasts SET fidelity_score = $1 WHERE id = $2', [savedScore, podcastId]);
 
+    // Persister les concepts réellement manquants après vérification du script corrigé
+    await pool.query(
+      "UPDATE podcasts SET ia_feedback = COALESCE(ia_feedback, '{}'::jsonb) || $1::jsonb WHERE id = $2",
+      [JSON.stringify({
+        concepts_manquants:  finalVerif.missingConcepts,
+        concepts_incertains: finalVerif.uncertainConceptsList ?? [],
+        cached_concepts:     finalVerif.extractedConcepts || cachedConcepts || [],
+        suggestions: [`${finalVerif.validatedConcepts} / ${finalVerif.totalConcepts} concepts du cours sont présents dans le podcast.`]
+      }), podcastId]
+    );
+    console.log(`[auto-verify-and-fix] ia_feedback mis à jour — ${finalVerif.missingConcepts.length} concept(s) manquant(s) conservé(s) en DB`);
+
     if (lastScore >= targetScore) {
       console.log('[groundingCheck] Déclenchement — lastScore:', lastScore, 'targetScore:', targetScore);
       await groundingCheck(podcastId, segmentContent);
