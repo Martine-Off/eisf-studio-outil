@@ -1153,6 +1153,21 @@ router.post("/auto-verify-and-fix", async (req, res) => {
             );
           }
         }
+        // Insérer les nouvelles répliques ajoutées par Make (sans id)
+        if (added.length > 0) {
+          const maxIdxRes = await pool.query(
+            'SELECT COALESCE(MAX(order_index), -1) AS m FROM dialogues WHERE podcast_id = $1', [podcastId]
+          );
+          let nextIdx = (maxIdxRes.rows[0].m ?? -1) + 1;
+          for (const d of added) {
+            const r = await pool.query(
+              'INSERT INTO dialogues (podcast_id, order_index, character, text_studio, text_reading, duration_seconds, section, sound_before) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id',
+              [podcastId, nextIdx++, d.character || 'ines', d.text_studio || '', d.text_reading || d.text_studio || '', null, d.section || 'content', false]
+            );
+            d.id = r.rows[0].id;
+          }
+          console.log(`[auto-verify-and-fix] Pass ${passCount + 1} — ${added.length} nouvelle(s) réplique(s) insérée(s) en DB`);
+        }
         currentDialogues = corrected;
       } catch (e) {
         console.error("Échec parsing correction pass", passCount + 1, e.message);
