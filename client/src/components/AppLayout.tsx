@@ -4,7 +4,7 @@
 //
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { LayoutGrid, Plus, LogOut, Bell, Menu, X } from 'lucide-react';
+import { LayoutGrid, Plus, LogOut, Bell, HelpCircle, Menu, X } from 'lucide-react';
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -62,6 +62,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                         >
                             <Plus className="h-4 w-4" />
                             Nouveau projet
+                        </Link>
+                        <Link
+                            to="/guide"
+                            className="p-2 text-ink-soft hover:text-ink hover:bg-canvas rounded transition-colors"
+                            title="Guide utilisateur"
+                        >
+                            <HelpCircle className="h-4 w-4" />
                         </Link>
                         <button className="p-2 text-ink-soft hover:text-ink hover:bg-canvas rounded transition-colors">
                             <Bell className="h-4 w-4" />

@@ -14,6 +14,7 @@ const Editor         = React.lazy(() => import('./pages/Editor'));
 const Create         = React.lazy(() => import('./pages/Create'));
 const ProjectPodcasts = React.lazy(() => import('./components/ProjectPodcasts'));
 const PodcastEditor  = React.lazy(() => import('./components/PodcastEditor'));
+const Guide          = React.lazy(() => import('./pages/Guide'));
 
 const Loader = () => (
   <div className="flex items-center justify-center h-screen">Chargement...</div>
@@ -26,6 +27,7 @@ function App() {
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/guide" element={<Guide />} />
 
           <Route element={<ProtectedRoute />}>
             <Route path="/dashboard" element={<Dashboard />} />
