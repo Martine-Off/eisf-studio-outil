@@ -1167,12 +1167,13 @@ router.post("/auto-verify-and-fix", async (req, res) => {
       .map(d => `${d.character}: ${d.text_reading || d.text_studio}`)
       .join('\n');
     const finalVerif = await verifyScriptAgainstSource(segmentContent, finalScriptText, cachedConcepts);
-    console.log(`[auto-verify-and-fix] Vérif finale — score=${finalVerif.fidelityScore}%, manquants=${finalVerif.missingConcepts.length}`);
     lastScore = finalVerif.fidelityScore;
     passHistory.push({ pass: 'final', score: lastScore, missingCount: finalVerif.missingConcepts.length, missing: finalVerif.missingConcepts });
 
-    // Mettre à jour le score du podcast en BDD
-    await pool.query('UPDATE podcasts SET fidelity_score = $1 WHERE id = $2', [lastScore, podcastId]);
+    const hasFinalMissing = finalVerif.missingConcepts.length > 0;
+    const savedScore = Math.min(99, Math.max(0, hasFinalMissing ? Math.min(lastScore, 94) : lastScore));
+    console.log(`[auto-verify-and-fix] Vérif finale — ratio=${lastScore}%, sauvegardé=${savedScore}%, manquants=${finalVerif.missingConcepts.length}`);
+    await pool.query('UPDATE podcasts SET fidelity_score = $1 WHERE id = $2', [savedScore, podcastId]);
 
     if (lastScore >= targetScore) {
       console.log('[groundingCheck] Déclenchement — lastScore:', lastScore, 'targetScore:', targetScore);

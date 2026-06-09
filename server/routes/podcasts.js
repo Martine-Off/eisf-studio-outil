@@ -377,8 +377,11 @@ router.post('/:id/verify', authMiddleware, async (req, res) => {
         );
         const ungroundedCount = parseInt(ungroundedRes.rows[0].count) || 0;
         const penalty = ungroundedCount * 5;
-        const finalScore = Math.min(99, Math.max(0, result.fidelityScore - penalty));
-        console.log(`[VERIFY] Score brut : ${result.fidelityScore}% — pénalité : -${penalty}% (${ungroundedCount} inventées) — score final : ${finalScore}%`);
+        const hasMissing = result.missingConcepts.length > 0;
+        const afterPenalty = result.fidelityScore - penalty;
+        const capped = hasMissing ? Math.min(afterPenalty, 94) : afterPenalty;
+        const finalScore = Math.min(99, Math.max(0, capped));
+        console.log(`[VERIFY] Ratio brut : ${result.fidelityScore}% — pénalité : -${penalty}% — plafond : ${hasMissing ? 94 : 99}% → score final : ${finalScore}%`);
 
         const iaFeedback = {
             concepts_manquants: result.missingConcepts,
