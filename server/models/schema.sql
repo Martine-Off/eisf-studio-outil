@@ -39,6 +39,7 @@ CREATE TABLE IF NOT EXISTS podcasts (
   fidelity_score DECIMAL(5,2),
   ia_feedback JSONB,
   audio_url VARCHAR(500),
+  segment_content TEXT,
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
 );

@@ -76,6 +76,9 @@ async function run() {
         console.log("Adding sound_before to dialogues...");
         await pool.query('ALTER TABLE dialogues ADD COLUMN IF NOT EXISTS sound_before BOOLEAN DEFAULT false;');
 
+        console.log("Adding segment_content to podcasts...");
+        await pool.query('ALTER TABLE podcasts ADD COLUMN IF NOT EXISTS segment_content TEXT;');
+
         console.log("All migrations OK!");
     } catch (e) {
         console.error("Error:", e);
