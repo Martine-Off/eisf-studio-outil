@@ -95,10 +95,12 @@ export const AIVerificationPanel: React.FC<AIVerificationPanelProps> = ({
     const [status, setStatus] = useState<'idle' | 'running' | 'fixing' | 'success' | 'insufficient'>('idle');
     const [autoFixResult, setAutoFixResult] = useState<AutoFixResult | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [quotaError, setQuotaError] = useState<'verify' | 'fix' | null>(null);
 
     const runAnalysis = async () => {
         setStatus('running');
         setError(null);
+        setQuotaError(null);
         setAutoFixResult(null);
         try {
             const res = await api.post(`/podcasts/${podcastId}/verify`);
@@ -111,7 +113,7 @@ export const AIVerificationPanel: React.FC<AIVerificationPanelProps> = ({
         } catch (err: any) {
             const code = err?.response?.data?.error;
             if (err?.response?.status === 429 || code === 'quota_make_exceeded' || code === 'MAKE_QUOTA_EXCEEDED') {
-                setError("Quota Make dépassé. Attendez quelques minutes puis réessayez. Si le problème persiste, connectez-vous sur make.com pour vérifier votre quota mensuel.");
+                setQuotaError('verify');
             } else if (code === 'MAKE_TIMEOUT') {
                 setError("Make n'a pas répondu à temps. Réessayez dans quelques instants. Si le problème persiste, vérifiez que le scénario Make est bien activé sur make.com.");
             } else {
@@ -124,6 +126,7 @@ export const AIVerificationPanel: React.FC<AIVerificationPanelProps> = ({
     const runAutoFix = async () => {
         setStatus('fixing');
         setError(null);
+        setQuotaError(null);
         try {
             const res = await api.post('/ai/auto-verify-and-fix', { podcastId: Number(podcastId) }, {
                 timeout: 300000,
@@ -137,7 +140,7 @@ export const AIVerificationPanel: React.FC<AIVerificationPanelProps> = ({
         } catch (err: any) {
             const code = err?.response?.data?.error;
             if (err?.response?.status === 429 || code === 'quota_make_exceeded' || code === 'MAKE_QUOTA_EXCEEDED') {
-                setError("Quota Make dépassé. Attendez quelques minutes puis réessayez. Si le problème persiste, connectez-vous sur make.com pour vérifier votre quota mensuel.");
+                setQuotaError('fix');
             } else if (code === 'MAKE_TIMEOUT') {
                 setError("Make n'a pas répondu à temps. Réessayez dans quelques instants. Si le problème persiste, vérifiez que le scénario Make est bien activé sur make.com.");
             } else {
@@ -329,6 +332,22 @@ export const AIVerificationPanel: React.FC<AIVerificationPanelProps> = ({
                         </>
                     );
                 })()}
+
+                {quotaError && (
+                    <div className="flex items-center justify-between gap-3 bg-orange-50 border border-orange-200 rounded-xl px-4 py-3">
+                        <div className="flex items-center gap-2 text-xs text-orange-800">
+                            <AlertTriangle className="h-4 w-4 text-orange-500 flex-shrink-0" />
+                            <span>Quota Make dépassé — réessayez dans quelques minutes.</span>
+                        </div>
+                        <button
+                            onClick={() => { setQuotaError(null); quotaError === 'fix' ? runAutoFix() : runAnalysis(); }}
+                            className="flex items-center gap-1.5 bg-orange-100 hover:bg-orange-200 text-orange-800 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors flex-shrink-0"
+                        >
+                            <RefreshCw className="h-3 w-3" />
+                            Réessayer
+                        </button>
+                    </div>
+                )}
 
                 {error && <ErrorModal message={error} onClose={() => setError(null)} />}
             </div>
