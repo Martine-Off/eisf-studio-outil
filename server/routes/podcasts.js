@@ -382,7 +382,14 @@ router.post('/:id/verify', authMiddleware, async (req, res) => {
             console.log(`[VERIFY] ${concepts.length} concepts sauvegardés en DB (protection quota)`);
         });
 
-        // Pénalité -5% par réplique is_grounded = false (données du grounding check précédent)
+        // Grounding check AVANT le calcul du score pour que is_grounded = false soit inclus
+        if (result.fidelityScore >= 95) {
+            console.log('[VERIFY] Lancement grounding check...');
+            await groundingCheck(id, cleanedText);
+            console.log('[VERIFY] Grounding check terminé');
+        }
+
+        // Pénalité -5% par réplique is_grounded = false (grounding check ci-dessus)
         const ungroundedRes = await pool.query(
             'SELECT COUNT(*) FROM dialogues WHERE podcast_id = $1 AND is_grounded = false', [id]
         );
@@ -392,7 +399,7 @@ router.post('/:id/verify', authMiddleware, async (req, res) => {
         const afterPenalty = result.fidelityScore - penalty;
         const capped = hasMissing ? Math.min(afterPenalty, 94) : afterPenalty;
         const finalScore = Math.min(99, Math.max(0, capped));
-        console.log(`[VERIFY] Ratio brut : ${result.fidelityScore}% — pénalité : -${penalty}% — plafond : ${hasMissing ? 94 : 99}% → score final : ${finalScore}%`);
+        console.log(`[VERIFY] Ratio brut : ${result.fidelityScore}% — pénalité : -${penalty}% (${ungroundedCount} non ancrées) — plafond : ${hasMissing ? 94 : 99}% → score final : ${finalScore}%`);
 
         const iaFeedback = {
             concepts_manquants: result.missingConcepts,
@@ -408,12 +415,6 @@ router.post('/:id/verify', authMiddleware, async (req, res) => {
         );
 
         res.json({ success: true, ia_feedback: iaFeedback, fidelity_score: finalScore });
-
-        if (finalScore >= 95) {
-            groundingCheck(id, cleanedText).catch(e =>
-                console.error('[VERIFY] groundingCheck error:', e)
-            );
-        }
     } catch (error) {
         console.error('Erreur vérification GPT:', error);
         res.status(500).json({ error: 'Erreur serveur lors de la vérification IA' });
