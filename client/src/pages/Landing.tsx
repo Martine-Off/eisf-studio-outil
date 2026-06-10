@@ -117,7 +117,7 @@ export default function Landing() {
                                 <ArrowRight className="h-4 w-4" />
                             </Link>
                             <a
-                                href="/docs/GUIDE-UTILISATEUR.html"
+                                href={`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/docs/GUIDE-UTILISATEUR.html`}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors mx-auto w-fit"
