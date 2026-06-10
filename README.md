@@ -75,7 +75,8 @@ ALLOWED_ORIGINS=http://localhost:5173
 |---|---|
 | [Architecture Technique](docs/Architecture%20Technique.txt) | Architecture détaillée, schéma BDD, routes API |
 | [Cahier des charges](docs/cahier-des-charges.md) | Spécifications fonctionnelles |
-| [Charte graphique](docs/charte_graphique_eisf.md) | Palette EISF, typographie, composants UI |
+| [Charte graphique Studio](docs/charte_graphique_STUDIO.md) | Palette EISF, typographie, composants UI (à jour) |
+| [Charte graphique v1](docs/charte_graphique_eisf.md) | Ancienne charte (obsolète, conservée pour historique) |
 | [Options de déploiement](docs/DEPLOYMENT_OPTIONS.md) | Docker, VPS, Railway, hébergement |
 | [Audit de sécurité](docs/SECURITY_AUDIT.md) | Analyse de sécurité et recommandations |
 | [Architecture audio](docs/audio_integration_architecture.md) | Pipeline TTS, ffmpeg, ElevenLabs, Gemini |
