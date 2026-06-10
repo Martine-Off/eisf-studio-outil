@@ -3,7 +3,7 @@
 // Auteur : Martine Desmaroux — martine.desmaroux@gmail.com / contact@eisf.fr
 //
 import React, { Suspense } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import ProtectedRoute from './components/ProtectedRoute';
 import { AuthProvider } from './context/AuthContext';
 
@@ -21,6 +21,7 @@ const Loader = () => (
 );
 
 function App() {
+  const location = useLocation();
   return (
     <AuthProvider>
       <Suspense fallback={<Loader />}>
@@ -30,7 +31,7 @@ function App() {
           <Route path="/guide" element={<Guide />} />
 
           <Route element={<ProtectedRoute />}>
-            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/dashboard" element={<Dashboard key={location.key} />} />
             <Route path="/new-project" element={<Create />} />
             <Route path="/editor/:projectId" element={<Editor />} />
             <Route path="/project/:projectId/podcasts" element={<ProjectPodcasts />} />

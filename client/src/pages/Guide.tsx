@@ -139,7 +139,7 @@ function SectionContent({ active }: { active: SectionId }) {
     <>
       <StepHeader num="4" title="Générer le dialogue IA" subtitle="L'IA crée un dialogue naturel entre Inès et Yannick" />
       <Card>
-        <Capture code="CAPTURE_05" desc='Sélection d\'un chapitre + choix durée + bouton "Générer le dialogue"' />
+        <Capture code="CAPTURE_05" desc={`Sélection d'un chapitre + choix durée + bouton "Générer le dialogue"`} />
         <Steps items={[
           <span>Sélectionner un chapitre dans la liste</span>,
           <span>Choisir la durée cible : <strong>4, 5, 6 ou 7 minutes</strong></span>,
