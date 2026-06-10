@@ -1,7 +1,7 @@
 # Guide utilisateur — Studio EISF
 
 > **Pour qui ?** Les formateurs EISF qui souhaitent transformer leurs cours Storyline en podcasts pédagogiques.
-> **Prérequis :** Avoir un export `.docx` Articulate Storyline. Aucune compétence technique requise.
+> **Prérequis :** Avoir un export `.docx` Articulate Storyline (sans images). Aucune compétence technique requise.
 > **URL de l'outil :** https://en.eisf.fr/studio
 
 ---
@@ -9,20 +9,19 @@
 ## Table des matières
 
 1. [Se connecter](#1-se-connecter)
-2. [Créer un projet](#2-créer-un-projet)
-3. [Importer votre cours Storyline](#3-importer-votre-cours-storyline)
-4. [Générer le dialogue IA](#4-générer-le-dialogue-ia)
-5. [Vérifier la fidélité au contenu](#5-vérifier-la-fidélité-au-contenu)
-6. [Éditer le dialogue](#6-éditer-le-dialogue)
-7. [Générer l'audio](#7-générer-laudio)
-8. [Exporter le podcast](#8-exporter-le-podcast)
-9. [Problèmes fréquents](#9-problèmes-fréquents)
+2. [Importer votre cours Storyline](#2-importer-votre-cours-storyline)
+3. [Générer le dialogue IA](#3-générer-le-dialogue-ia)
+4. [Vérifier la fidélité au contenu](#4-vérifier-la-fidélité-au-contenu)
+5. [Éditer le dialogue](#5-éditer-le-dialogue)
+6. [Générer l'audio](#6-générer-laudio)
+7. [Exporter le podcast](#7-exporter-le-podcast)
+8. [Problèmes fréquents](#8-problèmes-fréquents)
 
 ---
 
 ## 1. Se connecter
 
-[CAPTURE_01 — Page de connexion : champs identifiant + mot de passe + bouton "Se connecter"]
+![CAPTURE_01](captures/CAPTURE_01.jpg)
 
 1. Ouvrir **https://en.eisf.fr/studio** dans votre navigateur
 2. Saisir l'identifiant et le mot de passe fournis par votre administrateur
@@ -33,53 +32,45 @@
 
 ---
 
-## 2. Créer un projet
+## 2. Importer votre cours Storyline
 
-[CAPTURE_02 — Tableau de bord avec bouton "Nouveau projet" en évidence]
+![CAPTURE_02](captures/CAPTURE_02.jpg)
 
 1. Sur le tableau de bord, cliquer sur **Nouveau projet**
-2. Donner un nom au projet (ex : *"La panification — Module 1"*)
-3. Cliquer sur **Créer**
+2. Glisser votre fichier `.docx` dans la zone d'import, ou cliquer pour le sélectionner
 
-> 💡 Les personnages sont prédéfinis : **Inès** (experte, 70% du temps de parole) et **Yannick** (apprenant curieux, 30%).
+![CAPTURE_03](captures/CAPTURE_03.jpg)
 
----
-
-## 3. Importer votre cours Storyline
-
-[CAPTURE_03 — Zone d'import avec glisser-déposer du fichier .docx]
-
-1. Dans le projet, cliquer sur **Importer un fichier**
-2. Glisser votre fichier `.docx` dans la zone prévue, ou cliquer pour le sélectionner
 3. L'outil détecte automatiquement les chapitres — vérifier la liste affichée
 
-[CAPTURE_04 — Liste des chapitres détectés après import]
+![CAPTURE_04](captures/CAPTURE_04.jpg)
 
-> ⚠️ **Prérequis fichier :** Le fichier doit être un **export Word d'Articulate Storyline** (tableau 4 colonnes : ID, Type, Texte d'origine, Traduction).
-> Un export PDF ou un document Word classique ne fonctionnera pas.
+4. Donner un nom au projet et valider
+
+> ⚠️ **Prérequis fichier :** Le fichier doit être un **export Word d'Articulate Storyline sans images** (tableau 4 colonnes : ID, Type, Texte d'origine, Traduction). Un export PDF ou un document Word classique ne fonctionnera pas.
 
 ---
 
-## 4. Générer le dialogue IA
+## 3. Générer le dialogue IA
 
-[CAPTURE_05 — Sélection d'un chapitre + choix de durée + bouton "Générer le dialogue"]
+![CAPTURE_05](captures/CAPTURE_05.jpg)
 
 1. Sélectionner un chapitre dans la liste
-2. Choisir la durée cible : **4, 5, 6 ou 7 minutes**
-3. Cliquer sur **Générer le dialogue**
-4. Attendre la génération (30 à 60 secondes selon la longueur du chapitre)
+2. Cliquer sur **Générer le dialogue**
+3. Attendre la génération (30 à 60 secondes selon la longueur du chapitre)
 
 > 💡 Le dialogue généré contient automatiquement :
 > - Une **accroche** (45 secondes)
-> - Le **contenu pédagogique** avec un quiz intégré
+> - Le **contenu pédagogique** avec quiz intégré
 > - Une **conclusion** + annonce du prochain épisode
 > - L'**intro et l'outro EISF** fixes
+> - Les personnages prédéfinis : **Inès** (experte, 70%) et **Yannick** (apprenant, 30%)
 
 ---
 
-## 5. Vérifier la fidélité au contenu
+## 4. Vérifier la fidélité au contenu
 
-[CAPTURE_06 — Bandeau de score de fidélité (ex : 97%) affiché en haut de l'éditeur]
+![CAPTURE_06](captures/CAPTURE_06.jpg)
 
 Après génération, l'IA vérifie automatiquement que le dialogue respecte votre cours source.
 
@@ -87,6 +78,8 @@ Après génération, l'IA vérifie automatiquement que le dialogue respecte votr
 |---|---|---|
 | ✅ ≥ 95% | Fidèle au contenu source | Vous pouvez générer l'audio |
 | ⚠️ < 95% | Des écarts ont été détectés | Corriger dans l'éditeur, relancer la vérification |
+
+> 💡 Vous pouvez consulter le **contenu source** du chapitre directement depuis l'éditeur pour comparer (voir CAPTURE_10).
 
 ### Les balises [PROPOSITION]
 
@@ -96,29 +89,34 @@ Quand l'IA ajoute du contenu **absent de votre cours source**, elle le signale :
 [PROPOSITION: exemple concret que j'ajoute pour illustrer]
 ```
 
-[CAPTURE_07 — Bandeau orange "Propositions en attente" avec boutons ◀ ▶ Garder / Supprimer]
+![CAPTURE_07](captures/CAPTURE_07.jpg)
 
-- Cliquer **Garder** → l'ajout est validé et intégré au dialogue
+- Cliquer **Garder** → l'ajout est validé
 - Cliquer **Supprimer** → l'ajout est retiré
 
 > ⚠️ La génération audio est **bloquée** tant qu'il reste des propositions non résolues.
-> Utiliser les boutons **◀ ▶** pour naviguer entre elles.
 
 ---
 
-## 6. Éditer le dialogue
+## 5. Éditer le dialogue
 
-[CAPTURE_08 — Éditeur avec une réplique sélectionnée en mode édition]
+![CAPTURE_08](captures/CAPTURE_08.jpg)
 
 1. Cliquer sur une réplique pour la modifier directement
 2. Les modifications sont sauvegardées automatiquement
 3. Relancer la vérification après toute modification importante
 
+### Ajouter un son au début d'une réplique
+
+![CAPTURE_08bis](captures/CAPTURE_08bis.jpg)
+
+Vous pouvez activer un son de transition avant certaines répliques (ex : début de section) en utilisant le bouton son disponible sur chaque réplique.
+
 ---
 
-## 7. Générer l'audio
+## 6. Générer l'audio
 
-[CAPTURE_09 — Bouton "Générer l'audio" actif + lecteur audio intégré avec waveform]
+![CAPTURE_09](captures/CAPTURE_09.jpg)
 
 1. Vérifier que toutes les propositions sont résolues et le score ≥ 95%
 2. Cliquer sur **Générer l'audio**
@@ -129,25 +127,22 @@ Quand l'IA ajoute du contenu **absent de votre cours source**, elle le signale :
 
 ---
 
-## 8. Exporter le podcast
+## 7. Exporter le podcast
 
-[CAPTURE_10 — Menu d'export avec les différents formats disponibles]
+![CAPTURE_10](captures/CAPTURE_10.jpg)
 
 | Format | Usage |
 |---|---|
 | **MP3** | Podcast final à diffuser aux apprenants |
-| **Word Studio** | Dialogue avec indications de jeu (usage interne) |
-| **Word Lecture** | Texte seul, sans instructions (version apprenant) |
-| **PDF** | Version imprimable |
-| **JSON** | Données complètes (usage technique) |
+| **Word** | Dialogue écrit (usage interne) |
 
 ---
 
-## 9. Problèmes fréquents
+## 8. Problèmes fréquents
 
 | Problème | Solution |
 |---|---|
-| Le fichier `.docx` n'est pas reconnu | Vérifier que c'est un export Storyline, pas un Word classique |
+| Le fichier `.docx` n'est pas reconnu | Vérifier que c'est un export Storyline sans images, pas un Word classique |
 | La génération échoue | Vérifier la connexion internet et relancer |
 | Le score de fidélité est bas | Corriger les passages inventés dans l'éditeur, relancer la vérification |
 | L'audio est coupé | Rafraîchir la page et régénérer l'audio |
@@ -163,20 +158,3 @@ Problème non résolu ? **contact@eisf.fr**
 ---
 
 *© 2026 EISF — École Internationale du Savoir-Faire Français. Développé par Martine Desmaroux.*
-
----
-
-## Liste des captures à réaliser
-
-| Référence | Ce qu'il faut capturer |
-|---|---|
-| CAPTURE_01 | Page de connexion (champs + bouton) |
-| CAPTURE_02 | Tableau de bord avec bouton "Nouveau projet" |
-| CAPTURE_03 | Zone d'import glisser-déposer |
-| CAPTURE_04 | Liste des chapitres détectés après import |
-| CAPTURE_05 | Sélection chapitre + durée + bouton Générer |
-| CAPTURE_06 | Bandeau score de fidélité (≥ 95%) |
-| CAPTURE_07 | Bandeau orange propositions + boutons ◀ ▶ |
-| CAPTURE_08 | Éditeur avec réplique en mode édition |
-| CAPTURE_09 | Bouton "Générer l'audio" + lecteur |
-| CAPTURE_10 | Menu d'export avec formats |
