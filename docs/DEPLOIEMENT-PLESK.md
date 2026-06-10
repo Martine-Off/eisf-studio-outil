@@ -11,11 +11,16 @@
 ```bash
 # Sur la machine de dev
 git checkout main
-git merge feat/single-auth
 git push origin main
+
+# Créer client/.env avec l'URL de production avant le build
+echo "VITE_API_URL=https://votre-domaine.eisf.fr" > client/.env
+
 cd client && npm run build
 # Vérifier : 0 erreur, dossier client/dist généré
 ```
+
+> ⚠️ `VITE_API_URL` est injecté au moment du build — sans cette variable, le lien "Guide utilisateur" de la landing pointera vers `localhost:3001` en production.
 
 ## 2. Plesk — Node.js
 - Créer une application Node.js
