@@ -116,6 +116,15 @@ export default function Landing() {
                                 Se connecter
                                 <ArrowRight className="h-4 w-4" />
                             </Link>
+                            <a
+                                href="/docs/GUIDE-UTILISATEUR.html"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors mx-auto w-fit"
+                            >
+                                <FileText className="h-3.5 w-3.5" />
+                                Guide utilisateur
+                            </a>
                             <div className="flex items-center gap-4 text-xs text-[#5A5963]">
                                 <span className="flex items-center gap-1.5">
                                     <span className="w-1.5 h-1.5 rounded-full bg-[#BDD145]" />
@@ -253,7 +262,7 @@ export default function Landing() {
                         <span className="font-heading font-bold text-xs text-[#1C1B22]">Studio EISF</span>
                     </div>
                     <p className="text-xs text-[#5A5963] text-center">
-                        © 2026 EISF — École Internationale du Savoir-Faire Français. Développé par Martine Desmaroux.
+                        © 2026 EISF · Studio EISF par Martine Desmaroux.
                     </p>
                 </div>
             </footer>

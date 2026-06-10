@@ -375,7 +375,7 @@ export default function Guide() {
       </div>
 
       <footer style={{ marginLeft: 240, borderTop: `1px solid ${C.border}`, padding: '1.5rem 3rem', fontSize: 12, color: C.gray, background: C.white }}>
-        © 2026 EISF — École Internationale du Savoir-Faire Français. Développé par Martine Desmaroux.
+        © 2026 EISF · Studio EISF par Martine Desmaroux.
       </footer>
     </div>
   );

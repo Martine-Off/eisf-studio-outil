@@ -92,6 +92,7 @@ app.use((req, res, next) => {
 
 // Servir les fichiers statiques du dossier uploads (token requis)
 app.use('/uploads', authQueryMiddleware, express.static(path.join(__dirname, 'uploads')));
+app.use('/docs', express.static(path.join(__dirname, '..', 'docs')));
 
 // Servir les fichiers audio générés par Gemini TTS
 app.use('/audio', express.static(path.join(__dirname, 'audio')));
