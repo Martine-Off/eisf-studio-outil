@@ -1,0 +1,1 @@
+function n(i){const e=i.endsWith("Z")||i.includes("+")?i:i+"Z";return new Intl.DateTimeFormat("fr-FR",{timeZone:"Europe/Paris",day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"}).format(new Date(e))}export{n as f};
